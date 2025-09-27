@@ -651,9 +651,16 @@
                 return;
             }
             try {
-                // Create Auth user
-                const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
-                const user = userCred.user;
+                // Try to create Auth user if available
+                let createdAuth = false;
+                try {
+                    const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                    createdAuth = !!(userCred && userCred.user && userCred.user.uid);
+                } catch(authErr) {
+                    console.warn('Auth createUser failed (will fallback to DB-only).', authErr);
+                    // If auth not configured (operation-not-allowed / configuration-not-found), we'll fallback
+                }
+
                 // Write hrUsers entry in DB (keep username as local part before @ or uid)
                 const username = email.split('@')[0];
                 await set(ref(db, 'hrUsers/' + username), {
@@ -661,11 +668,18 @@
                     fullName: '',
                     phone: '',
                     email,
-                    password, // optional: consider removing storing plain password in DB in prod
+                    // Do NOT store plain password in production. For now keep null to avoid leaks.
+                    password: null,
                     active: true,
-                    createdAt: Date.now()
+                    createdAt: Date.now(),
+                    authCreated: createdAuth
                 });
-                alert('Kayıt başarılı! İK hesabınız oluşturuldu. Yönetici onayı sonrası giriş yapabilirsiniz.');
+
+                if (createdAuth) {
+                    alert('Kayıt başarılı! İK hesabınız oluşturuldu. Yönetici onayı sonrası giriş yapabilirsiniz.');
+                } else {
+                    alert('Kayıt başarıyla veritabanına yazıldı, ancak Firebase Auth oluşturulamadı (Auth yapılandırması eksik).\nLütfen Firebase Console -> Authentication -> Email/Password etkinleştir veya yöneticiden Auth hesabı oluşturmasını isteyin.');
+                }
                 const modal = document.getElementById('hrRegisterModal');
                 if (modal) modal.classList.add('hidden');
             } catch(err) {
@@ -673,6 +687,54 @@
                 alert('Kayıt sırasında hata: ' + (err.message || err));
             }
         });
+    }
+
+    // --- Pending candidate submission queue (localStorage) ---
+    function queueCandidateSubmission(item) {
+        try {
+            const key = 'apx_pending_submissions';
+            const raw = localStorage.getItem(key);
+            const arr = raw ? JSON.parse(raw) : [];
+            arr.push(Object.assign({ts: Date.now()}, item));
+            localStorage.setItem(key, JSON.stringify(arr));
+            console.log('Queued candidate submission, total pending=', arr.length);
+        } catch(e) { console.warn('queue failed', e); }
+    }
+
+    async function retryPendingSubmissions() {
+        const key = 'apx_pending_submissions';
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        let arr = [];
+        try { arr = JSON.parse(raw); } catch(e){ arr = []; }
+        if (!arr.length) return;
+        console.log('Retrying', arr.length, 'pending submissions');
+        const remaining = [];
+        for (const it of arr) {
+            try {
+                await update(ref(db, 'candidates/' + (it.rumuz || ('pending_' + it.ts))), {
+                    rumuz: it.rumuz || null,
+                    tip: it.tip || null,
+                    baslik: it.baslik || null,
+                    cevaplar: it.cevaplar || [],
+                    skorlar: it.skorlar || {},
+                    timestamp: it.ts || Date.now(),
+                    pendingOriginally: true
+                });
+                console.log('Pending submission sent for', it.rumuz || it.ts);
+            } catch(e) {
+                console.warn('Retry failed for', it, e);
+                remaining.push(it);
+            }
+        }
+        if (remaining.length) localStorage.setItem(key, JSON.stringify(remaining));
+        else localStorage.removeItem(key);
+    }
+
+    // Try retrying pending submissions on load and when IK panel opens
+    window.addEventListener('load', function(){ setTimeout(retryPendingSubmissions, 1500); });
+    if (ikPanel) {
+        ikPanel.addEventListener('transitionend', function(){ setTimeout(retryPendingSubmissions, 500); });
     }
 
     // Giriş işlemi (Firebase üzerinden kontrol)
