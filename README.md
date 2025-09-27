@@ -434,16 +434,32 @@
                 skorlar: finalSkorlar,
                 timestamp: Date.now()
             });
+            return { ok: true };
         } catch (err) {
-            console.error('Scoring failed, falling back to raw save', err);
-            await update(ref(db, 'candidates/' + rumuz), {
-                rumuz,
-                tip,
-                baslik,
-                cevaplar,
-                skorlar: skorlar || {},
-                timestamp: Date.now()
-            });
+            console.error('saveCandidateTest: primary save failed', err);
+            // Try a raw save as a fallback but capture any permission errors
+            try {
+                await update(ref(db, 'candidates/' + rumuz), {
+                    rumuz,
+                    tip,
+                    baslik,
+                    cevaplar,
+                    skorlar: skorlar || {},
+                    timestamp: Date.now()
+                });
+                return { ok: true, fallback: true };
+            } catch (err2) {
+                console.error('saveCandidateTest: fallback save failed', err2);
+                // Surface helpful message to the user
+                const code = (err2 && err2.code) ? err2.code : null;
+                const msg = (err2 && err2.message) ? err2.message : String(err2);
+                alert('Kaydetme başarısız oldu: ' + (code || msg));
+                // If permission denied, give explicit guidance
+                if ((code && code.toLowerCase().includes('permission')) || (msg && msg.toLowerCase().includes('permission'))) {
+                    alert('Görünüşe göre Realtime Database kuralları yazmaya izin vermiyor (permission_denied).\n\nÇözüm önerileri:\n- Firebase Console -> Realtime Database -> Rules bölümünden geçici olarak test kuralları uygulayarak deneyin.\n- Ya da adayları Auth ile giriş yaptırıp UID temelli yazma izni sağlayın.\n- Üretimde kesinlikle kuralları herkese açık yapmayın.');
+                }
+                throw err2;
+            }
         }
     };
 
