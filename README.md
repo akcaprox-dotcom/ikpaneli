@@ -400,7 +400,7 @@
     apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
     authDomain: "ikpaneli.firebaseapp.com",
     projectId: "ikpaneli",
-    storageBucket: "ikpaneli.firebasestorage.app",
+    storageBucket: "ikpaneli.appspot.com",
     messagingSenderId: "645340845423",
     appId: "1:645340845423:web:435b57f7093782422e449a",
     measurementId: "G-6NBTKSBVYL",
