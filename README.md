@@ -57,21 +57,17 @@
                             <input type="text" id="newCandidatePassword" required class="w-full px-3 py-2 border rounded-lg" placeholder="Şifre">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Aday Tipi</label>
-                            <select id="candidateType" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Sektör</label>
+                            <select id="candidateSector" class="w-full px-3 py-2 border rounded-lg">
                                 <option value="">Seçiniz</option>
-                                <option value="mavi yaka">Mavi Yaka</option>
-                                <option value="beyaz yaka">Beyaz Yaka</option>
-                                <option value="yonetici">Yönetici</option>
+                                <option value="imalat">İmalat Sektörü</option>
+                                <option value="hizmet">Hizmet Sektörü</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Soru Başlığı</label>
-                            <select id="questionCategory" class="w-full px-3 py-2 border rounded-lg">
-                                <option value="">Seçiniz</option>
-                                <option value="iletişim">İletişim</option>
-                                <option value="liderlik">Liderlik</option>
-                                <option value="teknik">Teknik</option>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Görevi (Rol)</label>
+                            <select id="candidateRole" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="">Önce sektör seçin</option>
                             </select>
                         </div>
                     </div>
@@ -750,7 +746,20 @@
                 if (createdAuth) {
                     alert('Kayıt başarılı! İK hesabınız oluşturuldu veya var olan hesabınıza bağlı olarak işlem yapıldı.');
                 } else {
-                    alert('Kayıt başarıyla veritabanına yazıldı, ancak Firebase Auth oluşturulamadı (Auth yapılandırması eksik).\nLütfen Firebase Console -> Authentication -> Email/Password etkinleştir veya yöneticiden Auth hesabı oluşturmasını isteyin.');
+                    // Silent fallback: DB entry created but Auth user could not be created.
+                    // Previously we showed a blocking alert here; hide it to avoid annoying users.
+                    console.debug('HR register: DB entry created but Firebase Auth user not created. Enable Email/Password in Firebase Console or ask admin to create Auth account if you need Auth features.');
+                    // Optionally preserve a non-intrusive visual trace in the messageContainer (hidden by default)
+                    try {
+                        const mc = document.getElementById('messageContainer');
+                        if (mc) {
+                            const el = document.createElement('div');
+                            el.style.display = 'none';
+                            el.className = 'apx-silent-log';
+                            el.textContent = 'Kayıt veritabanına yazıldı (Auth oluşturulamadı).';
+                            mc.appendChild(el);
+                        }
+                    } catch(e){/* ignore */}
                 }
                 const modal = document.getElementById('hrRegisterModal');
                 if (modal) modal.classList.add('hidden');
@@ -1540,11 +1549,43 @@
     }
 
     // Test sorularını dinamik oluştur
-    function renderTestQuestions(tip, baslik) {
+    // Yeni davranış: test tek seferde role (görev) bazlı tüm alt kategorilerin sorularını birleştirerek gösterir.
+    // Parametreler: sector (imalat/hizmet), role (mavi_yaka, beyaz_yaka, yonetici, yonetici_idari, hizmet_personeli)
+    function renderTestQuestions(sector, role) {
         const testForm = document.getElementById('testForm');
         if (!testForm) return;
         testForm.innerHTML = '';
-        const questions = (questionPool[tip] && questionPool[tip][baslik]) || [];
+
+        // map our role keys to questionPool top-level keys
+        const ROLE_TO_POOL_KEY = {
+            'mavi_yaka': 'mavi yaka',
+            'beyaz_yaka': 'beyaz yaka',
+            'yonetici': 'yonetici',
+            'yonetici_idari': 'yonetici',
+            'hizmet_personeli': 'hizmet-on-cephe'
+        };
+
+        const poolKey = ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null;
+
+        // Gather all questions for the mapped poolKey: flatten every subcategory's arrays
+        let questions = [];
+        if (poolKey && questionPool[poolKey]) {
+            const sub = questionPool[poolKey];
+            Object.keys(sub).forEach(k => {
+                const arr = Array.isArray(sub[k]) ? sub[k] : [];
+                questions = questions.concat(arr);
+            });
+        }
+
+        // Fallback: if no questions found, present a short generic set
+        if (!questions.length) {
+            questions = [
+                'Takım çalışmasına yatkın mısınız?',
+                'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?',
+                'Problem çözme yeteneğinizi nasıl değerlendirirsiniz?'
+            ];
+        }
+
         questions.forEach((q, i) => {
             testForm.innerHTML += `
                 <div>
@@ -1592,11 +1633,21 @@
             if (!candidateList) return;
             candidateList.innerHTML = '';
             candidates.forEach(c => {
+                const SECTOR_MAP = { 'imalat': 'İmalat', 'hizmet': 'Hizmet' };
+                const ROLE_LABELS = {
+                    'mavi_yaka': 'Mavi Yaka Kadrosu',
+                    'beyaz_yaka': 'Beyaz Yaka / Memur Kadrosu',
+                    'yonetici': 'Yönetici Kadrosu',
+                    'yonetici_idari': 'Yönetici ve İdari Kadro',
+                    'hizmet_personeli': 'Hizmet Personeli'
+                };
+                const sectorLabel = SECTOR_MAP[c.tip] || c.tip || '';
+                const roleLabel = ROLE_LABELS[c.baslik] || c.baslik || '';
                 candidateList.innerHTML += `
                     <tr>
                         <td class='p-2'>${c.rumuz}</td>
-                        <td class='p-2'>${c.tip}</td>
-                        <td class='p-2'>${c.baslik}</td>
+                        <td class='p-2'>${sectorLabel}</td>
+                        <td class='p-2'>${roleLabel}</td>
                         <td class='p-2'>
                             <button class='px-2 py-1 border view-detail' data-r='${c.rumuz}'>Detay</button>
                             <button class='px-2 py-1 border ml-2 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
@@ -1749,6 +1800,23 @@
         });
     }
 
+    // --- TEST MODE: auto-open compact admin login on load for quick access ---
+    window.addEventListener('load', function(){
+        try {
+            const adminLoginCompactEl = document.getElementById('adminLoginCompact');
+            if (adminLoginCompactEl) {
+                adminLoginCompactEl.classList.remove('hidden');
+                adminLoginCompactEl.style.display = 'flex';
+                try { adminLoginCompactEl.style.zIndex = '100000'; } catch(e){}
+                // focus password input
+                setTimeout(function(){
+                    const pw = adminLoginCompactEl.querySelector('#adminPasswordCompact');
+                    if (pw) { pw.focus(); pw.select && pw.select(); }
+                }, 200);
+            }
+        } catch(e){ console.warn('Failed to auto-open admin test modal', e); }
+    });
+
     // Admin panelindeki butonların işlevselliği
     if (adminPanel) {
       // İK Yöneticisi Ekle butonu (zaten modal açıyor)
@@ -1829,16 +1897,46 @@
     let candidates = [];
     const addCandidateForm = document.getElementById('addCandidateForm');
     const candidateList = document.getElementById('candidateList');
+    // Populate role options based on selected sector
+    const sectorEl = document.getElementById('candidateSector');
+    const roleEl = document.getElementById('candidateRole');
+    const ROLE_MAP = {
+        'imalat': [
+            {value: 'mavi_yaka', label: 'Mavi Yaka Kadrosu'},
+            {value: 'beyaz_yaka', label: 'Beyaz Yaka / Memur Kadrosu'},
+            {value: 'yonetici', label: 'Yönetici Kadrosu'}
+        ],
+        'hizmet': [
+            {value: 'yonetici_idari', label: 'Yönetici ve İdari Kadro'},
+            {value: 'hizmet_personeli', label: 'Hizmet Personeli'}
+        ]
+    };
+    function populateRolesForSector(s) {
+        if (!roleEl) return;
+        roleEl.innerHTML = '';
+        roleEl.disabled = true;
+        if (!s || !ROLE_MAP[s]) {
+            roleEl.innerHTML = '<option value="">Önce sektör seçin</option>';
+            roleEl.disabled = true;
+            return;
+        }
+        roleEl.disabled = false;
+        roleEl.innerHTML = '<option value="">Seçiniz</option>' + ROLE_MAP[s].map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+    }
+    if (sectorEl) {
+        sectorEl.addEventListener('change', function(){ populateRolesForSector(this.value); });
+    }
     if (addCandidateForm) {
         addCandidateForm.onsubmit = async function(e) {
             e.preventDefault();
             const rumuz = document.getElementById('newCandidateNickname').value.trim();
             const sifre = document.getElementById('newCandidatePassword').value;
-            const tip = document.getElementById('candidateType').value;
-            const baslik = document.getElementById('questionCategory').value;
+            const sector = (document.getElementById('candidateSector')||{}).value || '';
+            const role = (document.getElementById('candidateRole')||{}).value || '';
+            const baslik = role || '';
             if (!rumuz) { alert('Rumuz giriniz'); return; }
             try {
-                await window.addCandidateToDB({ rumuz, password: sifre, tip, baslik, createdBy: window.currentHR || 'admin' });
+                await window.addCandidateToDB({ rumuz, password: sifre, tip: sector, baslik: role, createdBy: window.currentHR || 'admin' });
                 addCandidateForm.reset();
                 // refresh list from Firebase
                 if (typeof loadCandidatesFromFirebase === 'function') loadCandidatesFromFirebase();
@@ -1983,7 +2081,17 @@
         if (window.candidates && window.candidates.length) {
             candidateList.innerHTML = '';
             window.candidates.forEach(c => {
-                candidateList.innerHTML += `<tr><td class='p-2'>${c.rumuz}</td><td class='p-2'>${c.tip}</td><td class='p-2'>${c.baslik}</td></tr>`;
+                const SECTOR_MAP = { 'imalat': 'İmalat', 'hizmet': 'Hizmet' };
+                const ROLE_LABELS = {
+                    'mavi_yaka': 'Mavi Yaka Kadrosu',
+                    'beyaz_yaka': 'Beyaz Yaka / Memur Kadrosu',
+                    'yonetici': 'Yönetici Kadrosu',
+                    'yonetici_idari': 'Yönetici ve İdari Kadro',
+                    'hizmet_personeli': 'Hizmet Personeli'
+                };
+                const sectorLabel = SECTOR_MAP[c.tip] || c.tip || '';
+                const roleLabel = ROLE_LABELS[c.baslik] || c.baslik || '';
+                candidateList.innerHTML += `<tr><td class='p-2'>${c.rumuz}</td><td class='p-2'>${sectorLabel}</td><td class='p-2'>${roleLabel}</td></tr>`;
             });
             return;
         }
