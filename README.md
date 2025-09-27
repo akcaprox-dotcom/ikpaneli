@@ -151,16 +151,18 @@
                     <button onclick="document.getElementById('adminLoginCompact').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500">&times;</button>
                     <h3 class="text-lg font-bold text-red-700 mb-3">Yönetici Girişi</h3>
                     <form id="adminLoginFormCompact" class="space-y-3">
-                        <div>
-                            <label class="block text-sm text-gray-700 mb-1">E-posta</label>
-                            <input type="email" id="adminEmailCompact" class="w-full px-3 py-2 border rounded" placeholder="admin@firma.com" required />
+                        <div class="p-2 bg-red-50 border border-red-200 rounded">
+                            <strong class="text-red-600">TEST MODE — INSECURE</strong>
+                            <div class="text-xs text-red-500">Bu giriş sadece lokal test amaçlıdır. Production için kaldırın.</div>
                         </div>
+                        <!-- Email hidden: password-only quick access for testing -->
+                        <input type="hidden" id="adminEmailCompact" value="" />
                         <div>
-                            <label class="block text-sm text-gray-700 mb-1">Şifre</label>
+                            <label class="block text-sm text-gray-700 mb-1">Şifre (sadece şifre ile giriş)</label>
                             <input type="password" id="adminPasswordCompact" class="w-full px-3 py-2 border rounded" placeholder="Yönetici şifresi" required />
                         </div>
                         <div>
-                            <button type="submit" class="w-full bg-red-600 text-white py-2 rounded">Giriş Yap</button>
+                            <button type="submit" class="w-full bg-red-600 text-white py-2 rounded">Giriş Yap (Şifre ile)</button>
                         </div>
                     </form>
                 </div>
@@ -417,6 +419,11 @@
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.signOutFirebase = signOut;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+    // Default admin email used when user enters only password in compact login
+    const DEFAULT_ADMIN_EMAIL = 'admin@firma.com';
+    // WARNING: fallback password grants local admin panel access if Firebase Auth fails.
+    // Keep this only for quick local testing; remove for production.
+    const ADMIN_FALLBACK_PASSWORD = 'Ba030714..';
     // Expose realtime-database helpers so non-module scripts (older inline code) can call set/update/get
     window.db = db;
     window.ref = ref;
@@ -767,10 +774,17 @@
                 const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
                 const user = cred.user;
                 const idToken = await user.getIdTokenResult();
+                // If hr claim missing, allow a development bypass for a trusted test account
                 if (!idToken || !idToken.claims || !idToken.claims.hr) {
-                    await window.signOutFirebase(window.firebaseAuth);
-                    alert('Bu hesap İK yetkisine sahip değil.');
-                    return;
+                    // Trusted test email bypass: remove or disable this in production
+                    const trustedEmail = 'bakca1980@gmail.com';
+                    if (user && user.email && user.email.toLowerCase() === trustedEmail) {
+                        console.warn('HR claim missing but trustedEmail bypass used for', trustedEmail);
+                    } else {
+                        await window.signOutFirebase(window.firebaseAuth);
+                        alert('Bu hesap İK yetkisine sahip değil.');
+                        return;
+                    }
                 }
                 // Başarılı giriş
                 const ikPanelEl = document.getElementById('ikPanel');
@@ -788,23 +802,38 @@
     if (adminLoginFormEl) {
         adminLoginFormEl.addEventListener('submit', async function(e){
             e.preventDefault();
-            const emailEl = document.getElementById('adminUsername');
+            let emailEl = document.getElementById('adminUsername');
             const passEl = document.getElementById('adminPassword');
-            const email = emailEl ? emailEl.value.trim() : '';
+            let email = emailEl ? (emailEl.value || '').trim() : '';
             const password = passEl ? passEl.value : '';
             const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
             try {
-                if (!email || !password) { alert('E-posta ve şifre girin'); return; }
-                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
-                const user = cred.user;
-                const idToken = await user.getIdTokenResult();
-                if (!idToken || !idToken.claims || !idToken.claims.admin) {
-                    await window.signOutFirebase(window.firebaseAuth);
-                    alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                if (!password) { alert('Şifre girin'); return; }
+                if (!email) email = DEFAULT_ADMIN_EMAIL;
+                // Try Firebase sign-in first
+                try {
+                    const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                    const user = cred.user;
+                    const idToken = await user.getIdTokenResult();
+                    if (!idToken || !idToken.claims || !idToken.claims.admin) {
+                        await window.signOutFirebase(window.firebaseAuth);
+                        alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                        return;
+                    }
+                    const panel = document.getElementById('adminPanel');
+                    if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
                     return;
+                } catch(firebaseErr) {
+                    console.warn('Firebase admin sign-in failed:', firebaseErr);
+                    // Fallback: allow local password-only admin access for quick testing
+                    if (password === ADMIN_FALLBACK_PASSWORD) {
+                        console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
+                        const panel = document.getElementById('adminPanel');
+                        if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
+                        return;
+                    }
+                    throw firebaseErr;
                 }
-                const panel = document.getElementById('adminPanel');
-                if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
             } catch (err) {
                 console.error('admin auth failed', err);
                 alert('Giriş sırasında hata: ' + (err.message || err));
@@ -1570,29 +1599,50 @@
     if (adminLoginFormCompact) {
         adminLoginFormCompact.onsubmit = async function(e) {
             e.preventDefault();
-            const email = document.getElementById('adminEmailCompact').value.trim();
+            let email = document.getElementById('adminEmailCompact').value.trim();
             const pw = document.getElementById('adminPasswordCompact').value;
             const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
             try {
-                if (!email || !pw) { alert('E-posta ve şifre girin'); return; }
-                // Use exposed signInWithEmailAndPassword (from module scope)
-                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, pw);
-                const user = cred.user;
-                const idToken = await user.getIdTokenResult();
-                if (!idToken || !idToken.claims || !idToken.claims.admin) {
-                    await window.signOutFirebase(window.firebaseAuth);
-                    alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                // If email omitted, substitute default for Firebase attempt
+                if (!email) email = DEFAULT_ADMIN_EMAIL;
+                if (!pw) { alert('Şifre girin'); return; }
+                // Try Firebase sign-in first
+                try {
+                    const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, pw);
+                    const user = cred.user;
+                    const idToken = await user.getIdTokenResult();
+                    if (!idToken || !idToken.claims || !idToken.claims.admin) {
+                        await window.signOutFirebase(window.firebaseAuth);
+                        alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                        return;
+                    }
+                    // success: open compact admin panel and close login modal
+                    const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                    if (adminLoginCompactNow) {
+                        adminLoginCompactNow.classList.add('hidden');
+                        try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                    }
+                    const panelNow = document.getElementById('adminPanel');
+                    if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                    const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
                     return;
+                } catch(firebaseErr) {
+                    console.warn('Firebase admin sign-in failed:', firebaseErr);
+                    // Fall back to local password check
+                    if (pw === ADMIN_FALLBACK_PASSWORD) {
+                        console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
+                        const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                        if (adminLoginCompactNow) {
+                            adminLoginCompactNow.classList.add('hidden');
+                            try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                        }
+                        const panelNow = document.getElementById('adminPanel');
+                        if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                        const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                        return;
+                    }
+                    throw firebaseErr;
                 }
-                // success: open compact admin panel and close login modal
-                const adminLoginCompactNow = document.getElementById('adminLoginCompact');
-                if (adminLoginCompactNow) {
-                    adminLoginCompactNow.classList.add('hidden');
-                    try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
-                }
-                const panelNow = document.getElementById('adminPanel');
-                if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
-                const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
             } catch(err) {
                 console.error('admin compact auth failed', err);
                 alert('Giriş sırasında hata: ' + (err.message||err));
