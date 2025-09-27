@@ -6,11 +6,17 @@
     <title>Giriş - Analiz Pro X</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+    /* Küçük tema destekleri */
+    .apx-dark { background: linear-gradient(180deg,#0f172a,#07132a) !important; color: #e6eef8; }
+    .apx-dark .bg-white { background-color: #0b1220 !important; }
+    .apx-dark .text-gray-700, .apx-dark .text-gray-900 { color: #dbeafe !important; }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 min-h-screen flex items-center justify-center overflow-auto">
     <!-- Background Pattern -->
     <div class="absolute inset-0 bg-black opacity-30"></div>
-    <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%234F46E5" fill-opacity="0.05"><circle cx="30" cy="30" r="30"/></g></g></svg>'); background-size: 120px 120px;"></div>
+    <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%234F46E5%22%20fill-opacity%3D%220.05%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%2230%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E'); background-size: 120px 120px;"></div>
     
     <div class="relative z-10 w-full max-w-5xl mx-auto px-2 md:px-8 py-8">
         <!-- Logo Section -->
@@ -27,9 +33,14 @@
         </div>
 
         <!-- Login Options -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 justify-items-center items-center place-items-center">
+        <!-- Floating admin quick-open button -->
+        <button id="openAdminBtn" title="Yönetici" class="fixed top-6 right-6 z-50 bg-white text-blue-700 p-3 rounded-full shadow-lg hover:scale-105 transform transition">
+            <i class="fas fa-user-cog"></i>
+        </button>
         <!-- Admin Panel (Başlangıçta gizli) -->
-    <div id="adminPanel" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[9999]">
+    <!-- Compact admin panel: opens from the floating button (not full-screen) -->
+    <div id="adminPanel" class="hidden fixed inset-0 z-[9999] flex items-start justify-center pt-16">
         <!-- İK Paneli (Başlangıçta gizli) -->
         <div id="ikPanel" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
             <div class="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-3xl relative overflow-y-auto max-h-screen">
@@ -39,7 +50,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Aday Rumuz</label>
-                            <input type="text" id="newCandidateNickname" required class="w-full px-3 py-2 border rounded-lg" placeholder="Rumuz">
+                            <input type="text" id="newCandidateNickname" required class="w-full px-3 py-2 border rounded-lg" placeholder="Rumuz (ör: aday01)">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Aday Şifre</label>
@@ -89,58 +100,74 @@
                 </div>
             </div>
         </div>
-            <div class="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-2xl relative">
-                <button onclick="document.getElementById('adminPanel').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
-                <h2 class="text-3xl font-bold text-blue-800 mb-6 text-center">Yönetici Paneli</h2>
-                <div class="space-y-4">
-                    <button class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700">İK Yöneticisi Ekle</button>
-                    <button class="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-green-800">Sistem Ayarları</button>
-                    <button class="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-6 rounded-lg font-semibold hover:from-red-700 hover:to-red-800">Çıkış Yap</button>
+            <div class="bg-white rounded-xl shadow p-4 w-72 relative">
+                <button id="closeAdminPanel" onclick="document.getElementById('adminPanel').classList.add('hidden')" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-lg">&times;</button>
+                <h2 class="text-lg font-bold text-blue-800 mb-3 text-center">Yönetici</h2>
+                <div class="space-y-2">
+                    <button id="manageUsersBtn" class="w-full bg-gray-200 text-black py-2 px-3 rounded-lg font-semibold">Kullanıcıları Yönet</button>
+                    <button id="systemSettingsBtn" class="w-full bg-green-600 text-white py-2 px-3 rounded-lg font-semibold hover:bg-green-700">Sistem Ayarları</button>
+                    <button id="logoutBtn" class="w-full bg-red-600 text-white py-2 px-3 rounded-lg font-semibold hover:bg-red-700">Çıkış Yap</button>
                 </div>
-                <div class="mt-8 text-center text-gray-500 text-sm">© 2025 Analiz Pro X</div>
+                <div class="mt-4 text-center text-gray-400 text-xs">
+                    <strong>Analiz Pro X</strong><br>
+                    © 2025
+                </div>
+            </div>
+            <!-- Sistem Ayarları Modal -->
+            <div id="systemSettingsModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]">
+                <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
+                    <button onclick="document.getElementById('systemSettingsModal').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Sistem Ayarları</h3>
+                    <form id="systemSettingsForm" class="space-y-4">
+                        <div>
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" id="settingCompactFooter" />
+                                <span>Kompakt footer (mobilde küçült)</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" id="settingHideFooter" />
+                                <span>Footer'ı gizle</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" id="settingDarkMode" />
+                                <span>Koyu tema (sayfa arka planını koyulaştır)</span>
+                            </label>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-4">
+                            <button type="button" id="resetSettingsBtn" class="px-4 py-2 rounded border">Sıfırla</button>
+                            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Kaydet</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-            <!-- Admin Login -->
-            <div class="bg-white rounded-2xl shadow-2xl p-8 transform transition duration-500 hover:scale-105">
-                <div class="text-center mb-6">
-                    <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-                        <i class="fas fa-crown text-2xl text-red-600"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Yönetici</h2>
-                    <p class="text-gray-600">Sistem yöneticisi girişi</p>
+            <!-- Admin Login (moved to compact modal opened by floating admin icon) -->
+            <div id="adminLoginCompact" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9998]">
+                <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm relative">
+                    <button onclick="document.getElementById('adminLoginCompact').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500">&times;</button>
+                    <h3 class="text-lg font-bold text-red-700 mb-3">Yönetici Girişi</h3>
+                    <form id="adminLoginFormCompact" class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">E-posta</label>
+                            <input type="email" id="adminEmailCompact" class="w-full px-3 py-2 border rounded" placeholder="admin@firma.com" required />
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Şifre</label>
+                            <input type="password" id="adminPasswordCompact" class="w-full px-3 py-2 border rounded" placeholder="Yönetici şifresi" required />
+                        </div>
+                        <div>
+                            <button type="submit" class="w-full bg-red-600 text-white py-2 rounded">Giriş Yap</button>
+                        </div>
+                    </form>
                 </div>
-
-                <form id="adminLoginForm" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-user text-red-600 mr-2"></i>
-                            Kullanıcı Adı
-                        </label>
-                        <input type="text" id="adminUsername" required 
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition duration-200"
-                               placeholder="admin">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-lock text-red-600 mr-2"></i>
-                            Şifre
-                        </label>
-                        <input type="password" id="adminPassword" required 
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition duration-200"
-                               placeholder="Şifrenizi girin">
-                    </div>
-                    
-                    <button type="submit" 
-                            class="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-6 rounded-lg hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transform transition duration-200 hover:scale-105 font-medium">
-                        <i class="fas fa-sign-in-alt mr-2"></i>
-                        Yönetici Girişi
-                    </button>
-                </form>
             </div>
 
             <!-- HR Manager Login -->
-            <div class="bg-white rounded-2xl shadow-2xl p-8 transform transition duration-500 hover:scale-105">
+    <div class="bg-white rounded-2xl shadow-2xl py-20 px-8 min-h-[560px] transform transition duration-500 hover:scale-105 w-full max-w-md mx-auto">
                 <div class="text-center mb-6">
                     <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
                         <i class="fas fa-users text-2xl text-green-600"></i>
@@ -175,11 +202,94 @@
                         <i class="fas fa-sign-in-alt mr-2"></i>
                         İK Yöneticisi Girişi
                     </button>
+                    <div class="text-center mt-3">
+                        <button type="button" id="showHrRegister" class="text-green-700 underline text-sm">Üye Ol</button>
+                    </div>
                 </form>
+
+                <!-- İK Yöneticisi Üye Ol Modalı -->
+                <div id="hrRegisterModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-xs relative">
+                        <button onclick="document.getElementById('hrRegisterModal').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+                        <h3 class="text-lg font-bold text-green-700 mb-4">Yeni İK Yöneticisi Kaydı</h3>
+                        <form id="hrRegisterForm" class="flex flex-col gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">E-posta</label>
+                                <input type="email" id="hrRegEmail" class="border rounded px-2 py-1 w-full" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Şifre</label>
+                                <input type="password" id="hrRegPassword" class="border rounded px-2 py-1 w-full" required>
+                            </div>
+                            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded font-semibold">Kaydol</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- Admin -> İK Yöneticisi Ekle Modal (eksikti) -->
+                <div id="hrAdminModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-xs relative">
+                        <button onclick="document.getElementById('hrAdminModal').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+                        <h3 class="text-lg font-bold text-blue-800 mb-4">İK Yöneticisi Ekle</h3>
+                        <form id="hrAdminForm" class="flex flex-col gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Kullanıcı Adı</label>
+                                <input type="text" id="hrAdminUsername" class="border rounded px-2 py-1 w-full" placeholder="kullaniciadi" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">İsim Soyisim</label>
+                                <input type="text" id="hrAdminFullName" class="border rounded px-2 py-1 w-full" placeholder="İsim Soyisim">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Telefon</label>
+                                <input type="text" id="hrAdminPhone" class="border rounded px-2 py-1 w-full" placeholder="05xxxxxxxxx">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">E-posta</label>
+                                <input type="email" id="hrAdminEmail" class="border rounded px-2 py-1 w-full" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Şifre</label>
+                                <input type="password" id="hrAdminPassword" class="border rounded px-2 py-1 w-full" required>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-2">
+                                <button type="button" onclick="document.getElementById('hrAdminModal').classList.add('hidden')" class="px-3 py-1 border rounded">İptal</button>
+                                <button type="submit" class="bg-blue-600 text-white px-4 py-1 rounded">Ekle</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <!-- HR Yönetim Modal -->
+                <div id="hrManageModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]">
+                    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-4xl relative overflow-y-auto max-h-[80vh]">
+                        <button onclick="document.getElementById('hrManageModal').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">İK Yöneticileri Yönetimi</h3>
+                        <div class="mb-4 flex gap-3 items-center">
+                            <label class="text-sm">Başlangıç:</label>
+                            <input type="date" id="filterFrom" class="border rounded px-2 py-1">
+                            <label class="text-sm">Bitiş:</label>
+                            <input type="date" id="filterTo" class="border rounded px-2 py-1">
+                            <button id="applyFilterBtn" class="bg-blue-600 text-white px-3 py-1 rounded">Filtrele</button>
+                            <button id="refreshHrListBtn" class="px-3 py-1 border rounded">Yenile</button>
+                        </div>
+                        <table class="w-full text-sm text-left border">
+                            <thead class="bg-gray-100"><tr>
+                                <th class="p-2">Kullanıcı Adı</th>
+                                <th class="p-2">İsim Soyisim</th>
+                                <th class="p-2">Telefon</th>
+                                <th class="p-2">E-posta</th>
+                                <th class="p-2">Şifre</th>
+                                <th class="p-2">Test Et Sayısı</th>
+                                <th class="p-2">Durum</th>
+                                <th class="p-2">Eylemler</th>
+                            </tr></thead>
+                            <tbody id="hrManageTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- Candidate Login -->
-            <div class="bg-white rounded-2xl shadow-2xl p-8 transform transition duration-500 hover:scale-105">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 transform transition duration-500 hover:scale-105 w-full max-w-md mx-auto">
                 <div class="text-center mb-6">
                     <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
                         <i class="fas fa-user-graduate text-2xl text-blue-600"></i>
@@ -280,9 +390,322 @@
         </div>
     </div>
 
-    <script src="giris-logic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, get, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
+    authDomain: "ikpaneli.firebaseapp.com",
+    projectId: "ikpaneli",
+    storageBucket: "ikpaneli.firebasestorage.app",
+    messagingSenderId: "645340845423",
+    appId: "1:645340845423:web:435b57f7093782422e449a",
+    measurementId: "G-6NBTKSBVYL",
+    databaseURL: "https://ikpaneli-default-rtdb.europe-west1.firebasedatabase.app/"
+  };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    // Expose auth and helpers to global window for legacy non-module handlers
+    // Note: avoid keeping any admin password on client in production
+    window.firebaseAuth = auth;
+    window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+    window.signOutFirebase = signOut;
+    window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+
+  // ADAY TEST SONUÇLARINI KAYDETME
+    window.saveCandidateTest = async function(rumuz, tip, baslik, cevaplar, skorlar) {
+        // skorlar: {radar: [...], sjt: [...], bias: ...}
+        // Compute deterministic scored values + NLG summary on client side as fallback
+        try {
+            const computed = computeScoresAndNLG(cevaplar, { tip, baslik });
+            // merge provided skorlar (if any) with computed, but prefer computed values
+            const finalSkorlar = Object.assign({}, skorlar || {}, computed);
+            await update(ref(db, 'candidates/' + rumuz), {
+                rumuz,
+                tip,
+                baslik,
+                cevaplar,
+                skorlar: finalSkorlar,
+                timestamp: Date.now()
+            });
+        } catch (err) {
+            console.error('Scoring failed, falling back to raw save', err);
+            await update(ref(db, 'candidates/' + rumuz), {
+                rumuz,
+                tip,
+                baslik,
+                cevaplar,
+                skorlar: skorlar || {},
+                timestamp: Date.now()
+            });
+        }
+    };
+
+    // Compute normalized scores, response-bias and a small NLG summary
+    function mapAnswerToNumber(a) {
+        if (a === null || a === undefined) return 0;
+        const s = String(a).toLowerCase().trim();
+        if (!isNaN(Number(s))) return Number(s);
+        // common mappings
+        if (s === 'evet' || s === 'yes') return 5;
+        if (s === 'hayir' || s === 'no') return 1;
+        if (s === 'bazen' || s === 'sometimes') return 3;
+        if (s === 'iyi') return 4;
+        if (s === 'orta') return 3;
+        if (s === 'zayıf' || s === 'zayif' || s === 'zayıf') return 1;
+        // fallback: length-based heuristic
+        return Math.min(5, Math.max(1, Math.round((s.length % 5) + 1)));
+    }
+
+    function computeScoresAndNLG(cevaplar, meta) {
+        // cevaplar: array of answers (strings or numbers)
+        const nums = (cevaplar || []).map(mapAnswerToNumber).filter(n => typeof n === 'number');
+        const n = nums.length || 1;
+        const mean = nums.reduce((a,b)=>a+b,0)/n;
+        const variance = nums.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
+        const std = Math.sqrt(variance);
+        // Response bias: scale std to 0-100
+        const bias = Math.round(Math.min(100, std * 25 * 10)/10 * 10)/10 || 0;
+
+        // Radar: split answers into 5 buckets (simple heuristic) and normalize to 0-100
+        const buckets = [0,0,0,0,0];
+        const counts = [0,0,0,0,0];
+        for (let i=0;i<nums.length;i++){
+            const bi = i % 5;
+            buckets[bi] += nums[i]; counts[bi]++;
+        }
+        const radar = buckets.map((sum,idx) => {
+            const cnt = counts[idx]||1;
+            const avg = sum / cnt; // 1..5
+            return Math.round(((avg - 1) / 4) * 100); // normalize to 0-100
+        });
+
+        // SJT average heuristic: if meta.baslik contains SJT-like keywords, treat as sjt
+        const sjtKeywords = ['sjt','durumsal','problem','senaryo'];
+        const isSjt = (meta.baslik||'').toLowerCase().split(' ').some(w=>sjtKeywords.includes(w)) || false;
+        const sjtAvg = isSjt ? Math.round((mean/5)*100) : null;
+
+        // overall (weighted) score - simple average of radar
+        const genelSkor = Math.round((radar.reduce((a,b)=>a+b,0)/radar.length) * 10) / 10;
+
+        const labels = ['İletişim','Liderlik','Teknik','Vicdanlılık','Adaptasyon'];
+        const labeled = radar.map((val,i)=>({k: labels[i]||('K'+i), v: val}));
+        const sorted = labeled.slice().sort((a,b)=>b.v-a.v);
+        const top3Strong = sorted.slice(0,3).map(x=>x.k);
+        const top3Weak = sorted.slice(-3).map(x=>x.k);
+
+        // NLG - rule based
+        const nlgParts = [];
+        if (labeled[1].v > 85 && (sjtAvg===null || sjtAvg > 80)) {
+            nlgParts.push('Adayın liderlik ve karar verme yetkinliği oldukça yüksektir. Ekip lideri rolü için potansiyel taşımaktadır.');
+        }
+        if (labeled[0].v < 60 && labeled[4].v < 50) {
+            nlgParts.push('Aday, iletişim ve adaptasyon alanlarında gelişime ihtiyaç göstermektedir; müşteri temelli roller için dikkatli değerlendirme önerilir.');
+        }
+        if (bias > 30) nlgParts.push('Güvenilirlik puanı yüksek; sonuçlar manipülasyon riski taşıyabilir. Mülakat sırasında tutarlılık sorgulanmalıdır.');
+        if (!nlgParts.length) nlgParts.push('Adayın profili dengeli; dikkat edilmesi gereken belirgin bir risk tespit edilmedi.');
+
+        return {
+            radar,
+            sjt: sjtAvg ? [sjtAvg] : [],
+            bias,
+            genelSkor,
+            top3Strong,
+            top3Weak,
+            nlgSummary: nlgParts.join(' ')
+        };
+    }
+
+    // Create candidate record (called by HR panel when adding candidate)
+    window.addCandidateToDB = async function({rumuz, password, tip, baslik, createdBy}){
+        if (!rumuz) throw new Error('rumuz required');
+        await set(ref(db, 'candidates/' + rumuz), {
+            rumuz,
+            password: password || '',
+            tip: tip || '',
+            baslik: baslik || '',
+            createdBy: createdBy || 'admin',
+            timestamp: null,
+            cevaplar: [],
+            skorlar: {}
+        });
+    };
+
+    // Get candidate by rumuz (nickname)
+    window.getCandidateByNickname = async function(rumuz) {
+        if (!rumuz) return null;
+        const snap = await get(ref(db, 'candidates/' + rumuz));
+        return snap.exists() ? snap.val() : null;
+    };
+
+  // İK PANELİNE ADAYLARI VE SONUÇLARI GETİRME
+  window.listenCandidates = function(callback) {
+    const candidatesRef = ref(db, 'candidates');
+    onValue(candidatesRef, (snapshot) => {
+      const data = snapshot.val() || {};
+                        const arr = Object.values(data);
+                        // keep a simple client cache on window for older code
+                        window.candidates = arr.map(x => ({rumuz: x.rumuz, password: x.password, tip: x.tip, baslik: x.baslik, cevaplar: x.cevaplar||[], skorlar: x.skorlar||{}}));
+                        callback(arr);
+    });
+  };
+
+    // HR kullanıcı yönetimi helper'ları
+    window.addHRUser = async function(user) {
+        // user: {username, fullName, phone, email, password, active}
+        if (!user || !user.username) throw new Error('username required');
+        await set(ref(db, 'hrUsers/' + user.username), {
+            username: user.username,
+            fullName: user.fullName || '',
+            phone: user.phone || '',
+            email: user.email || '',
+            password: user.password || '',
+            active: user.active === undefined ? true : !!user.active,
+            createdAt: Date.now()
+        });
+    };
+
+    window.listHRUsers = function(callback) {
+        const hrRef = ref(db, 'hrUsers');
+        onValue(hrRef, (snapshot) => {
+            const data = snapshot.val() || {};
+            const arr = Object.keys(data).map(k => data[k]);
+            callback(arr);
+        });
+    };
+
+    window.getHRUserByEmail = async function(email) {
+        const hrRef = ref(db, 'hrUsers');
+        const snap = await get(hrRef);
+        const data = snap.val() || {};
+        const keys = Object.keys(data);
+        for (const k of keys) {
+            if (data[k].email === email) return data[k];
+        }
+        return null;
+    };
+
+    window.setHRActive = async function(username, active) {
+        if (!username) throw new Error('username required');
+        await update(ref(db, 'hrUsers/' + username), { active: !!active });
+    };
+
+    // Count candidate tests created by given hrUsername between two timestamps
+    window.countCandidateTestsByHRBetween = async function(hrUsername, fromTs, toTs) {
+        const candRef = ref(db, 'candidates');
+        const snap = await get(candRef);
+        const data = snap.val() || {};
+        const arr = Object.values(data);
+        const filtered = arr.filter(c => c.createdBy === hrUsername && c.timestamp && c.timestamp >= fromTs && c.timestamp <= toTs);
+        return filtered.length;
+    };
+</script>
     <script>
+    // Basit İK yöneticisi listesi (demo için local array)
+    let hrAdmins = [
+        {email: 'email@firma.com', password: '123456'}
+    ];
+
+    // Üye Ol modalı aç/kapat
+    const showHrRegisterBtn = document.getElementById('showHrRegister');
+    if (showHrRegisterBtn) {
+        showHrRegisterBtn.addEventListener('click', function(){
+            const modal = document.getElementById('hrRegisterModal');
+            if (modal) modal.classList.remove('hidden');
+        });
+    }
+
+    // Üye Ol işlemi
+    const hrRegisterFormEl = document.getElementById('hrRegisterForm');
+    if (hrRegisterFormEl) {
+        hrRegisterFormEl.addEventListener('submit', function(e){
+            e.preventDefault();
+            const emailEl = document.getElementById('hrRegEmail');
+            const passEl = document.getElementById('hrRegPassword');
+            const email = emailEl ? emailEl.value.trim() : '';
+            const password = passEl ? passEl.value : '';
+            if (!email || !password) {
+                alert('Tüm alanları doldurun!');
+                return;
+            }
+            if (hrAdmins.some(a => a.email === email)) {
+                alert('Bu e-posta zaten kayıtlı!');
+                return;
+            }
+            hrAdmins.push({email, password});
+            alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+            const modal = document.getElementById('hrRegisterModal');
+            if (modal) modal.classList.add('hidden');
+        });
+    }
+
+    // Giriş işlemi (Firebase üzerinden kontrol)
+    const hrLoginFormEl = document.getElementById('hrLoginForm');
+    if (hrLoginFormEl) {
+        hrLoginFormEl.addEventListener('submit', async function(e){
+            e.preventDefault();
+            const emailEl = document.getElementById('hrEmail');
+            const passEl = document.getElementById('hrPassword');
+            const email = emailEl ? emailEl.value.trim() : '';
+            const password = passEl ? passEl.value : '';
+            try {
+                if (!email || !password) { alert('E-posta ve şifre girin'); return; }
+                // Use Firebase Auth
+                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                const user = cred.user;
+                const idToken = await user.getIdTokenResult();
+                if (!idToken || !idToken.claims || !idToken.claims.hr) {
+                    await window.signOutFirebase(window.firebaseAuth);
+                    alert('Bu hesap İK yetkisine sahip değil.');
+                    return;
+                }
+                // Başarılı giriş
+                const ikPanelEl = document.getElementById('ikPanel');
+                if (ikPanelEl) ikPanelEl.classList.remove('hidden');
+                try { window.currentHR = user.uid || user.email || 'hr_unknown'; } catch(e) { window.currentHR = 'hr_unknown'; }
+            } catch (err) {
+                console.error(err);
+                alert('Giriş sırasında hata: ' + (err.message||err));
+            }
+        });
+    }
+
+    // Admin giriş işlemi (sabit kullanıcı)
+    const adminLoginFormEl = document.getElementById('adminLoginForm');
+    if (adminLoginFormEl) {
+        adminLoginFormEl.addEventListener('submit', async function(e){
+            e.preventDefault();
+            const emailEl = document.getElementById('adminUsername');
+            const passEl = document.getElementById('adminPassword');
+            const email = emailEl ? emailEl.value.trim() : '';
+            const password = passEl ? passEl.value : '';
+            const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
+            try {
+                if (!email || !password) { alert('E-posta ve şifre girin'); return; }
+                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                const user = cred.user;
+                const idToken = await user.getIdTokenResult();
+                if (!idToken || !idToken.claims || !idToken.claims.admin) {
+                    await window.signOutFirebase(window.firebaseAuth);
+                    alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                    return;
+                }
+                const panel = document.getElementById('adminPanel');
+                if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
+            } catch (err) {
+                console.error('admin auth failed', err);
+                alert('Giriş sırasında hata: ' + (err.message || err));
+            } finally {
+                if (overlay) overlay.classList.add('hidden');
+            }
+        });
+    }
     // Tüm sektör ve pozisyonlar için gerçek soru havuzu
     const questionPool = {
         'yonetici': {
@@ -713,7 +1136,7 @@
                 'Çapraz satış (cross-sell) ve yukarı satış (up-sell) fırsatlarını belirlemede iyiyim.'
             ],
             'Geri Bildirim ve Koçluk Kültürü': [
-                'Çalışanlarıma düzenli ve yapıcı geri bildirim veririm.',
+                'Çalışanlara düzenli ve yapıcı geri bildirim veririm.',
                 'Olumsuz geri bildirimi, resmi performans değerlendirmesine saklamam.',
                 'Çalışanlarımın gelişim planlarını desteklerim.',
                 'Geri bildirimin hemen ardından takip ve koçluk yaparım.',
@@ -888,7 +1311,9 @@
                 'Müşteri memnuniyeti, maaşımdan daha önemli bir motivasyon kaynağıdır.',
                 'Başkalarının hayatını kolaylaştırmak beni mutlu eder.',
                 'Hizmet sektöründe çalışmayı bir misyon olarak görürüm.',
+               
                 'Müşteri için ekstra çaba göstermekten çekinmem.',
+                                                                                                                                
                 'İnsanlarla etkileşim kurmak benim için yorucu değildir.',
                 'Yaptığım işin topluma faydalı olduğunu bilirim.',
                 'Ekibimi ve kendimi sürekli olarak hizmet standartlarımızı aşmaya teşvik ederim.',
@@ -902,20 +1327,24 @@
     const testSection = document.getElementById('testSection');
     let activeCandidate = null;
     if (candidateLoginForm) {
-        candidateLoginForm.addEventListener('submit', function(e) {
+        candidateLoginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            const nickname = document.getElementById('candidateNickname').value;
+            const nickname = document.getElementById('candidateNickname').value.trim();
             const password = document.getElementById('candidatePassword').value;
-            // İK panelinde kayıtlı adaylar ile kontrol
-            const found = candidates.find(c => c.rumuz === nickname && c.sifre === password);
-            if (found) {
-                activeCandidate = found;
+            if (!nickname) { alert('Lütfen rumuz girin'); return; }
+            try {
+                const cand = await window.getCandidateByNickname(nickname);
+                if (!cand) { alert('Rumuz bulunamadı'); return; }
+                if ((cand.password||'') !== password) { alert('Şifre hatalı'); return; }
+                // set active candidate from DB object
+                activeCandidate = cand;
                 candidateLoginForm.classList.add('hidden');
-                // Soruları dinamik oluştur
-                renderTestQuestions(found.tip, found.baslik);
+                // render questions according to stored tip/baslik
+                renderTestQuestions(cand.tip, cand.baslik);
                 testSection.classList.remove('hidden');
-            } else {
-                alert('Rumuz veya şifre hatalı!');
+            } catch (err) {
+                console.error(err);
+                alert('Giriş sırasında hata: ' + (err.message||err));
             }
         });
     }
@@ -942,80 +1371,410 @@
         testForm.innerHTML += `<button type='submit' class='w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800'>Cevapları Gönder</button>`;
     }
 
-    // Test cevaplarını kaydet ve İK paneline yansıt
+    // Test cevaplarını kaydet ve İK paneline yansıt (Firebase ile tam entegrasyon)
     const testForm = document.getElementById('testForm');
     if (testForm) {
-        testForm.onsubmit = function(e) {
+        testForm.onsubmit = async function(e) {
             e.preventDefault();
             if (!activeCandidate) return;
             const selects = testForm.querySelectorAll('select');
-            activeCandidate.cevaplar = Array.from(selects).map(s => s.value);
+            const cevaplar = Array.from(selects).map(s => s.value);
+            // Demo skorlar (gerçek hesaplama ile değiştirilebilir)
+            const skorlar = {
+                radar: [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100],
+                sjt: [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100],
+                bias: (80 + Math.random()*20).toFixed(1)
+            };
+            // Firebase'e kaydet
+            await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
             alert('Cevaplarınız kaydedildi!');
             // İK panelindeki cevap listesine yansıt
-            renderAnswers(activeCandidate);
-            // Demo: rastgele puanlarla radar güncelle
-            renderRadar([Math.random()*100, Math.random()*100, Math.random()*100]);
+            renderAnswers({cevaplar});
+            renderRadar(skorlar.radar);
         }
     }
 
-    // İK panelinde cevapları göster
-    function renderAnswers(candidate) {
-        const answerList = document.getElementById('answerList');
-        if (!answerList) return;
-        answerList.innerHTML = '';
-        if (candidate && candidate.cevaplar && candidate.cevaplar.length) {
-            candidate.cevaplar.forEach((cevap, i) => {
-                answerList.innerHTML += `<li>${i+1}. Soru: ${cevap}</li>`;
+    // İK paneli açıldığında adayları ve sonuçları Firebase'den çek
+    function loadCandidatesFromFirebase() {
+        window.listenCandidates(function(candidates){
+            // Tabloyu güncelle
+            const candidateList = document.getElementById('candidateList');
+            if (!candidateList) return;
+            candidateList.innerHTML = '';
+            candidates.forEach(c => {
+                candidateList.innerHTML += `
+                    <tr>
+                        <td class='p-2'>${c.rumuz}</td>
+                        <td class='p-2'>${c.tip}</td>
+                        <td class='p-2'>${c.baslik}</td>
+                        <td class='p-2'>
+                            <button class='px-2 py-1 border view-detail' data-r='${c.rumuz}'>Detay</button>
+                            <button class='px-2 py-1 border ml-2 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
+                        </td>
+                    </tr>
+                `;
             });
-        }
+            // Son eklenen adayı detayda göster (örnek)
+            if (candidates.length > 0) {
+                const last = candidates[candidates.length-1];
+                renderAnswers(last);
+                renderAggregateRadar(candidates);
+            }
+            // Attach table action handlers
+            Array.from(document.querySelectorAll('.view-detail')).forEach(btn => {
+                btn.onclick = function(){
+                    const r = this.dataset.r;
+                    const cand = (candidates || []).find(x=>x.rumuz===r);
+                    if (cand) showCandidateDetail(cand);
+                };
+            });
+            Array.from(document.querySelectorAll('.send-creds')).forEach(btn => {
+                btn.onclick = function(){
+                    const r = this.dataset.r; const p = this.dataset.p;
+                    // copy to clipboard and alert (HR is expected to deliver to candidate manually)
+                    const text = `Rumuz: ${r}\nŞifre: ${p}`;
+                    try { navigator.clipboard.writeText(text); alert('Kimlik panoya kopyalandı. Adaya gönderin.'); }
+                    catch(e){ prompt('Aşağıdaki kimliği adayla paylaşın:', text); }
+                };
+            });
+        });
     }
-
+    // İK paneli açıldığında otomatik yükle
+    const ikPanel = document.getElementById('ikPanel');
+    if (ikPanel) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (!ikPanel.classList.contains('hidden')) {
+                    loadCandidatesFromFirebase();
+                }
+            });
+        });
+        observer.observe(ikPanel, {attributes:true});
+    }
     // Admin giriş formu işlemleri
     const adminLoginForm = document.getElementById('adminLoginForm');
     const adminPanel = document.getElementById('adminPanel');
-    const ikPanel = document.getElementById('ikPanel');
-    if (adminLoginForm) {
-        adminLoginForm.addEventListener('submit', function(e) {
+    const anaGrid = document.querySelector('.grid');
+    // Compact admin login flow (opened from floating admin icon)
+    // We'll attach a single handler later that opens the compact login modal.
+
+    const adminLoginFormCompact = document.getElementById('adminLoginFormCompact');
+    const adminLoginCompact = document.getElementById('adminLoginCompact');
+    if (adminLoginFormCompact) {
+        adminLoginFormCompact.onsubmit = async function(e) {
             e.preventDefault();
-            const adminUsername = document.getElementById('adminUsername').value;
-            const adminPassword = document.getElementById('adminPassword').value;
-            if (adminUsername === 'superadmin' && adminPassword === '030714') {
-                // Tüm ana içeriği gizle
-                const anaGrid = document.querySelector('.grid');
-                if (anaGrid) anaGrid.style.display = 'none';
-                adminPanel.classList.remove('hidden');
-                adminPanel.style.display = 'flex';
+            const email = document.getElementById('adminEmailCompact').value.trim();
+            const pw = document.getElementById('adminPasswordCompact').value;
+            const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
+            try {
+                if (!email || !pw) { alert('E-posta ve şifre girin'); return; }
+                // Use exposed signInWithEmailAndPassword (from module scope)
+                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, pw);
+                const user = cred.user;
+                const idToken = await user.getIdTokenResult();
+                if (!idToken || !idToken.claims || !idToken.claims.admin) {
+                    await window.signOutFirebase(window.firebaseAuth);
+                    alert('Bu hesap yönetici (admin) yetkisine sahip değil.');
+                    return;
+                }
+                // success: open compact admin panel and close login modal
+                const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                if (adminLoginCompactNow) {
+                    adminLoginCompactNow.classList.add('hidden');
+                    try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                }
+                const panelNow = document.getElementById('adminPanel');
+                if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+            } catch(err) {
+                console.error('admin compact auth failed', err);
+                alert('Giriş sırasında hata: ' + (err.message||err));
+            } finally {
+                if (overlay) overlay.classList.add('hidden');
+            }
+        }
+    }
+    // Admin panelinden çıkış yapınca tekrar giriş ekranı gelsin
+    const adminLogoutBtn = Array.from(adminPanel.querySelectorAll('button')).find(btn => btn.textContent.includes('Çıkış'));
+    if (adminLogoutBtn) {
+        adminLogoutBtn.onclick = function() {
+            // hide compact admin panel and restore any UI state
+            adminPanel.classList.add('hidden');
+            adminPanel.style.display = 'none';
+            if (anaGrid) anaGrid.style.display = '';
+        };
+    }
+
+    // Floating admin open button behavior - open the compact admin login modal
+    const openAdminBtn = document.getElementById('openAdminBtn');
+    if (openAdminBtn) {
+        // ensure the admin open button sits above overlays
+        try { openAdminBtn.style.zIndex = '100000'; openAdminBtn.style.pointerEvents = 'auto'; } catch(e){}
+        openAdminBtn.addEventListener('click', function() {
+            console.log('openAdminBtn clicked');
+            let adminLoginCompactEl = document.getElementById('adminLoginCompact');
+            if (adminLoginCompactEl) {
+                try { adminLoginCompactEl.style.zIndex = '100000'; adminLoginCompactEl.style.pointerEvents = 'auto'; } catch(e){}
+                // Ensure it's attached to body so fixed positioning works
+                if (adminLoginCompactEl.parentElement !== document.body) try { document.body.appendChild(adminLoginCompactEl); } catch(e){}
+                adminLoginCompactEl.classList.remove('hidden');
+                adminLoginCompactEl.style.display = 'flex';
+                // try to focus the password input inside the modal
+                try {
+                    const input = adminLoginCompactEl.querySelector('#adminPasswordCompact');
+                    if (input) { input.focus(); input.select && input.select(); }
+                } catch(e){}
+                return;
+            }
+            // fallback: toggle admin panel if compact modal not present
+            const panel = document.getElementById('adminPanel');
+            if (!panel) return;
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden'); panel.style.display = 'block';
+                const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
             } else {
-                alert('Kullanıcı adı veya şifre hatalı!');
+                panel.classList.add('hidden'); panel.style.display = 'none';
             }
         });
     }
 
-    // Admin panelinden İK panelini aç
+    // Admin panelindeki butonların işlevselliği
     if (adminPanel) {
-        adminPanel.querySelector('button').onclick = function() {
-            adminPanel.classList.add('hidden');
-            ikPanel.classList.remove('hidden');
+      // İK Yöneticisi Ekle butonu (zaten modal açıyor)
+      const addHrBtn = document.getElementById('addHrBtn');
+      if (addHrBtn) {
+        addHrBtn.onclick = function() {
+          document.getElementById('hrAdminModal').classList.remove('hidden');
         };
+      }
+            // Sistem Ayarları butonu
+            const systemSettingsBtn = document.getElementById('systemSettingsBtn');
+            if (systemSettingsBtn) {
+                systemSettingsBtn.onclick = function() {
+                    document.getElementById('systemSettingsModal').classList.remove('hidden');
+                    // Load current settings into form
+                    const compact = localStorage.getItem('apx_compactFooter') === '1';
+                    const hide = localStorage.getItem('apx_hideFooter') === '1';
+                    const dark = localStorage.getItem('apx_darkMode') === '1';
+                    document.getElementById('settingCompactFooter').checked = compact;
+                    document.getElementById('settingHideFooter').checked = hide;
+                    document.getElementById('settingDarkMode').checked = dark;
+                };
+            }
+      // Çıkış Yap butonu
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.onclick = function() {
+          adminPanel.classList.add('hidden');
+          adminPanel.style.display = 'none';
+          if (anaGrid) anaGrid.style.display = '';
+        };
+      }
     }
+
+    // Sistem Ayarları form işlemleri
+    const systemSettingsForm = document.getElementById('systemSettingsForm');
+    const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+    function applySettings() {
+        const footer = document.querySelector('footer');
+        const footerContainer = document.querySelector('.text-center.mt-12');
+        const dark = localStorage.getItem('apx_darkMode') === '1';
+        const hide = localStorage.getItem('apx_hideFooter') === '1';
+        const compact = localStorage.getItem('apx_compactFooter') === '1';
+        if (footer) {
+            footer.style.display = hide ? 'none' : '';
+            if (compact) footer.classList.add('text-xs'); else footer.classList.remove('text-xs');
+        }
+        if (footerContainer) footerContainer.style.display = hide ? 'none' : '';
+        if (dark) document.body.classList.add('apx-dark'); else document.body.classList.remove('apx-dark');
+    }
+    if (systemSettingsForm) {
+        systemSettingsForm.onsubmit = function(e) {
+            e.preventDefault();
+            const compact = document.getElementById('settingCompactFooter').checked;
+            const hide = document.getElementById('settingHideFooter').checked;
+            const dark = document.getElementById('settingDarkMode').checked;
+            localStorage.setItem('apx_compactFooter', compact ? '1' : '0');
+            localStorage.setItem('apx_hideFooter', hide ? '1' : '0');
+            localStorage.setItem('apx_darkMode', dark ? '1' : '0');
+            applySettings();
+            document.getElementById('systemSettingsModal').classList.add('hidden');
+            alert('Ayarlar kaydedildi.');
+        }
+    }
+    if (resetSettingsBtn) {
+        resetSettingsBtn.onclick = function() {
+            localStorage.removeItem('apx_compactFooter');
+            localStorage.removeItem('apx_hideFooter');
+            localStorage.removeItem('apx_darkMode');
+            applySettings();
+            alert('Ayarlar sıfırlandı.');
+        }
+    }
+    // Apply settings on load
+    applySettings();
 
     // İK paneli: aday ekleme ve listeleme
     let candidates = [];
     const addCandidateForm = document.getElementById('addCandidateForm');
     const candidateList = document.getElementById('candidateList');
     if (addCandidateForm) {
-        addCandidateForm.onsubmit = function(e) {
+        addCandidateForm.onsubmit = async function(e) {
             e.preventDefault();
-            const rumuz = document.getElementById('newCandidateNickname').value;
+            const rumuz = document.getElementById('newCandidateNickname').value.trim();
             const sifre = document.getElementById('newCandidatePassword').value;
             const tip = document.getElementById('candidateType').value;
             const baslik = document.getElementById('questionCategory').value;
-            candidates.push({rumuz, sifre, tip, baslik, cevaplar: []});
-            renderCandidates();
-            addCandidateForm.reset();
+            if (!rumuz) { alert('Rumuz giriniz'); return; }
+            try {
+                await window.addCandidateToDB({ rumuz, password: sifre, tip, baslik, createdBy: window.currentHR || 'admin' });
+                addCandidateForm.reset();
+                // refresh list from Firebase
+                if (typeof loadCandidatesFromFirebase === 'function') loadCandidatesFromFirebase();
+                else if (typeof renderCandidates === 'function') renderCandidates();
+                alert('Aday veritabanına eklendi.');
+            } catch (err) {
+                console.error(err);
+                alert('Aday eklenirken hata: ' + (err.message||err));
+            }
+        };
+    }
+
+    // Admin panelinden İK yöneticisi ekleme formu işlemi
+    const hrAdminForm = document.getElementById('hrAdminForm');
+    if (hrAdminForm) {
+        hrAdminForm.onsubmit = function(e) {
+            e.preventDefault();
+            const username = document.getElementById('hrAdminUsername').value.trim();
+            const fullName = document.getElementById('hrAdminFullName').value.trim();
+            const phone = document.getElementById('hrAdminPhone').value.trim();
+            const email = document.getElementById('hrAdminEmail').value.trim();
+            const password = document.getElementById('hrAdminPassword').value;
+            if (!username || !email || !password) {
+                alert('Kullanıcı adı, e-posta ve şifre zorunludur.');
+                return;
+            }
+            // Use Firebase helper
+            addHRUser({username, fullName, phone, email, password, active: true}).then(() => {
+                alert('İK yöneticisi başarıyla eklendi.');
+                document.getElementById('hrAdminModal').classList.add('hidden');
+                hrAdminForm.reset();
+                // refresh list if modal açık
+                if (!document.getElementById('hrManageModal').classList.contains('hidden')) loadHRList();
+            }).catch(err => {
+                console.error(err);
+                alert('Kayıt sırasında hata: ' + (err.message||err));
+            });
+        }
+    }
+
+    // HR yönetim modal logic
+    const refreshHrListBtn = document.getElementById('refreshHrListBtn');
+    const applyFilterBtn = document.getElementById('applyFilterBtn');
+    const hrManageTableBody = document.getElementById('hrManageTableBody');
+    async function loadHRList() {
+        hrManageTableBody.innerHTML = '<tr><td colspan="8" class="p-2">Yükleniyor...</td></tr>';
+        listHRUsers(async function(list){
+            // render rows
+            hrManageTableBody.innerHTML = '';
+            const fromDate = document.getElementById('filterFrom').value;
+            const toDate = document.getElementById('filterTo').value;
+            const fromTs = fromDate ? new Date(fromDate).getTime() : 0;
+            const toTs = toDate ? new Date(toDate).getTime() + 24*3600*1000 - 1 : Date.now();
+            for (const u of list) {
+                const testCount = await countCandidateTestsByHRBetween(u.username, fromTs, toTs).catch(()=>0);
+                const status = u.active ? 'Aktif' : 'Pasif';
+                hrManageTableBody.innerHTML += `<tr>
+                    <td class='p-2'>${u.username}</td>
+                    <td class='p-2'>${u.fullName||''}</td>
+                    <td class='p-2'>${u.phone||''}</td>
+                    <td class='p-2'>${u.email||''}</td>
+                    <td class='p-2'>${u.password||''}</td>
+                    <td class='p-2'>${testCount}</td>
+                    <td class='p-2'>${status}</td>
+                    <td class='p-2'><button class='px-2 py-1 border toggle-hr' data-user='${u.username}'>${u.active? 'Pasife Al' : 'Aktifleştir'}</button></td>
+                    <td class='p-2'><button class='px-2 py-1 bg-indigo-600 text-white rounded request-nlg' data-hr='${u.username}'>Gemini Özeti</button></td>
+                </tr>`;
+            }
+            // attach toggles
+            Array.from(document.querySelectorAll('.toggle-hr')).forEach(btn => {
+                btn.onclick = async function(){
+                    const username = this.dataset.user;
+                    // flip
+                    const current = this.textContent.includes('Pasife')? true : false;
+                    const newActive = !current;
+                    await setHRActive(username, newActive);
+                    loadHRList();
+                }
+            });
+        });
+    }
+    if (refreshHrListBtn) refreshHrListBtn.onclick = loadHRList;
+    if (applyFilterBtn) applyFilterBtn.onclick = loadHRList;
+    
+    // Attach handler for Gemini NLG request buttons
+    document.addEventListener('click', function(e){
+        if (e.target && e.target.classList && e.target.classList.contains('request-nlg')){
+            const username = e.target.dataset.hr;
+            if (!username) return alert('Kullanıcı seçili değil');
+            // ask confirmation
+            if (!confirm(`'${username}' için Gemini ile özet oluşturulsun mu?`)) return;
+            requestCandidateNLG(username).then(result => {
+                alert('Gemini özeti oluşturuldu ve kaydedildi.');
+                // refresh candidate list/details
+                loadCandidatesFromFirebase();
+                if (!document.getElementById('hrManageModal').classList.contains('hidden')) loadHRList();
+            }).catch(err => {
+                console.error(err);
+                alert('Gemini özeti oluşturulurken hata: ' + (err.message||err));
+            });
+        }
+    });
+
+    // Call the generateCandidateNLG cloud function for a given candidate username
+    async function requestCandidateNLG(rumuz){
+        // function URL and secret can be configured in the global window for convenience
+        const fnUrl = window.GENERATE_NLG_URL || prompt('Fonksiyon URL (ör: https://REGION-PROJECT.cloudfunctions.net/generateCandidateNLG):');
+        if (!fnUrl) throw new Error('Fonksiyon URL girilmedi');
+        const secret = window.APX_SECRET || prompt('APX secret (x-apx-secret başlığı):');
+        if (!secret) throw new Error('APX secret girilmedi');
+
+        // store for convenience in this session
+        window.GENERATE_NLG_URL = fnUrl;
+        window.APX_SECRET = secret;
+
+        const res = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-apx-secret': secret
+            },
+            body: JSON.stringify({ rumuz })
+        });
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error('Fonksiyon hatası: ' + txt);
+        }
+        return res.json();
+    }
+    // Yönetici panelindeki 'Kullanıcıları Yönet' butonunu bağla
+    const manageUsersBtnElm = document.getElementById('manageUsersBtn');
+    if (manageUsersBtnElm) {
+        manageUsersBtnElm.onclick = function() {
+            document.getElementById('hrManageModal').classList.remove('hidden');
+            loadHRList();
         };
     }
     function renderCandidates() {
+        // Prefer DB-driven list if available
+        if (window.candidates && window.candidates.length) {
+            candidateList.innerHTML = '';
+            window.candidates.forEach(c => {
+                candidateList.innerHTML += `<tr><td class='p-2'>${c.rumuz}</td><td class='p-2'>${c.tip}</td><td class='p-2'>${c.baslik}</td></tr>`;
+            });
+            return;
+        }
+        // Fallback to local array
         candidateList.innerHTML = '';
         candidates.forEach(c => {
             candidateList.innerHTML += `<tr><td class='p-2'>${c.rumuz}</td><td class='p-2'>${c.tip}</td><td class='p-2'>${c.baslik}</td></tr>`;
@@ -1024,13 +1783,13 @@
 
     // Radar grafik örneği (demo verisi)
     let radarChart;
-    function renderRadar(dataArr) {
+    function renderRadar(dataArr, labels) {
         const ctx = document.getElementById('radarChart').getContext('2d');
         if (radarChart) radarChart.destroy();
         radarChart = new Chart(ctx, {
             type: 'radar',
             data: {
-                labels: ['İletişim', 'Liderlik', 'Teknik'],
+                labels: labels || ['İletişim', 'Liderlik', 'Teknik', 'Vicdanlılık','Adaptasyon'],
                 datasets: [{
                     label: 'Aday Puanı',
                     data: dataArr || [80, 65, 90],
@@ -1043,6 +1802,180 @@
         });
     }
     if (document.getElementById('radarChart')) renderRadar();
+
+    // Render answers list in IK panel
+    function renderAnswers(candidate) {
+        const answerList = document.getElementById('answerList');
+        if (!answerList) return;
+        answerList.innerHTML = '';
+        if (!candidate || !candidate.cevaplar || !candidate.cevaplar.length) {
+            answerList.innerHTML = '<li>Henüz cevap yok.</li>';
+            return;
+        }
+        candidate.cevaplar.forEach((a,i) => {
+            const li = document.createElement('li');
+            li.className = 'text-sm text-gray-700';
+            li.innerText = `${i+1}. ${a}`;
+            answerList.appendChild(li);
+        });
+    }
+
+    // Aggregate radar rendering for IK overview: average radar across candidates
+    function renderAggregateRadar(allCandidates) {
+        if (!allCandidates || !allCandidates.length) return renderRadar();
+        // build average of radar arrays (assume 5-dim)
+        const sums = [0,0,0,0,0]; let counts = 0;
+        allCandidates.forEach(c => {
+            const r = (c.skorlar && c.skorlar.radar) ? c.skorlar.radar : null;
+            if (r && r.length===5) {
+                counts++;
+                for (let i=0;i<5;i++) sums[i] += Number(r[i]) || 0;
+            }
+        });
+        const avg = counts ? sums.map(s=>Math.round(s/counts)) : [60,60,60,60,60];
+        renderRadar(avg, ['İletişim','Liderlik','Teknik','Vicdanlılık','Adaptasyon']);
+    }
+
+    // Aday detay modalı fonksiyonu (örnek, gerçek veriye bağlanabilir)
+function showCandidateDetail(candidate) {
+  // Modal oluştur
+  let modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[99999]';
+  modal.innerHTML = `
+    <div class='bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl relative'>
+      <button onclick='this.closest(".fixed").remove()' class='absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl'>&times;</button>
+      <h2 class='text-2xl font-bold text-blue-800 mb-4'>Aday Detay Analizi</h2>
+      <div class='mb-4'><b>Rumuz:</b> ${candidate.rumuz} &nbsp; <b>Tip:</b> ${candidate.tip} &nbsp; <b>Başlık:</b> ${candidate.baslik}</div>
+      <div class='mb-6 flex flex-col md:flex-row gap-6'>
+        <div class='flex-1 bg-blue-50 rounded-lg p-4'>
+          <canvas id='detailRadar' width='300' height='200'></canvas>
+          <div class='text-xs text-gray-500 mt-2'>Big Five & Alt Yetkinlikler</div>
+        </div>
+        <div class='flex-1 bg-blue-50 rounded-lg p-4'>
+          <h4 class='font-semibold mb-2'>SJT Performansı</h4>
+          <canvas id='detailSJT' width='300' height='200'></canvas>
+          <div class='text-xs text-gray-500 mt-2'>Durumsal Yargı Testi</div>
+        </div>
+      </div>
+      <div class='mb-4'>
+        <b>Güvenilirlik Puanı (Response Bias):</b> <span id='detailBias'></span>
+      </div>
+      <div>
+        <h4 class='font-semibold mb-2'>Cevapladığı Sorular</h4>
+        <ul id='detailAnswers' class='list-disc pl-5 text-gray-700'></ul>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  // Radar ve SJT grafikleri demo (örnek puanlar)
+        setTimeout(() => {
+            // Prefer database-provided skorlar if available
+            const s = candidate.skorlar || {};
+            const radarData = (s.radar && s.radar.length) ? s.radar : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100];
+            const sjtData = (s.sjt && s.sjt.length) ? s.sjt : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100];
+
+            try {
+                new Chart(document.getElementById('detailRadar').getContext('2d'), {
+                    type: 'radar',
+                    data: {
+                        labels: ['Vicdanlılık', 'Dışadönüklük', 'Uyumluluk', 'Duygusal Denge', 'Deneyime Açıklık'],
+                        datasets: [{
+                            label: 'Big Five',
+                            data: radarData,
+                            backgroundColor: 'rgba(59,130,246,0.2)',
+                            borderColor: 'rgba(59,130,246,1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {responsive: false, plugins: {legend: {display: false}}}
+                });
+            } catch(e) { console.warn('Radar chart render failed', e); }
+
+            try {
+                new Chart(document.getElementById('detailSJT').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Senaryo 1','Senaryo 2','Senaryo 3','Senaryo 4','Senaryo 5'],
+                        datasets: [{
+                            label: 'SJT Skoru',
+                            data: sjtData,
+                            backgroundColor: 'rgba(16,185,129,0.5)'
+                        }]
+                    },
+                    options: {responsive: false, plugins: {legend: {display: false}}}
+                });
+            } catch(e) { console.warn('SJT chart render failed', e); }
+
+            const biasText = (s.bias !== undefined && s.bias !== null) ? (s.bias + ' / 100') : ((80 + Math.random()*20).toFixed(1) + ' / 100');
+            document.getElementById('detailBias').innerText = biasText;
+
+            // NLG summary (if available) + Yapay Zeka Yorumu butonu
+            const summaryElId = 'detailNLG';
+            let summaryEl = document.getElementById(summaryElId);
+            let container = summaryEl ? summaryEl.closest('.nlg-container') : null;
+            if (!summaryEl) {
+                container = document.createElement('div');
+                container.className = 'mt-4 p-3 bg-gray-50 rounded nlg-container';
+                // create title and summary holder
+                const title = document.createElement('h4');
+                title.className = 'font-semibold mb-2';
+                title.innerText = 'Özet / Yorum';
+                const summaryHolder = document.createElement('div');
+                summaryHolder.id = summaryElId;
+                summaryHolder.className = 'text-sm text-gray-700';
+                container.appendChild(title);
+                container.appendChild(summaryHolder);
+                // create button to request Gemini NLG
+                const btn = document.createElement('button');
+                btn.className = 'mt-3 inline-block bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700';
+                btn.innerText = 'Yapay Zeka Yorumu İste';
+                btn.onclick = async function(){
+                    try {
+                        summaryHolder.innerText = 'Oluşturuluyor... Lütfen bekleyin.';
+                        const resp = await requestCandidateNLG(candidate.rumuz);
+                        // resp may be { rumuz, result }
+                        const text = resp && resp.result ? resp.result : (typeof resp === 'string' ? resp : JSON.stringify(resp));
+                        summaryHolder.innerText = text || 'Gemini döndü fakat metin alınamadı.';
+                    } catch (err) {
+                        console.error('NLG isteği başarısız', err);
+                        summaryHolder.innerText = 'NLG isteği sırasında hata oluştu: ' + (err.message||err);
+                    }
+                };
+                container.appendChild(btn);
+                modal.querySelector('.bg-white')?.appendChild(container);
+                summaryEl = document.getElementById(summaryElId);
+            }
+            summaryEl.innerText = s.nlgSummary || 'Detaylı yorum bulunmuyor.';
+
+            // Cevap listesi
+            const ans = document.getElementById('detailAnswers');
+            ans.innerHTML = '';
+            if (candidate.cevaplar && candidate.cevaplar.length) {
+                candidate.cevaplar.forEach((cevap, i) => {
+                    ans.innerHTML += `<li>${i+1}. Soru: ${cevap}</li>`;
+                });
+            } else {
+                ans.innerHTML = '<li>Henüz cevap yok.</li>';
+            }
+        }, 100);
+}
     </script>
+        <script>
+        // Taşınması gereken modal/overlay elemanlarını body'ye taşıyarak layout bozulmalarını engelle
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // list of modal element ids we want at body level so fixed positioning and z-index behave correctly
+                const modalIds = ['adminPanel','ikPanel','hrAdminModal','hrManageModal','systemSettingsModal','loadingOverlay'];
+                modalIds.forEach(id => {
+                    try {
+                        const el = document.getElementById(id);
+                        if (el && el.parentElement !== document.body) document.body.appendChild(el);
+                    } catch(inner){ /* ignore single element failures */ }
+                });
+            } catch (e) {
+                console.warn('Modal taşıma sırasında hata:', e);
+            }
+        });
+        </script>
 </body>
 </html>
