@@ -550,61 +550,137 @@
     }
 
     function computeScoresAndNLG(cevaplar, meta) {
-        // cevaplar: array of answers (strings or numbers)
-        const nums = (cevaplar || []).map(mapAnswerToNumber).filter(n => typeof n === 'number');
-        const n = nums.length || 1;
-        const mean = nums.reduce((a,b)=>a+b,0)/n;
-        const variance = nums.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
-        const std = Math.sqrt(variance);
-        // Response bias: scale std to 0-100
-        const bias = Math.round(Math.min(100, std * 25 * 10)/10 * 10)/10 || 0;
+        // Advanced scoring with per-question Target/Expert mapping, per-category normalization,
+        // Response Bias adjustment and NLG templates. Returns both overall and per-category data.
+        meta = meta || {};
+        // typedAnswers: array of {value, type} (type: 'personality' | 'sjt')
+        const typed = Array.isArray(meta.typedAnswers) ? meta.typedAnswers.slice() : null;
+        const questions = Array.isArray(meta.questions) ? meta.questions : (testForm && testForm._questions) ? testForm._questions : [];
 
-        // Radar: split answers into 5 buckets (simple heuristic) and normalize to 0-100
-        const buckets = [0,0,0,0,0];
-        const counts = [0,0,0,0,0];
-        for (let i=0;i<nums.length;i++){
-            const bi = i % 5;
-            buckets[bi] += nums[i]; counts[bi]++;
+        // If typed not provided, infer from raw cevaplar (fallback: personality scale mapping)
+        let inferredTyped = [];
+        if (!typed) {
+            inferredTyped = (cevaplar || []).map(v => ({ value: v, type: 'personality' }));
         }
-        const radar = buckets.map((sum,idx) => {
-            const cnt = counts[idx]||1;
-            const avg = sum / cnt; // 1..5
-            return Math.round(((avg - 1) / 4) * 100); // normalize to 0-100
+        const allTyped = typed || inferredTyped;
+
+        // Helper: map to numeric 1..5 for personality style answers
+        function toNum(val) {
+            if (val === null || val === undefined) return null;
+            const n = Number(val);
+            if (!isNaN(n)) return Math.max(1, Math.min(5, Math.round(n)));
+            const s = String(val).toLowerCase();
+            if (s === 'evet' || s === '5') return 5;
+            if (s === 'hayir' || s === 'hay' || s === '1') return 1;
+            if (s === 'bazen' || s === 'sometimes' || s === '3') return 3;
+            if (s === 'iyi' || s === '4') return 4;
+            if (s === 'orta' || s === '2') return 3;
+            return null;
+        }
+
+        // Build per-category accumulators
+        const categories = {}; // category -> { personalitySum, personalityCount, sjtSum, sjtCount, questions: [] }
+        for (let i = 0; i < allTyped.length; i++) {
+            const t = allTyped[i];
+            const q = questions[i] || {};
+            const cat = q.category || q.categoryName || ('Genel');
+            if (!categories[cat]) categories[cat] = { personalitySum: 0, personalityCount: 0, sjtSum: 0, sjtCount: 0, questions: [] };
+            const bucket = categories[cat];
+            // push question snapshot for detail view
+            bucket.questions.push({ index: i, text: q.text || ('Soru ' + (i+1)), type: t.type, answer: t.value, target: q.target || null, expertScores: q.expertScores || null });
+            if (t.type === 'personality') {
+                const cand = toNum(t.value);
+                const target = (q.target !== undefined && q.target !== null) ? Number(q.target) : 5; // default target=5
+                if (cand !== null) {
+                    // contribution: match to target -> 1..5
+                    const contribution = Math.max(1, 5 - Math.abs(cand - target));
+                    bucket.personalitySum += contribution;
+                    bucket.personalityCount++;
+                }
+            } else if (t.type === 'sjt') {
+                // SJT: map chosen option index to expertAvg if provided
+                const chosenIndex = (typeof t.value === 'string' && t.value !== '') ? Number(t.value) : NaN;
+                let expertAvg = null;
+                if (Array.isArray(q.expertScores) && !isNaN(chosenIndex)) {
+                    expertAvg = q.expertScores[chosenIndex];
+                }
+                if (expertAvg == null) {
+                    if (!isNaN(chosenIndex)) expertAvg = Math.max(1, Math.min(5, chosenIndex + 1));
+                    else expertAvg = 3;
+                }
+                bucket.sjtSum += expertAvg; // 1..5
+                bucket.sjtCount++;
+            }
+        }
+
+        // Compute per-category normalized scores (0..100), apply RB adjustment
+        // Response Bias: compute from personality answers overall (std mapped to 0..100 as before)
+        const personalityVals = allTyped.filter(t=>t.type==='personality').map(t=>toNum(t.value)).filter(x=>x!==null);
+        const n = personalityVals.length || 1;
+        const mean = personalityVals.reduce((a,b)=>a+b,0)/n;
+        const variance = personalityVals.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
+        const std = Math.sqrt(variance);
+        const bias = Math.round(Math.min(100, std * 25 * 10)/10 * 10)/10 || 0; // 0..100
+
+        const perCategory = {};
+        Object.keys(categories).forEach(cat => {
+            const b = categories[cat];
+            // personality % (if any)
+            const persMax = (b.personalityCount * 5) || 1;
+            const persRaw = Math.round((b.personalitySum / persMax) * 100);
+            // sjt % (if any)
+            const sjtMax = (b.sjtCount * 5) || 1;
+            const sjtRaw = b.sjtCount ? Math.round((b.sjtSum / sjtMax) * 100) : null;
+            // combined: weight by counts
+            let combinedRaw = persRaw;
+            if (sjtRaw !== null) {
+                const totalQuestions = (b.personalityCount + b.sjtCount) || 1;
+                combinedRaw = Math.round(((persRaw * b.personalityCount) + (sjtRaw * b.sjtCount)) / totalQuestions);
+            }
+            // Apply RB adjustment: Final = combinedRaw * (1 - bias%)
+            const final = Math.round(combinedRaw * (1 - (bias/100)));
+            // Label per thresholds
+            let label = 'Gelişim Alanı';
+            if (final >= 85) label = 'Güçlü Yön';
+            else if (final >= 60) label = 'Kabul Edilebilir';
+
+            perCategory[cat] = {
+                raw: combinedRaw,
+                adjusted: final,
+                personality: { raw: persRaw, count: b.personalityCount },
+                sjt: { raw: sjtRaw, count: b.sjtCount },
+                questions: b.questions,
+                label
+            };
         });
 
-        // SJT average heuristic: if meta.baslik contains SJT-like keywords, treat as sjt
-        const sjtKeywords = ['sjt','durumsal','problem','senaryo'];
-        const isSjt = (meta.baslik||'').toLowerCase().split(' ').some(w=>sjtKeywords.includes(w)) || false;
-        const sjtAvg = isSjt ? Math.round((mean/5)*100) : null;
+        // Overall score is average of category adjusted scores
+        const cats = Object.keys(perCategory);
+        const overall = cats.length ? Math.round(Object.values(perCategory).reduce((a,b)=>a+b.adjusted,0)/cats.length) : 0;
 
-        // overall (weighted) score - simple average of radar
-        const genelSkor = Math.round((radar.reduce((a,b)=>a+b,0)/radar.length) * 10) / 10;
+        // NLG: templates per threshold
+        function nlgForScore(name, score) {
+            if (score >= 85) return `(${name}) Puan: ${score}. Adayın ${name} yeteneği, sektör ortalamasının oldukça üzerindedir ve bu rol için kritik bir güç kaynağıdır. Hemen yüksek sorumluluk gerektiren görevlere atanması önerilir.`;
+            if (score >= 60) return `(${name}) Puan: ${score}. ${name} yetkinliği kabul edilebilir düzeydedir; görev için yeterli olabilir, ancak belirli görevler için mülakatla doğrulama önerilir.`;
+            return `(${name}) Puan: ${score}. ${name} yetkinliği geliştirilmelidir; planlı gelişim programları ve hedefli eğitim önerilir.`;
+        }
 
-        const labels = ['İletişim','Liderlik','Teknik','Vicdanlılık','Adaptasyon'];
-        const labeled = radar.map((val,i)=>({k: labels[i]||('K'+i), v: val}));
-        const sorted = labeled.slice().sort((a,b)=>b.v-a.v);
-        const top3Strong = sorted.slice(0,3).map(x=>x.k);
-        const top3Weak = sorted.slice(-3).map(x=>x.k);
-
-        // NLG - rule based
         const nlgParts = [];
-        if (labeled[1].v > 85 && (sjtAvg===null || sjtAvg > 80)) {
-            nlgParts.push('Adayın liderlik ve karar verme yetkinliği oldukça yüksektir. Ekip lideri rolü için potansiyel taşımaktadır.');
-        }
-        if (labeled[0].v < 60 && labeled[4].v < 50) {
-            nlgParts.push('Aday, iletişim ve adaptasyon alanlarında gelişime ihtiyaç göstermektedir; müşteri temelli roller için dikkatli değerlendirme önerilir.');
-        }
-        if (bias > 30) nlgParts.push('Güvenilirlik puanı yüksek; sonuçlar manipülasyon riski taşıyabilir. Mülakat sırasında tutarlılık sorgulanmalıdır.');
-        if (!nlgParts.length) nlgParts.push('Adayın profili dengeli; dikkat edilmesi gereken belirgin bir risk tespit edilmedi.');
+        Object.keys(perCategory).forEach(cat => {
+            nlgParts.push(nlgForScore(cat, perCategory[cat].adjusted));
+        });
+
+        const overallLabel = overall >= 85 ? 'Güçlü Yön' : (overall >= 60 ? 'Kabul Edilebilir' : 'Gelişim Alanı');
 
         return {
-            radar,
-            sjt: sjtAvg ? [sjtAvg] : [],
+            perCategory,
             bias,
-            genelSkor,
-            top3Strong,
-            top3Weak,
-            nlgSummary: nlgParts.join(' ')
+            genelSkor: overall,
+            genelLabel: overallLabel,
+            nlgSummary: nlgParts.join('\n'),
+            radar: Object.values(perCategory).length ? Object.values(perCategory).map(c=>c.adjusted).slice(0,5) : [],
+            top3Strong: [],
+            top3Weak: []
         };
     }
 
@@ -1583,6 +1659,76 @@
         });
     }
 
+    // Helper: produce question list (maintains type info) for a given sector/role
+    function getQuestionsFor(sector, role) {
+        const ROLE_TO_POOL_KEY = {
+            'mavi_yaka': 'mavi yaka',
+            'beyaz_yaka': 'beyaz yaka',
+            'yonetici': 'yonetici',
+            'yonetici_idari': 'yonetici',
+            'hizmet_personeli': 'hizmet-on-cephe'
+        };
+        const poolKey = ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null;
+        let questions = [];
+        if (poolKey && questionPool[poolKey]) {
+            const sub = questionPool[poolKey];
+            Object.keys(sub).forEach(k => {
+                const arr = Array.isArray(sub[k]) ? sub[k] : [];
+                const type = (/sjt|durumsal|problem|senaryo/i.test(k)) ? 'sjt' : 'personality';
+                arr.forEach(q => questions.push({text: q, type, category: k}));
+            });
+        }
+        // fallback generic questions
+        if (!questions.length) {
+            questions = [
+                {text: 'Takım çalışmasına yatkın mısınız?', type: 'personality'},
+                {text: 'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?', type: 'personality'},
+                {text: 'Bir senaryoda en uygun aksiyonu nasıl seçersiniz?', type: 'sjt'}
+            ];
+        }
+        return questions;
+    }
+
+    // Load question keys (expertScores / target) from DB into window.questionKeysCache
+    async function loadQuestionKeys() {
+        try {
+            const snap = await get(ref(db, 'questionKeys'));
+            window.questionKeysCache = snap.exists() ? snap.val() : {};
+            console.log('Loaded questionKeys into cache', Object.keys(window.questionKeysCache||{}));
+        } catch(e) { console.warn('Failed to load questionKeys', e); window.questionKeysCache = {}; }
+    }
+
+    // Seed sample expert scores into DB for demo (call from console or admin)
+    window.seedSampleExpertScores = async function() {
+        // Example structure under questionKeys/<poolKey> = { '<category>': [ { text: '...', expertScores: [1.2,4.8,3.5, ...], target: 5 }, ... ] }
+        try {
+            const sample = {
+                'yonetici': {
+                    'Stratejik Vizyon ve Planlama': [
+                        { expertScores: null, target: 5 },
+                        { expertScores: null, target: 5 }
+                    ],
+                    'Problem Çözme Çevikliği (SJT)': [
+                        { expertScores: [1.2,4.8,3.5,2.1,1.0] },
+                        { expertScores: [1.0,3.5,4.2,3.8,2.1] }
+                    ]
+                },
+                'mavi yaka': {
+                    'Problem Bildirme Yeteneği': [
+                        { expertScores: [1.2,4.8,3.5,2.0,1.0] },
+                        { expertScores: [1.0,4.5,3.0,2.5,1.5] }
+                    ]
+                }
+            };
+            await set(ref(db, 'questionKeys'), sample);
+            await loadQuestionKeys();
+            alert('Örnek expertScores DB ye yazıldı ve cache yüklendi.');
+        } catch(e) { console.error('seedSampleExpertScores failed', e); alert('Seed başarısız: '+e.message); }
+    };
+
+    // Ensure keys are loaded at startup
+    try { loadQuestionKeys(); } catch(e) { console.warn('loadQuestionKeys init failed', e); }
+
     // Test sorularını dinamik oluştur
     // Yeni davranış: test tek seferde role (görev) bazlı tüm alt kategorilerin sorularını birleştirerek gösterir.
     // Parametreler: sector (imalat/hizmet), role (mavi_yaka, beyaz_yaka, yonetici, yonetici_idari, hizmet_personeli)
@@ -1602,39 +1748,65 @@
 
         const poolKey = ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null;
 
-        // Gather all questions for the mapped poolKey: flatten every subcategory's arrays
-        let questions = [];
-        if (poolKey && questionPool[poolKey]) {
-            const sub = questionPool[poolKey];
-            Object.keys(sub).forEach(k => {
-                const arr = Array.isArray(sub[k]) ? sub[k] : [];
-                questions = questions.concat(arr);
-            });
-        }
+        // Build structured question objects preserving type info
+        const qObjs = getQuestionsFor(sector, role);
+        // Enrich with expert scores/target from loaded cache if available
+        try {
+            const poolKey = (ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null);
+            const cache = window.questionKeysCache || {};
+            if (poolKey && cache[poolKey]) {
+                const poolKeys = cache[poolKey];
+                // for each qObj, try to find by category and assign expertScores/target
+                qObjs.forEach((qObj, idx) => {
+                    const cat = qObj.category;
+                    if (!cat || !poolKeys[cat]) return;
+                    // poolKeys[cat] is expected to be an array of objects matching the questions order
+                    const arr = poolKeys[cat] || [];
+                    const candidate = arr[idx] || null;
+                    if (candidate) {
+                        if (candidate.expertScores) qObj.expertScores = candidate.expertScores;
+                        if (candidate.target !== undefined) qObj.target = candidate.target;
+                    }
+                });
+            }
+        } catch(e) { console.warn('enrich questions failed', e); }
 
-        // Fallback: if no questions found, present a short generic set
-        if (!questions.length) {
-            questions = [
-                'Takım çalışmasına yatkın mısınız?',
-                'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?',
-                'Problem çözme yeteneğinizi nasıl değerlendirirsiniz?'
-            ];
-        }
-
-        questions.forEach((q, i) => {
-            testForm.innerHTML += `
+        // Render each question based on its type
+        qObjs.forEach((qObj, i) => {
+            if (qObj.type === 'personality') {
+                testForm.innerHTML += `
                 <div>
-                    <label class='block text-gray-700 font-medium mb-2'>${i+1}. ${q}</label>
-                    <select class='w-full px-4 py-2 border rounded-lg' required>
+                    <label class='block text-gray-700 font-medium mb-2'>${i+1}. ${qObj.text}</label>
+                    <select class='w-full px-4 py-2 border rounded-lg' data-qtype='personality' required data-qindex='${i}'>
                         <option value=''>Seçiniz</option>
-                        <option value='evet'>Evet</option>
-                        <option value='hayir'>Hayır</option>
-                        <option value='bazen'>Bazen</option>
+                        <option value='1'>1 — Kesinlikle Katılmıyorum</option>
+                        <option value='2'>2 — Katılmıyorum</option>
+                        <option value='3'>3 — Kararsız / Kısmen Katılıyorum</option>
+                        <option value='4'>4 — Katılıyorum</option>
+                        <option value='5'>5 — Kesinlikle Katılıyorum</option>
                     </select>
                 </div>
             `;
+            } else {
+                // SJT: render A..E choices. Expert scoring will map chosen option index to score later.
+                testForm.innerHTML += `
+                <div>
+                    <label class='block text-gray-700 font-medium mb-2'>${i+1}. ${qObj.text}</label>
+                    <select class='w-full px-4 py-2 border rounded-lg' data-qtype='sjt' required data-qindex='${i}'>
+                        <option value=''>Seçiniz</option>
+                        <option value='0'>A</option>
+                        <option value='1'>B</option>
+                        <option value='2'>C</option>
+                        <option value='3'>D</option>
+                        <option value='4'>E</option>
+                    </select>
+                </div>
+            `;
+            }
         });
         testForm.innerHTML += `<button type='submit' class='w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800'>Cevapları Gönder</button>`;
+        // store latest questions on the form for later scoring/detail rendering
+        testForm._questions = qObjs;
     }
 
     // Test cevaplarını kaydet ve İK paneline yansıt (Firebase ile tam entegrasyon)
@@ -1644,18 +1816,36 @@
             e.preventDefault();
             if (!activeCandidate) return;
             const selects = testForm.querySelectorAll('select');
-            const cevaplar = Array.from(selects).map(s => s.value);
+            // preserve both raw answers and typed answers
+            const cevaplar = [];
+            const typedAnswers = [];
+            Array.from(selects).forEach((s, idx) => {
+                const val = s.value;
+                const qtype = s.dataset.qtype || (testForm._questions && testForm._questions[idx] && testForm._questions[idx].type) || 'personality';
+                cevaplar.push(val);
+                typedAnswers.push({ value: val, type: qtype });
+            });
             // Demo skorlar (gerçek hesaplama ile değiştirilebilir)
-            const skorlar = {
-                radar: [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100],
-                sjt: [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100],
-                bias: (80 + Math.random()*20).toFixed(1)
-            };
+            // Compute scores using computeScoresAndNLG which now expects typed answers and questions
+            const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
             // Firebase'e kaydet
             await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
-            alert('Cevaplarınız kaydedildi!');
-            // İK panelindeki cevap listesine yansıt
-            renderAnswers({cevaplar});
+            // Hide the test UI and show a thank-you message
+            const testSectionEl = document.getElementById('testSection');
+            if (testSectionEl) {
+                testSectionEl.innerHTML = `
+                    <div class='p-6 bg-green-50 border border-green-200 rounded-lg text-center'>
+                        <h3 class='text-2xl font-semibold text-green-800 mb-2'>Test tamamlandı — teşekkürler!</h3>
+                        <p class='text-gray-700 mb-3'>Cevaplarınız başarıyla alındı. Rumuz: <b>${activeCandidate.rumuz}</b></p>
+                        <p class='text-sm text-gray-600'>Toplam puanınız: <b>${skorlar.genelSkor || '—'}</b></p>
+                    </div>
+                `;
+            }
+            // Ensure admin UI doesn't overlap candidate experience
+            try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
+            try { const comp = document.getElementById('adminLoginCompact'); if (comp) { comp.classList.add('hidden'); try { comp.style.display='none'; } catch(_){} } } catch(e){}
+            // Update IK panel and radar visual
+            renderAnswers(activeCandidate);
             renderRadar(skorlar.radar);
         }
     }
@@ -1768,9 +1958,27 @@
                     return;
                 } catch(firebaseErr) {
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
-                    // Provide actionable diagnostic to the user/developer and do NOT open admin panel via client-side fallback
-                    try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){}
-                    // Always fail here; removing client-side fallback for security.
+                    // Provide actionable diagnostic to the user/developer
+                    try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
+                    // Lightweight client-side fallback: only for the compact modal and only when the
+                    // entered password matches the legacy ADMIN_FALLBACK_PASSWORD. This is insecure
+                    // and intended as a short-term convenience per user request. Avoid using in
+                    // production; prefer server-side custom claims.
+                    try {
+                        if (typeof ADMIN_FALLBACK_PASSWORD !== 'undefined' && pw === ADMIN_FALLBACK_PASSWORD) {
+                            console.warn('ADMIN FALLBACK used (compact): opening admin panel locally. INSECURE.');
+                            const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                            if (adminLoginCompactNow) {
+                                adminLoginCompactNow.classList.add('hidden');
+                                try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                            }
+                            const panelNow = document.getElementById('adminPanel');
+                            if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                            const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                            return;
+                        }
+                    } catch(fb) { console.error('Fallback check failed', fb); }
+                    // If fallback not used, rethrow to be handled by outer catch
                     throw firebaseErr;
                 }
             } catch(err) {
@@ -2178,33 +2386,41 @@ function showCandidateDetail(candidate) {
       <button onclick='this.closest(".fixed").remove()' class='absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl'>&times;</button>
       <h2 class='text-2xl font-bold text-blue-800 mb-4'>Aday Detay Analizi</h2>
       <div class='mb-4'><b>Rumuz:</b> ${candidate.rumuz} &nbsp; <b>Tip:</b> ${candidate.tip} &nbsp; <b>Başlık:</b> ${candidate.baslik}</div>
-      <div class='mb-6 flex flex-col md:flex-row gap-6'>
-        <div class='flex-1 bg-blue-50 rounded-lg p-4'>
-          <canvas id='detailRadar' width='300' height='200'></canvas>
-          <div class='text-xs text-gray-500 mt-2'>Big Five & Alt Yetkinlikler</div>
-        </div>
-        <div class='flex-1 bg-blue-50 rounded-lg p-4'>
-          <h4 class='font-semibold mb-2'>SJT Performansı</h4>
-          <canvas id='detailSJT' width='300' height='200'></canvas>
-          <div class='text-xs text-gray-500 mt-2'>Durumsal Yargı Testi</div>
-        </div>
-      </div>
-      <div class='mb-4'>
-        <b>Güvenilirlik Puanı (Response Bias):</b> <span id='detailBias'></span>
-      </div>
-      <div>
-        <h4 class='font-semibold mb-2'>Cevapladığı Sorular</h4>
-        <ul id='detailAnswers' class='list-disc pl-5 text-gray-700'></ul>
-      </div>
+            <div class='mb-6 grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <div class='bg-blue-50 rounded-lg p-4 overflow-auto max-h-72'>
+                    <canvas id='detailRadar' width='300' height='200'></canvas>
+                    <div class='text-xs text-gray-500 mt-2'>Yetkinlik Dağılımı (Adjusted)</div>
+                </div>
+                <div class='bg-blue-50 rounded-lg p-4 overflow-auto max-h-72'>
+                    <h4 class='font-semibold mb-2'>SJT & Özet</h4>
+                    <canvas id='detailSJT' width='300' height='200'></canvas>
+                    <div class='text-xs text-gray-500 mt-2'>Durumsal Yargı Testi (Uzman Anahtarına Göre)</div>
+                </div>
+            </div>
+            <div class='mb-4'><b>Güvenilirlik Puanı (Response Bias):</b> <span id='detailBias'></span></div>
+            <div class='mb-4'>
+                <h4 class='font-semibold mb-2'>Yetkinlik Bazlı Dağılım</h4>
+                <div id='perCategoryBreakdown' class='space-y-2 text-sm text-gray-700'></div>
+            </div>
+            <div>
+                <h4 class='font-semibold mb-2'>Soru / Cevap Detayları</h4>
+                <div id='questionDetailList' class='text-sm text-gray-700 max-h-64 overflow-auto'></div>
+            </div>
+            <div class='mt-4 flex gap-2'>
+                <button id='exportCsvBtn' class='bg-gray-200 text-gray-800 px-3 py-1 rounded'>CSV Dışa Aktar</button>
+                <button id='copySummaryBtn' class='bg-indigo-600 text-white px-3 py-1 rounded'>Özet Kopyala</button>
+            </div>
     </div>
   `;
   document.body.appendChild(modal);
   // Radar ve SJT grafikleri demo (örnek puanlar)
         setTimeout(() => {
             // Prefer database-provided skorlar if available
-            const s = candidate.skorlar || {};
-            const radarData = (s.radar && s.radar.length) ? s.radar : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100];
-            const sjtData = (s.sjt && s.sjt.length) ? s.sjt : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100];
+                        const s = candidate.skorlar || {};
+                        // If server-side perCategory present, use that
+                        const perCat = s.perCategory || null;
+                        const radarData = (s.radar && s.radar.length) ? s.radar : (perCat ? Object.values(perCat).map(x=>x.adjusted) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]);
+                        const sjtData = (s.sjt && s.sjt.length) ? s.sjt : (perCat ? Object.values(perCat).map(x=>x.sjt && x.sjt.raw ? x.sjt.raw : Math.random()*100) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]);
 
             try {
                 new Chart(document.getElementById('detailRadar').getContext('2d'), {
@@ -2240,7 +2456,6 @@ function showCandidateDetail(candidate) {
 
             const biasText = (s.bias !== undefined && s.bias !== null) ? (s.bias + ' / 100') : ((80 + Math.random()*20).toFixed(1) + ' / 100');
             document.getElementById('detailBias').innerText = biasText;
-
             // NLG summary (if available) + Yapay Zeka Yorumu butonu
             const summaryElId = 'detailNLG';
             let summaryEl = document.getElementById(summaryElId);
@@ -2278,17 +2493,75 @@ function showCandidateDetail(candidate) {
                 summaryEl = document.getElementById(summaryElId);
             }
             summaryEl.innerText = s.nlgSummary || 'Detaylı yorum bulunmuyor.';
-
-            // Cevap listesi
-            const ans = document.getElementById('detailAnswers');
-            ans.innerHTML = '';
-            if (candidate.cevaplar && candidate.cevaplar.length) {
-                candidate.cevaplar.forEach((cevap, i) => {
-                    ans.innerHTML += `<li>${i+1}. Soru: ${cevap}</li>`;
+            // Per-category breakdown
+            const breakdownEl = document.getElementById('perCategoryBreakdown');
+            breakdownEl.innerHTML = '';
+            const pc = s.perCategory || {};
+            if (Object.keys(pc).length) {
+                Object.keys(pc).forEach(cat => {
+                    const c = pc[cat];
+                    const div = document.createElement('div');
+                    div.innerHTML = `<b>${cat}</b>: ${c.adjusted} (${c.label}) — raw: ${c.raw}`;
+                    breakdownEl.appendChild(div);
                 });
             } else {
-                ans.innerHTML = '<li>Henüz cevap yok.</li>';
+                breakdownEl.innerHTML = '<div>Detaylı kategori verisi yok.</div>';
             }
+
+            // Question-by-question detail
+            const qListEl = document.getElementById('questionDetailList');
+            qListEl.innerHTML = '';
+            const questions = (candidate.cevaplar && candidate.cevaplar.length && (testForm && testForm._questions)) ? testForm._questions : null;
+            if (questions && questions.length) {
+                questions.forEach((q, idx) => {
+                    const ans = candidate.cevaplar[idx] || '';
+                    const target = q.target || '';
+                    const expert = Array.isArray(q.expertScores) ? q.expertScores.join(',') : '';
+                    const row = document.createElement('div');
+                    row.className = 'mb-2';
+                    row.innerHTML = `<div class='font-semibold'>${idx+1}. ${q.text}</div><div class='text-sm text-gray-600'>Cevap: ${ans} ${target?('<br/>Target: '+target):''} ${expert?('<br/>Expert: '+expert):''}</div>`;
+                    qListEl.appendChild(row);
+                });
+            } else if (candidate.cevaplar && candidate.cevaplar.length) {
+                candidate.cevaplar.forEach((cevap, i) => {
+                    const row = document.createElement('div'); row.className='mb-2';
+                    row.innerHTML = `<div class='font-semibold'>${i+1}. Soru metni yok</div><div class='text-sm text-gray-600'>Cevap: ${cevap}</div>`;
+                    qListEl.appendChild(row);
+                });
+            } else {
+                qListEl.innerHTML = '<div>Henüz cevap yok.</div>';
+            }
+
+            // Export CSV handler
+            const exportBtn = document.getElementById('exportCsvBtn');
+            exportBtn.onclick = function(){
+                const rows = [];
+                rows.push(['Rumuz','Tip','Başlık','Kategori','Soru','Cevap','Target','ExpertScores','CategoryAdjusted']);
+                const pcKeys = Object.keys(pc);
+                if (questions && questions.length) {
+                    questions.forEach((q, idx) => {
+                        const ans = candidate.cevaplar[idx] || '';
+                        // find category adjusted
+                        let catAdj = '';
+                        for (const k of pcKeys) {
+                            const found = (pc[k].questions || []).find(x=>x.index===idx);
+                            if (found) { catAdj = pc[k].adjusted; break; }
+                        }
+                        rows.push([candidate.rumuz, candidate.tip, candidate.baslik, q.category||'', q.text, ans, q.target||'', Array.isArray(q.expertScores)?q.expertScores.join('|'): '', catAdj]);
+                    });
+                } else if (candidate.cevaplar && candidate.cevaplar.length) {
+                    candidate.cevaplar.forEach((a,i)=> rows.push([candidate.rumuz, candidate.tip, candidate.baslik, '', 'Soru metni yok', a, '', '', '']));
+                }
+                const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+                const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `${candidate.rumuz}_answers.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            };
+
+            const copyBtn = document.getElementById('copySummaryBtn');
+            copyBtn.onclick = function(){
+                try { navigator.clipboard.writeText(s.nlgSummary || ''); alert('Özet panoya kopyalandı'); } catch(e){ prompt('Özet (kopyalayın):', s.nlgSummary || ''); }
+            };
         }, 100);
 }
     </script>
