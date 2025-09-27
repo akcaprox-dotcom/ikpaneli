@@ -505,47 +505,56 @@
     window.saveCandidateTest = async function(rumuz, tip, baslik, cevaplar, skorlar) {
         // skorlar: {radar: [...], sjt: [...], bias: ...}
         // Compute deterministic scored values + NLG summary on client side as fallback
+        // More robust save strategy:
+        // 1) compute final skorlar client-side
+        // 2) try a targeted set for subpaths (candidates/<rumuz>/cevaplar and skorlar)
+        // 3) if that fails, try update on full node
+        // 4) if still fails, queue locally
         try {
             const computed = computeScoresAndNLG(cevaplar, { tip, baslik });
-            // merge provided skorlar (if any) with computed, but prefer computed values
             const finalSkorlar = Object.assign({}, skorlar || {}, computed);
-            await update(ref(db, 'candidates/' + rumuz), {
-                rumuz,
-                tip,
-                baslik,
-                cevaplar,
-                skorlar: finalSkorlar,
-                timestamp: Date.now()
-            });
-            return { ok: true };
-        } catch (err) {
-            console.error('saveCandidateTest: primary save failed', err);
-            // Try a raw save as a fallback but capture any permission errors
+
+            // Try to write answers and skorlar separately (some DB rules allow per-child write)
+            try {
+                await set(ref(db, `candidates/${rumuz}/cevaplar`), cevaplar || []);
+                await set(ref(db, `candidates/${rumuz}/skorlar`), finalSkorlar);
+                // ensure metadata fields
+                await update(ref(db, `candidates/${rumuz}`), { rumuz, tip, baslik, timestamp: Date.now() });
+                console.log('saveCandidateTest: wrote cevaplar and skorlar separately for', rumuz);
+                return { ok: true };
+            } catch (sepErr) {
+                console.warn('saveCandidateTest: write-by-child failed, trying full update', sepErr);
+            }
+
+            // Next try: replace/merge whole candidate node
             try {
                 await update(ref(db, 'candidates/' + rumuz), {
                     rumuz,
                     tip,
                     baslik,
                     cevaplar,
-                    skorlar: skorlar || {},
+                    skorlar: finalSkorlar,
                     timestamp: Date.now()
                 });
+                console.log('saveCandidateTest: updated full node for', rumuz);
                 return { ok: true, fallback: true };
             } catch (err2) {
-                console.error('saveCandidateTest: fallback save failed', err2);
-                // Surface helpful message to the user
+                console.error('saveCandidateTest: full update failed', err2);
                 const code = (err2 && err2.code) ? err2.code : null;
                 const msg = (err2 && err2.message) ? err2.message : String(err2);
-                alert('Kaydetme başarısız oldu: ' + (code || msg));
-                // If permission denied, give explicit guidance
                 if ((code && code.toLowerCase().includes('permission')) || (msg && msg.toLowerCase().includes('permission'))) {
-                    alert('Görünüşe göre Realtime Database kuralları yazmaya izin vermiyor (permission_denied).\n\nÇözüm önerileri:\n- Firebase Console -> Realtime Database -> Rules bölümünden geçici olarak test kuralları uygulayarak deneyin.\n- Ya da adayları Auth ile giriş yaptırıp UID temelli yazma izni sağlayın.\n- Üretimde kesinlikle kuralları herkese açık yapmayın.');
+                    console.warn('Permission denied while saving candidate data. Check RTDB rules.');
                 }
-                // final failure -> queue locally for retry and return queued status
-                try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: skorlar || {}, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
-                alert('Veri sunucuya gönderilemedi; otomatik olarak bekleyen gönderimler kuyruğuna alındı ve arka planda tekrar denenmeye çalışılacaktır.');
+                // final failure -> queue locally
+                try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: finalSkorlar, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                alert('Veri sunucuya gönderilemedi; otomatik olarak bekleyen gönderimler kuyruğuna alındı ve arka planda tekrar denenecektir. (Detay: ' + (msg||code||'unknown') + ')');
                 return { ok: false, queued: true };
             }
+        } catch (outerErr) {
+            console.error('saveCandidateTest: unexpected error', outerErr);
+            try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: skorlar || {}, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+            alert('Kaydetme sırasında beklenmeyen bir hata oluştu ve veriler kuyruğa alındı. Konsolu kontrol edin.');
+            return { ok: false, queued: true };
         }
     };
 
@@ -794,10 +803,15 @@
 
     window.listHRUsers = function(callback) {
         const hrRef = ref(db, 'hrUsers');
-        onValue(hrRef, (snapshot) => {
+        // Use a one-time read to avoid registering multiple onValue listeners which
+        // caused duplicate render callbacks when loadHRList was called repeatedly.
+        get(hrRef).then(snapshot => {
             const data = snapshot.val() || {};
             const arr = Object.keys(data).map(k => data[k]);
             callback(arr);
+        }).catch(err => {
+            console.warn('listHRUsers get failed', err);
+            callback([]);
         });
     };
 
@@ -1057,13 +1071,26 @@
                     // Provide actionable diagnostic to the user/developer
                     try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
                     try { firebaseAuthVerbose(firebaseErr); } catch(_){ }
-                    // Legacy local fallback: if the user entered the known local test password, open admin panel locally
-                    if (password === ADMIN_FALLBACK_PASSWORD) {
-                        console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
-                        const panel = document.getElementById('adminPanel');
-                        if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
-                        return;
-                    }
+                    // If it's an invalid-credential / 400 during local/dev, offer to use local fallback password
+                    try {
+                        const code = (firebaseErr && firebaseErr.code) ? String(firebaseErr.code) : '';
+                        if (code.includes('invalid-credential') || (firebaseErr && /400/.test(String(firebaseErr.message||'')))) {
+                            // Only allow dev fallback on local/dev hosts or if explicitly enabled via localStorage
+                            const allowOnHost = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+                            const devToggle = localStorage.getItem('apx_allow_dev_fallback') === '1';
+                            if (allowOnHost || devToggle) {
+                                const ok = confirm('Firebase sign-in 400 / invalid-credential hatası alındı. Yerel test için admin paneli açılsın mı? (İNSECURE - yalnızca geliştirme için)');
+                                if (ok) {
+                                    console.warn('DEV FALLBACK used: opening admin panel locally without verifying credentials. INSECURE.');
+                                    const panel = document.getElementById('adminPanel');
+                                    if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
+                                    return;
+                                }
+                            } else {
+                                alert('Güvenlik nedeniyle bu cihaz/alan adına dev-fallback kapalı. Yerel geliştirme için dosyayı localhost üzerinden açın veya developer fallback özelliğini etkinleştirin (localStorage `apx_allow_dev_fallback` = 1).');
+                            }
+                        }
+                    } catch(e) { console.warn('fallback prompt failed', e); }
                     throw firebaseErr;
                 }
             } catch (err) {
@@ -1754,17 +1781,24 @@
     async function loadQuestionKeys() {
         try {
             let snap = null;
-            // Preferred: use imported `get` if present
-            if (typeof get === 'function') {
-                snap = await get(ref(db, 'questionKeys'));
-            } else if (typeof window.get === 'function') {
-                // fallback to globally-exposed helper
-                snap = await window.get(window.ref(window.db, 'questionKeys'));
+            // Preferred: use imported `get` and `ref` if present; guard against ReferenceError when imports failed
+            const localGet = (typeof get === 'function') ? get : (typeof window.get === 'function' ? window.get : null);
+            const localRef = (typeof ref === 'function') ? ref : (typeof window.ref === 'function' ? window.ref : null);
+            if (localGet && localRef) {
+                try {
+                    snap = await localGet(localRef(db, 'questionKeys'));
+                } catch(e) {
+                    console.warn('loadQuestionKeys: primary get(ref(...)) failed', e);
+                    snap = null;
+                }
+            } else if (localGet && typeof window.db !== 'undefined' && typeof window.ref === 'function') {
+                // fallback to global helpers
+                try { snap = await window.get(window.ref(window.db, 'questionKeys')); } catch(e){ console.warn('loadQuestionKeys: window.get(window.ref(...)) failed', e); snap = null; }
             } else {
                 // Last resort: use onValue once and resolve when data arrives
                 snap = await new Promise((resolve, reject) => {
                     try {
-                        const r = ref(db, 'questionKeys');
+                        const r = (localRef) ? localRef(db, 'questionKeys') : (typeof window.ref === 'function' ? window.ref(window.db, 'questionKeys') : null);
                         const unsub = onValue(r, (s) => {
                             try { if (typeof unsub === 'function') unsub(); } catch(_){}
                             resolve(s);
@@ -1834,32 +1868,20 @@
     function renderTestQuestions(sector, role) {
         const testForm = document.getElementById('testForm');
         if (!testForm) return;
-        testForm.innerHTML = '';
-
-        // map our role keys to questionPool top-level keys
-        const ROLE_TO_POOL_KEY = {
-            'mavi_yaka': 'mavi yaka',
-            'beyaz_yaka': 'beyaz yaka',
-            'yonetici': 'yonetici',
-            'yonetici_idari': 'yonetici',
-            'hizmet_personeli': 'hizmet-on-cephe'
-        };
-
-        const poolKey = ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null;
-
         // Build structured question objects preserving type info
         const qObjs = getQuestionsFor(sector, role);
         // Enrich with expert scores/target from loaded cache if available
         try {
+            const ROLE_TO_POOL_KEY = {
+                'mavi_yaka': 'mavi yaka', 'beyaz_yaka': 'beyaz yaka', 'yonetici': 'yonetici', 'yonetici_idari': 'yonetici', 'hizmet_personeli': 'hizmet-on-cephe'
+            };
             const poolKey = (ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null);
             const cache = window.questionKeysCache || {};
             if (poolKey && cache[poolKey]) {
                 const poolKeys = cache[poolKey];
-                // for each qObj, try to find by category and assign expertScores/target
                 qObjs.forEach((qObj, idx) => {
                     const cat = qObj.category;
                     if (!cat || !poolKeys[cat]) return;
-                    // poolKeys[cat] is expected to be an array of objects matching the questions order
                     const arr = poolKeys[cat] || [];
                     const candidate = arr[idx] || null;
                     if (candidate) {
@@ -1870,42 +1892,81 @@
             }
         } catch(e) { console.warn('enrich questions failed', e); }
 
-        // Render each question based on its type
-        qObjs.forEach((qObj, i) => {
-            if (qObj.type === 'personality') {
-                testForm.innerHTML += `
-                <div>
-                    <label class='block text-gray-700 font-medium mb-2'>${i+1}. ${qObj.text}</label>
-                    <select class='w-full px-4 py-2 border rounded-lg' data-qtype='personality' required data-qindex='${i}'>
-                        <option value=''>Seçiniz</option>
-                        <option value='1'>1 — Kesinlikle Katılmıyorum</option>
-                        <option value='2'>2 — Katılmıyorum</option>
-                        <option value='3'>3 — Kararsız / Kısmen Katılıyorum</option>
-                        <option value='4'>4 — Katılıyorum</option>
-                        <option value='5'>5 — Kesinlikle Katılıyorum</option>
-                    </select>
-                </div>
-            `;
-            } else {
-                // SJT: render A..E choices. Expert scoring will map chosen option index to score later.
-                testForm.innerHTML += `
-                <div>
-                    <label class='block text-gray-700 font-medium mb-2'>${i+1}. ${qObj.text}</label>
-                    <select class='w-full px-4 py-2 border rounded-lg' data-qtype='sjt' required data-qindex='${i}'>
-                        <option value=''>Seçiniz</option>
-                        <option value='0'>A</option>
-                        <option value='1'>B</option>
-                        <option value='2'>C</option>
-                        <option value='3'>D</option>
-                        <option value='4'>E</option>
-                    </select>
-                </div>
-            `;
-            }
-        });
-        testForm.innerHTML += `<button type='submit' class='w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800'>Cevapları Gönder</button>`;
-        // store latest questions on the form for later scoring/detail rendering
+        // Prepare paginated UI state
         testForm._questions = qObjs;
+        testForm._answers = new Array(qObjs.length).fill('');
+        testForm._currentQuestion = 0;
+
+        // Build UI container
+        testForm.innerHTML = `
+            <div id='questionPane' class='space-y-4'></div>
+            <div class='flex items-center gap-2 mt-4'>
+                <button type='button' id='prevQ' class='bg-gray-200 px-3 py-2 rounded disabled:opacity-50'>Önceki</button>
+                <div id='progress' class='text-sm text-gray-600 flex-1'>0 / 0</div>
+                <button type='button' id='nextQ' class='bg-blue-600 text-white px-3 py-2 rounded'>Sonraki</button>
+                <button type='submit' id='submitTest' class='hidden bg-green-600 text-white px-3 py-2 rounded'>Cevapları Gönder</button>
+            </div>
+        `;
+
+        const pane = testForm.querySelector('#questionPane');
+        const prevBtn = testForm.querySelector('#prevQ');
+        const nextBtn = testForm.querySelector('#nextQ');
+        const submitBtn = testForm.querySelector('#submitTest');
+        const progress = testForm.querySelector('#progress');
+
+        function renderAt(i) {
+            const q = qObjs[i] || {};
+            progress.innerText = `${i+1} / ${qObjs.length}`;
+            prevBtn.disabled = (i === 0);
+            // show submit on last
+            if (i === qObjs.length - 1) { nextBtn.classList.add('hidden'); submitBtn.classList.remove('hidden'); }
+            else { nextBtn.classList.remove('hidden'); submitBtn.classList.add('hidden'); }
+
+            // create content
+            let html = `<div><label class='block text-gray-700 font-medium mb-2'>${i+1}. ${q.text || ('Soru ' + (i+1))}</label>`;
+            if ((q.type || '').toLowerCase() === 'personality') {
+                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='personality'>
+                    <option value=''>Seçiniz</option>
+                    <option value='1'>1 — Kesinlikle Katılmıyorum</option>
+                    <option value='2'>2 — Katılmıyorum</option>
+                    <option value='3'>3 — Kararsız / Kısmen Katılıyorum</option>
+                    <option value='4'>4 — Katılıyorum</option>
+                    <option value='5'>5 — Kesinlikle Katılıyorum</option>
+                </select>`;
+            } else {
+                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='sjt'>
+                    <option value=''>Seçiniz</option>
+                    <option value='0'>A</option>
+                    <option value='1'>B</option>
+                    <option value='2'>C</option>
+                    <option value='3'>D</option>
+                    <option value='4'>E</option>
+                </select>`;
+            }
+            if (q.expertScores) html += `<div class='text-xs text-gray-500 mt-2'>Uzman skorları: ${JSON.stringify(q.expertScores)}</div>`;
+            html += `</div>`;
+            pane.innerHTML = html;
+            // prefill if answer exists
+            const sel = pane.querySelector('#curAnswer');
+            if (sel && testForm._answers[i] !== undefined && testForm._answers[i] !== '') sel.value = testForm._answers[i];
+            // focus select
+            try { sel && sel.focus(); } catch(e){}
+        }
+
+        // wire buttons
+        prevBtn.onclick = function(){
+            // save current
+            const cur = document.getElementById('curAnswer'); if (cur) testForm._answers[testForm._currentQuestion] = cur.value;
+            if (testForm._currentQuestion > 0) testForm._currentQuestion--;
+            renderAt(testForm._currentQuestion);
+        };
+        nextBtn.onclick = function(){
+            const cur = document.getElementById('curAnswer'); if (cur) testForm._answers[testForm._currentQuestion] = cur.value;
+            if (testForm._currentQuestion < qObjs.length - 1) testForm._currentQuestion++;
+            renderAt(testForm._currentQuestion);
+        };
+        // initial render
+        renderAt(0);
     }
 
     // Test cevaplarını kaydet ve İK paneline yansıt (Firebase ile tam entegrasyon)
@@ -1915,20 +1976,17 @@
             e.preventDefault();
             if (!activeCandidate) return;
             try {
-                const selects = testForm.querySelectorAll('select');
-                // preserve both raw answers and typed answers
-                const cevaplar = [];
-                const typedAnswers = [];
-                Array.from(selects).forEach((s, idx) => {
-                    const val = s.value;
-                    const qtype = s.dataset.qtype || (testForm._questions && testForm._questions[idx] && testForm._questions[idx].type) || 'personality';
-                    cevaplar.push(val);
-                    typedAnswers.push({ value: val, type: qtype });
-                });
-                // Compute scores using computeScoresAndNLG which now expects typed answers and questions
+                // Use accumulated answers from the paginated UI if present
+                const cevaplar = Array.isArray(testForm._answers) ? testForm._answers.slice() : [];
+                // Build typedAnswers using known question types
+                const typedAnswers = (testForm._questions || []).map((q, idx) => ({ value: cevaplar[idx] || '', type: q && q.type ? q.type : 'personality' }));
+
+                // Compute scores
                 const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
-                // Attempt to save; if saving fails, saveCandidateTest will queue
+
+                // Attempt to save; if saving fails, saveCandidateTest will handle fallback/queue
                 const res = await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
+
                 // Hide the test UI and show a thank-you message
                 const testSectionEl = document.getElementById('testSection');
                 if (testSectionEl) {
@@ -1941,16 +1999,18 @@
                         </div>
                     `;
                 }
+
                 // Ensure admin UI doesn't overlap candidate experience
                 try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
                 try { const comp = document.getElementById('adminLoginCompact'); if (comp) { comp.classList.add('hidden'); try { comp.style.display='none'; } catch(_){} } } catch(e){}
+
                 // Update IK panel and radar visual
                 renderAnswers(activeCandidate);
                 renderRadar(skorlar.radar);
             } catch (err) {
                 console.error('Test submit failed', err);
                 // Queue as last resort
-                try { queueCandidateSubmission({ rumuz: activeCandidate.rumuz, tip: activeCandidate.tip, baslik: activeCandidate.baslik, cevaplar: [], skorlar: {} }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                try { queueCandidateSubmission({ rumuz: activeCandidate.rumuz, tip: activeCandidate.tip, baslik: activeCandidate.baslik, cevaplar: (testForm._answers||[]), skorlar: {} }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
                 alert('Cevaplarınız gönderilirken hata oluştu. Veriler yerel kuyruğa alındı ve otomatik olarak tekrar denenecektir.');
             }
         }
@@ -1985,6 +2045,7 @@
                         <td class='p-2'>
                             <button class='px-2 py-1 border view-detail' data-r='${c.rumuz}'>Detay</button>
                             <button class='px-2 py-1 border ml-2 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
+                            <button class='px-2 py-1 border ml-2 request-ai' data-r='${c.rumuz}'>Yapay Zeka</button>
                             <button class='px-2 py-1 border ml-2 delete-cand' data-r='${c.rumuz}'>Sil</button>
                         </td>
                     </tr>
@@ -2025,6 +2086,26 @@
                         console.error('delete candidate failed', e);
                         alert('Silme işlemi sırasında hata: ' + (e.message||e));
                     }
+                };
+            });
+            // Attach AI request handlers per row (opens detail modal and auto-invokes modal NLG button)
+            Array.from(document.querySelectorAll('.request-ai')).forEach(btn => {
+                btn.onclick = function(){
+                    const r = this.dataset.r;
+                    const cand = (candidates || []).find(x=>x.rumuz===r);
+                    if (!cand) return alert('Aday bulunamadı');
+                    // open detail modal
+                    showCandidateDetail(cand);
+                    // attempt to auto-click the modal's NLG button (retry for short period)
+                    const tryClick = function(attemptsLeft){
+                        const modalBtn = document.querySelector('.nlg-request-btn');
+                        if (modalBtn) {
+                            try { modalBtn.click(); } catch(e){ console.warn('auto invoke nlg failed', e); }
+                            return;
+                        }
+                        if (attemptsLeft > 0) setTimeout(()=> tryClick(attemptsLeft-1), 300);
+                    };
+                    tryClick(6); // try for ~1.8s
                 };
             });
         });
@@ -2082,28 +2163,33 @@
                     return;
                 } catch(firebaseErr) {
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
-                    // Provide actionable diagnostic to the user/developer
                     try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
                     try { firebaseAuthVerbose(firebaseErr); } catch(_){ }
-                    // Lightweight client-side fallback: only for the compact modal and only when the
-                    // entered password matches the legacy ADMIN_FALLBACK_PASSWORD. This is insecure
-                    // and intended as a short-term convenience per user request. Avoid using in
-                    // production; prefer server-side custom claims.
                     try {
-                        if (typeof ADMIN_FALLBACK_PASSWORD !== 'undefined' && pw === ADMIN_FALLBACK_PASSWORD) {
-                            console.warn('ADMIN FALLBACK used (compact): opening admin panel locally. INSECURE.');
-                            const adminLoginCompactNow = document.getElementById('adminLoginCompact');
-                            if (adminLoginCompactNow) {
-                                adminLoginCompactNow.classList.add('hidden');
-                                try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                        const code = (firebaseErr && firebaseErr.code) ? String(firebaseErr.code) : '';
+                        if (code.includes('invalid-credential') || (firebaseErr && /400/.test(String(firebaseErr.message||'')))) {
+                            // Only allow dev fallback on local/dev hosts or if explicitly enabled via localStorage
+                            const allowOnHost2 = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+                            const devToggle2 = localStorage.getItem('apx_allow_dev_fallback') === '1';
+                            if (allowOnHost2 || devToggle2) {
+                                const ok = confirm('Firebase sign-in 400 / invalid-credential hatası alındı. Yerel test için admin paneli açılsın mı? (İNSECURE - yalnızca geliştirme için)');
+                                if (ok) {
+                                    console.warn('DEV FALLBACK used (compact): opening admin panel locally without verifying credentials. INSECURE.');
+                                    const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                                    if (adminLoginCompactNow) {
+                                        adminLoginCompactNow.classList.add('hidden');
+                                        try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                                    }
+                                    const panelNow = document.getElementById('adminPanel');
+                                    if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                                    const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                                    return;
+                                }
+                            } else {
+                                alert('Güvenlik nedeniyle bu cihaz/alan adına dev-fallback kapalı. Yerel geliştirme için dosyayı localhost üzerinden açın veya developer fallback özelliğini etkinleştirin (localStorage `apx_allow_dev_fallback` = 1).');
                             }
-                            const panelNow = document.getElementById('adminPanel');
-                            if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
-                            const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
-                            return;
                         }
-                    } catch(fb) { console.error('Fallback check failed', fb); }
-                    // If fallback not used, rethrow to be handled by outer catch
+                    } catch(e) { console.warn('fallback prompt failed', e); }
                     throw firebaseErr;
                 }
             } catch(err) {
@@ -2339,29 +2425,65 @@
             for (const u of list) {
                 const testCount = await countCandidateTestsByHRBetween(u.username, fromTs, toTs).catch(()=>0);
                 const status = u.active ? 'Aktif' : 'Pasif';
-                hrManageTableBody.innerHTML += `<tr>
+                // Build a stable row id/data attribute so we can replace existing rows instead of appending
+                const rowId = 'hr_row_' + u.username.replace(/[^a-zA-Z0-9_-]/g,'');
+                const newRowHtml = `<tr id='${rowId}' data-hr='${u.username}'>
                     <td class='p-2'>${u.username}</td>
                     <td class='p-2'>${u.fullName||''}</td>
                     <td class='p-2'>${u.phone||''}</td>
                     <td class='p-2'>${u.email||''}</td>
                     <td class='p-2'>${u.password||''}</td>
                     <td class='p-2'>${testCount}</td>
-                    <td class='p-2'>${status}</td>
+                    <td class='p-2 hr-status'>${status}</td>
                     <td class='p-2'><button class='px-2 py-1 border toggle-hr' data-user='${u.username}'>${u.active? 'Pasife Al' : 'Aktifleştir'}</button></td>
                     <td class='p-2'><button class='px-2 py-1 bg-indigo-600 text-white rounded request-nlg' data-hr='${u.username}'>Gemini Özeti</button></td>
                 </tr>`;
-            }
-            // attach toggles
-            Array.from(document.querySelectorAll('.toggle-hr')).forEach(btn => {
-                btn.onclick = async function(){
-                    const username = this.dataset.user;
-                    // flip
-                    const current = this.textContent.includes('Pasife')? true : false;
-                    const newActive = !current;
-                    await setHRActive(username, newActive);
-                    loadHRList();
+                const existing = document.getElementById(rowId);
+                if (existing) {
+                    // replace the existing row markup
+                    existing.outerHTML = newRowHtml;
+                } else {
+                    hrManageTableBody.insertAdjacentHTML('beforeend', newRowHtml);
                 }
-            });
+                // Attach handlers to the newly inserted/updated row
+                try {
+                    const rowEl = document.getElementById(rowId);
+                    if (!rowEl) continue;
+                    const toggleBtn = rowEl.querySelector('.toggle-hr');
+                    if (toggleBtn) {
+                        toggleBtn.onclick = async function(){
+                            const username = this.dataset.user;
+                            // flip based on current status text in the row to avoid stale closures
+                            const statusCell = rowEl.querySelector('.hr-status');
+                            const currentIsActive = statusCell && statusCell.textContent.trim().toLowerCase() === 'aktif';
+                            const newActive = !currentIsActive;
+                            try {
+                                await setHRActive(username, newActive);
+                                // immediately update UI in-place instead of reloading whole list
+                                if (statusCell) statusCell.textContent = newActive ? 'Aktif' : 'Pasif';
+                                // update button label
+                                this.textContent = newActive ? 'Pasife Al' : 'Aktifleştir';
+                            } catch(e) {
+                                console.error('setHRActive failed', e);
+                                alert('Durum güncellenirken hata: ' + (e.message||e));
+                            }
+                        };
+                    }
+                    const nlgBtn = rowEl.querySelector('.request-nlg');
+                    if (nlgBtn) {
+                        nlgBtn.onclick = function(){
+                            const username = this.dataset.hr;
+                            if (!username) return alert('Kullanıcı seçili değil');
+                            if (!confirm(`'${username}' için Gemini ile özet oluşturulsun mu?`)) return;
+                            requestCandidateNLG(username).then(result => {
+                                alert('Gemini özeti oluşturuldu ve kaydedildi.');
+                                loadCandidatesFromFirebase();
+                                if (!document.getElementById('hrManageModal').classList.contains('hidden')) loadHRList();
+                            }).catch(err => { console.error(err); alert('Gemini özeti oluşturulurken hata: ' + (err.message||err)); });
+                        };
+                    }
+                } catch(e) { console.warn('attach hr row handlers failed', e); }
+            }
         });
     }
     if (refreshHrListBtn) refreshHrListBtn.onclick = loadHRList;
@@ -2411,6 +2533,99 @@
             throw new Error('Fonksiyon hatası: ' + txt);
         }
         return res.json();
+    }
+    
+    // More detailed NLG request: compose an explicit prompt that instructs Gemini to
+    //  - inspect candidate answers and question texts
+    //  - inspect our technical inputs (perQuestion, perCategory, bias, genelSkor)
+    //  - inspect and respect our canonical math (score100 = ((avg5 - 1) / 4) * 100)
+    //  - produce a structured output (summary, strengths, development suggestions, candidate-friendly paragraph)
+    async function requestCandidateNLGDetailed(candidate){
+        if (!candidate || !candidate.rumuz) throw new Error('Aday bilgisi eksik');
+        // Determine function URL and secret (reuse previous prompts if present)
+        const defaultFn = window.CALL_GEMINI_URL || window.GENERATE_NLG_URL || null;
+        const fnUrl = defaultFn || prompt('Gemini çağrısı için fonksiyon URL (ör: https://REGION-PROJECT.cloudfunctions.net/callGeminiHttp) :');
+        if (!fnUrl) throw new Error('Fonksiyon URL girilmedi');
+        const secret = window.APX_SECRET || prompt('APX secret (x-apx-secret başlığı):');
+        if (!secret) throw new Error('APX secret girilmedi');
+
+        // persist for this session
+        window.CALL_GEMINI_URL = fnUrl;
+        window.APX_SECRET = secret;
+
+        // Build a rich prompt using available local data
+        // Prefer server/client computed skorlar if present
+        const s = candidate.skorlar || {};
+        // Attempt to include question texts from the latest rendered test form if available
+        const questions = (testForm && testForm._questions && testForm._questions.length) ? testForm._questions : [];
+
+        // Compose answers with question text where possible
+        const qaPairs = (candidate.cevaplar || []).map((ans, idx) => {
+            const q = questions[idx] || {};
+            return { index: idx, question: q.text || (q.category? (q.category + ' — soru ' + (idx+1)) : ('Soru ' + (idx+1))), answer: ans, type: q.type || (q && q.type) || (typeof ans === 'number' ? 'personality' : 'sjt'), expertScores: q.expertScores || null, target: q.target || null };
+        });
+
+        // Explain which internal fields we will ask Gemini to use
+        const technicalInputs = {
+            perCategory: s.perCategory || null,
+            perQuestion: s.perQuestion || null,
+            bias: s.bias !== undefined ? s.bias : null,
+            genelSkor: s.genelSkor !== undefined ? s.genelSkor : null,
+            genelLabel: s.genelLabel || null
+        };
+
+        const promptLines = [];
+        promptLines.push(`You are an expert industrial/organizational psychologist and assessment writer. Produce a concise, professional evaluation using the candidate data provided.`);
+        promptLines.push(`Instructions for the model (follow exactly):`);
+        promptLines.push(`1) Inspect the candidate's answers (question texts + answers). Use question context when available.`);
+        promptLines.push(`2) Use the following technical inputs exactly where available: perQuestion, perCategory, bias (0..100), genelSkor (0..100), genelLabel.`);
+        promptLines.push(`3) Respect the canonical math used by the product: score100 = ((avg5 - 1) / 4) * 100. When you reference scores, mention that formula briefly if you convert or interpret values.`);
+        promptLines.push(`4) Produce the output in Turkish and in this structure (plain text):`);
+        promptLines.push(`- Kısa Özet (3-4 cümle): profession-level summary of candidate performance.`);
+        promptLines.push(`- En Güçlü 3 Yetkinlik (category name — score100): list top 3 with brief justification based on answers and expertScores/perQuestion evidence.`);
+        promptLines.push(`- En Zayıf 3 Yetkinlik (category name — score100): list bottom 3 with practical reasons and what the evidence shows.`);
+        promptLines.push(`- Gelişim Önerileri (3 somut adım): each step should be actionable, time-bound where possible.`);
+        promptLines.push(`- Adaya Yönelik Kısa Not (1 paragraf): friendly, motivating, 2-3 cümle.`);
+        promptLines.push(`5) Where you base a judgement on expertScores or perQuestion averages, briefly state which input you used (e.g., "kaynak: perCategory['X'].score100=" or "perQuestion[2].avg5=").`);
+        promptLines.push(`6) Keep output concise (max ~350-500 words). Use Turkish.`);
+
+        // Attach candidate metadata and data dumps (JSON) to the prompt for model to inspect
+        promptLines.push(`\n--- CANDIDATE METADATA ---`);
+        promptLines.push(JSON.stringify({ rumuz: candidate.rumuz, tip: candidate.tip, baslik: candidate.baslik, timestamp: candidate.timestamp || null }, null, 2));
+        promptLines.push(`\n--- TECHNICAL INPUTS (use these fields when justifying) ---`);
+        promptLines.push(JSON.stringify(technicalInputs, null, 2));
+        promptLines.push(`\n--- QUESTIONS & ANSWERS (use question text when available) ---`);
+        // List QA pairs compactly
+        qaPairs.forEach(q => {
+            promptLines.push(`${q.index+1}. Q: ${q.question} \n   A: ${q.answer} \n   type: ${q.type}${q.expertScores? ('\n   expertScores: '+ JSON.stringify(q.expertScores)) : ''}${q.target?('\n   target: '+q.target):''}`);
+        });
+
+        const finalPrompt = promptLines.join('\n');
+
+        // UX: disable potential duplicate calls by setting a global flag
+        if (requestCandidateNLGDetailed._running) throw new Error('Zaten bir NLG isteği oluşturuluyor, lütfen bekleyin.');
+        requestCandidateNLGDetailed._running = true;
+        try {
+            // call the function (expecting callGeminiHttp-like endpoint that accepts { prompt })
+            const resp = await fetch(fnUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-apx-secret': secret },
+                body: JSON.stringify({ prompt: finalPrompt })
+            });
+            if (!resp.ok) {
+                const txt = await resp.text();
+                throw new Error('Fonksiyon hatası: ' + txt);
+            }
+            const json = await resp.json();
+            // Response shape could be { result } or raw string
+            const text = (json && json.result) ? json.result : (typeof json === 'string' ? json : JSON.stringify(json));
+            return { ok: true, text };
+        } catch(err) {
+            console.error('requestCandidateNLGDetailed failed', err);
+            throw err;
+        } finally {
+            requestCandidateNLGDetailed._running = false;
+        }
     }
     // Yönetici panelindeki 'Kullanıcıları Yönet' butonunu bağla
     const manageUsersBtnElm = document.getElementById('manageUsersBtn');
@@ -2650,14 +2865,17 @@ function showCandidateDetail(candidate) {
                 btn.innerText = 'Yapay Zeka Yorumu İste';
                 btn.onclick = async function(){
                     try {
+                        // disable while running
+                        btn.disabled = true; btn.style.opacity = '0.6';
                         summaryHolder.innerText = 'Oluşturuluyor... Lütfen bekleyin.';
-                        const resp = await requestCandidateNLG(candidate.rumuz);
-                        // resp may be { rumuz, result }
-                        const text = resp && resp.result ? resp.result : (typeof resp === 'string' ? resp : JSON.stringify(resp));
+                        const resp = await requestCandidateNLGDetailed(candidate);
+                        const text = resp && resp.text ? resp.text : (typeof resp === 'string' ? resp : JSON.stringify(resp));
                         summaryHolder.innerText = text || 'Gemini döndü fakat metin alınamadı.';
                     } catch (err) {
                         console.error('NLG isteği başarısız', err);
                         summaryHolder.innerText = 'NLG isteği sırasında hata oluştu: ' + (err.message||err);
+                    } finally {
+                        btn.disabled = false; btn.style.opacity = '';
                     }
                 };
                 container.appendChild(btn);
