@@ -223,6 +223,18 @@
                                 <label class="block text-xs font-semibold mb-1">Şifre</label>
                                 <input type="password" id="hrRegPassword" class="border rounded px-2 py-1 w-full" required>
                             </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">İsim Soyisim</label>
+                                <input type="text" id="hrRegFullName" class="border rounded px-2 py-1 w-full" placeholder="Ad Soyad">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Kuruluş / Firma</label>
+                                <input type="text" id="hrRegCompany" class="border rounded px-2 py-1 w-full" placeholder="Firma adı">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Görevi</label>
+                                <input type="text" id="hrRegRole" class="border rounded px-2 py-1 w-full" placeholder="Pozisyon / Görev">
+                            </div>
                             <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded font-semibold">Kaydol</button>
                         </form>
                     </div>
@@ -248,6 +260,14 @@
                             <div>
                                 <label class="block text-xs font-semibold mb-1">E-posta</label>
                                 <input type="email" id="hrAdminEmail" class="border rounded px-2 py-1 w-full" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Kuruluş / Firma</label>
+                                <input type="text" id="hrAdminCompany" class="border rounded px-2 py-1 w-full" placeholder="Firma adı">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold mb-1">Görevi</label>
+                                <input type="text" id="hrAdminRole" class="border rounded px-2 py-1 w-full" placeholder="Pozisyon / Görev">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold mb-1">Şifre</label>
@@ -419,6 +439,9 @@
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.signOutFirebase = signOut;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+    // Expose newer auth helpers for non-module scripts
+    window.fetchSignInMethodsForEmail = fetchSignInMethodsForEmail;
+    window.sendPasswordResetEmail = sendPasswordResetEmail;
     // Default admin email used when user enters only password in compact login
     const DEFAULT_ADMIN_EMAIL = 'admin@firma.com';
     // WARNING: fallback password grants local admin panel access if Firebase Auth fails.
@@ -592,13 +615,15 @@
 
     // HR kullanıcı yönetimi helper'ları
     window.addHRUser = async function(user) {
-        // user: {username, fullName, phone, email, password, active}
+        // user: {username, fullName, phone, email, password, active, company, role}
         if (!user || !user.username) throw new Error('username required');
         await set(ref(db, 'hrUsers/' + user.username), {
             username: user.username,
             fullName: user.fullName || '',
             phone: user.phone || '',
             email: user.email || '',
+            company: user.company || '',
+            role: user.role || '',
             password: user.password || '',
             active: user.active === undefined ? true : !!user.active,
             createdAt: Date.now()
@@ -706,11 +731,16 @@
 
                 // Write or update hrUsers entry in DB (username is local part of email)
                 const username = email.split('@')[0];
+                const fullName = (document.getElementById('hrRegFullName') || {}).value || '';
+                const company = (document.getElementById('hrRegCompany') || {}).value || '';
+                const role = (document.getElementById('hrRegRole') || {}).value || '';
                 await set(ref(db, 'hrUsers/' + username), {
                     username,
-                    fullName: '',
+                    fullName: fullName,
                     phone: '',
                     email,
+                    company: company,
+                    role: role,
                     password: null,
                     active: true,
                     createdAt: Date.now(),
@@ -1831,12 +1861,14 @@
             const phone = document.getElementById('hrAdminPhone').value.trim();
             const email = document.getElementById('hrAdminEmail').value.trim();
             const password = document.getElementById('hrAdminPassword').value;
+            const company = (document.getElementById('hrAdminCompany')||{}).value || '';
+            const role = (document.getElementById('hrAdminRole')||{}).value || '';
             if (!username || !email || !password) {
                 alert('Kullanıcı adı, e-posta ve şifre zorunludur.');
                 return;
             }
             // Use Firebase helper
-            addHRUser({username, fullName, phone, email, password, active: true}).then(() => {
+            addHRUser({username, fullName, phone, email, password, company, role, active: true}).then(() => {
                 alert('İK yöneticisi başarıyla eklendi.');
                 document.getElementById('hrAdminModal').classList.add('hidden');
                 hrAdminForm.reset();
