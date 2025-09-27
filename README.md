@@ -396,7 +396,7 @@
     <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
     import { getDatabase, ref, set, push, onValue, get, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
@@ -669,24 +669,48 @@
                 return;
             }
             try {
-                // Try to create Auth user if available
+                // Check if email already has sign-in methods
                 let createdAuth = false;
                 try {
-                    const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
-                    createdAuth = !!(userCred && userCred.user && userCred.user.uid);
-                } catch(authErr) {
-                    console.warn('Auth createUser failed (will fallback to DB-only).', authErr);
-                    // If auth not configured (operation-not-allowed / configuration-not-found), we'll fallback
+                    const methods = await fetchSignInMethodsForEmail(window.firebaseAuth, email);
+                    if (methods && methods.length > 0) {
+                        // Email already registered in Auth - offer password reset but still write to DB
+                        const ok = confirm('Bu e-posta zaten kayıtlı. Şifre sıfırlama e-postası göndermek ister misiniz?');
+                        if (ok) {
+                            try {
+                                await sendPasswordResetEmail(window.firebaseAuth, email);
+                                alert('Şifre sıfırlama e-postası gönderildi. Gelen kutunuzu kontrol edin.');
+                            } catch(resetErr) {
+                                console.warn('Password reset failed', resetErr);
+                                alert('Şifre sıfırlama e-postası gönderilemedi: ' + (resetErr.message||resetErr));
+                            }
+                        }
+                        createdAuth = true; // treat as auth-existing
+                    } else {
+                        try {
+                            const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                            createdAuth = !!(userCred && userCred.user && userCred.user.uid);
+                        } catch(authErr) {
+                            console.warn('Auth createUser failed (will fallback to DB-only).', authErr);
+                        }
+                    }
+                } catch(checkErr) {
+                    console.warn('fetchSignInMethodsForEmail failed, attempting createUser anyway', checkErr);
+                    try {
+                        const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                        createdAuth = !!(userCred && userCred.user && userCred.user.uid);
+                    } catch(authErr) {
+                        console.warn('Auth createUser failed (will fallback to DB-only).', authErr);
+                    }
                 }
 
-                // Write hrUsers entry in DB (keep username as local part before @ or uid)
+                // Write or update hrUsers entry in DB (username is local part of email)
                 const username = email.split('@')[0];
                 await set(ref(db, 'hrUsers/' + username), {
                     username,
                     fullName: '',
                     phone: '',
                     email,
-                    // Do NOT store plain password in production. For now keep null to avoid leaks.
                     password: null,
                     active: true,
                     createdAt: Date.now(),
@@ -694,7 +718,7 @@
                 });
 
                 if (createdAuth) {
-                    alert('Kayıt başarılı! İK hesabınız oluşturuldu. Yönetici onayı sonrası giriş yapabilirsiniz.');
+                    alert('Kayıt başarılı! İK hesabınız oluşturuldu veya var olan hesabınıza bağlı olarak işlem yapıldı.');
                 } else {
                     alert('Kayıt başarıyla veritabanına yazıldı, ancak Firebase Auth oluşturulamadı (Auth yapılandırması eksik).\nLütfen Firebase Console -> Authentication -> Email/Password etkinleştir veya yöneticiden Auth hesabı oluşturmasını isteyin.');
                 }
