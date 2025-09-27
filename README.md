@@ -476,6 +476,18 @@
             return null;
         }
     }
+    // Extra helper to pretty-print token response if present (useful for 400 invalid-credential)
+    function firebaseAuthVerbose(err) {
+        try {
+            console.group('FirebaseAuth Verbose');
+            console.error(err);
+            if (err && err.customData && err.customData._tokenResponse) {
+                try { console.info('Server token response:', JSON.parse(JSON.stringify(err.customData._tokenResponse))); } catch(e) { console.info('Server token response (raw):', err.customData._tokenResponse); }
+            }
+            if (err && err.serverResponse) console.info('serverResponse:', err.serverResponse);
+            console.groupEnd();
+        } catch(e) { console.warn('firebaseAuthVerbose failed', e); }
+    }
     // Expose realtime-database helpers so non-module scripts (older inline code) can call set/update/get
     window.db = db;
     window.ref = ref;
@@ -484,6 +496,7 @@
     window.onValue = onValue;
     window.get = get;
     window.update = update;
+    window.remove = typeof remove === 'function' ? remove : (window.remove || null);
     window.query = query;
     window.orderByChild = orderByChild;
     window.equalTo = equalTo;
@@ -528,7 +541,10 @@
                 if ((code && code.toLowerCase().includes('permission')) || (msg && msg.toLowerCase().includes('permission'))) {
                     alert('Görünüşe göre Realtime Database kuralları yazmaya izin vermiyor (permission_denied).\n\nÇözüm önerileri:\n- Firebase Console -> Realtime Database -> Rules bölümünden geçici olarak test kuralları uygulayarak deneyin.\n- Ya da adayları Auth ile giriş yaptırıp UID temelli yazma izni sağlayın.\n- Üretimde kesinlikle kuralları herkese açık yapmayın.');
                 }
-                throw err2;
+                // final failure -> queue locally for retry and return queued status
+                try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: skorlar || {}, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                alert('Veri sunucuya gönderilemedi; otomatik olarak bekleyen gönderimler kuyruğuna alındı ve arka planda tekrar denenmeye çalışılacaktır.');
+                return { ok: false, queued: true };
             }
         }
     };
@@ -550,21 +566,19 @@
     }
 
     function computeScoresAndNLG(cevaplar, meta) {
-        // Advanced scoring with per-question Target/Expert mapping, per-category normalization,
-        // Response Bias adjustment and NLG templates. Returns both overall and per-category data.
+        // Canonical scoring:
+        // - Personality items: map to 1..5 and take simple average per category
+        // - SJT items: map chosen option to expert score (1..5) if available, else optionIndex+1
+        // - Per-category avg (1..5) = weighted average of personality and sjt averages by counts
+        // - Normalize to 0..100: score100 = ((avg5 - 1) / 4) * 100
         meta = meta || {};
-        // typedAnswers: array of {value, type} (type: 'personality' | 'sjt')
         const typed = Array.isArray(meta.typedAnswers) ? meta.typedAnswers.slice() : null;
         const questions = Array.isArray(meta.questions) ? meta.questions : (testForm && testForm._questions) ? testForm._questions : [];
 
-        // If typed not provided, infer from raw cevaplar (fallback: personality scale mapping)
         let inferredTyped = [];
-        if (!typed) {
-            inferredTyped = (cevaplar || []).map(v => ({ value: v, type: 'personality' }));
-        }
+        if (!typed) inferredTyped = (cevaplar || []).map(v => ({ value: v, type: 'personality' }));
         const allTyped = typed || inferredTyped;
 
-        // Helper: map to numeric 1..5 for personality style answers
         function toNum(val) {
             if (val === null || val === undefined) return null;
             const n = Number(val);
@@ -578,87 +592,126 @@
             return null;
         }
 
-        // Build per-category accumulators
-        const categories = {}; // category -> { personalitySum, personalityCount, sjtSum, sjtCount, questions: [] }
+        const categories = {}; // cat -> { personalityVals: [], sjtVals: [], questions: [] }
+        // per-question aggregates
+        const perQuestion = []; // index -> { index, text, type, totalResponses, personalityCounts:{1..5}, sjtOptionCounts:{0..4}, sjtMappedSum, sjtMappedCount, avg5 }
+        for (let qi = 0; qi < questions.length; qi++) {
+            const q = questions[qi] || {};
+            perQuestion[qi] = {
+                index: qi,
+                text: q.text || ('Soru ' + (qi+1)),
+                type: q.type || (/(sjt|durumsal|problem|senaryo)/i.test(q.category||'') ? 'sjt' : 'personality'),
+                totalResponses: 0,
+                personalityCounts: {1:0,2:0,3:0,4:0,5:0},
+                sjtOptionCounts: {0:0,1:0,2:0,3:0,4:0},
+                sjtMappedSum: 0,
+                sjtMappedCount: 0,
+                avg5: null
+            };
+        }
+
         for (let i = 0; i < allTyped.length; i++) {
             const t = allTyped[i];
             const q = questions[i] || {};
-            const cat = q.category || q.categoryName || ('Genel');
-            if (!categories[cat]) categories[cat] = { personalitySum: 0, personalityCount: 0, sjtSum: 0, sjtCount: 0, questions: [] };
+            const cat = q.category || q.categoryName || 'Genel';
+            if (!categories[cat]) categories[cat] = { personalityVals: [], sjtVals: [], questions: [] };
             const bucket = categories[cat];
-            // push question snapshot for detail view
             bucket.questions.push({ index: i, text: q.text || ('Soru ' + (i+1)), type: t.type, answer: t.value, target: q.target || null, expertScores: q.expertScores || null });
+
+            // ensure perQuestion slot exists
+            const pq = perQuestion[i] || null;
             if (t.type === 'personality') {
-                const cand = toNum(t.value);
-                const target = (q.target !== undefined && q.target !== null) ? Number(q.target) : 5; // default target=5
-                if (cand !== null) {
-                    // contribution: match to target -> 1..5
-                    const contribution = Math.max(1, 5 - Math.abs(cand - target));
-                    bucket.personalitySum += contribution;
-                    bucket.personalityCount++;
+                const num = toNum(t.value);
+                if (num !== null) {
+                    bucket.personalityVals.push(num);
+                    if (pq) {
+                        pq.personalityCounts[num] = (pq.personalityCounts[num] || 0) + 1;
+                        pq.totalResponses++;
+                    }
                 }
             } else if (t.type === 'sjt') {
-                // SJT: map chosen option index to expertAvg if provided
                 const chosenIndex = (typeof t.value === 'string' && t.value !== '') ? Number(t.value) : NaN;
-                let expertAvg = null;
-                if (Array.isArray(q.expertScores) && !isNaN(chosenIndex)) {
-                    expertAvg = q.expertScores[chosenIndex];
+                let expertScore = null;
+                if (Array.isArray(q.expertScores) && !isNaN(chosenIndex) && q.expertScores[chosenIndex] !== undefined) {
+                    expertScore = Number(q.expertScores[chosenIndex]);
                 }
-                if (expertAvg == null) {
-                    if (!isNaN(chosenIndex)) expertAvg = Math.max(1, Math.min(5, chosenIndex + 1));
-                    else expertAvg = 3;
+                if (expertScore == null) {
+                    if (!isNaN(chosenIndex)) expertScore = Math.max(1, Math.min(5, chosenIndex + 1));
+                    else expertScore = 3;
                 }
-                bucket.sjtSum += expertAvg; // 1..5
-                bucket.sjtCount++;
+                bucket.sjtVals.push(Math.max(1, Math.min(5, Number(expertScore))));
+                if (pq) {
+                    const opt = isNaN(chosenIndex) ? null : chosenIndex;
+                    if (opt !== null) pq.sjtOptionCounts[opt] = (pq.sjtOptionCounts[opt] || 0) + 1;
+                    pq.sjtMappedSum += Number(expertScore);
+                    pq.sjtMappedCount++;
+                    pq.totalResponses++;
+                }
             }
         }
 
-        // Compute per-category normalized scores (0..100), apply RB adjustment
-        // Response Bias: compute from personality answers overall (std mapped to 0..100 as before)
-        const personalityVals = allTyped.filter(t=>t.type==='personality').map(t=>toNum(t.value)).filter(x=>x!==null);
-        const n = personalityVals.length || 1;
-        const mean = personalityVals.reduce((a,b)=>a+b,0)/n;
-        const variance = personalityVals.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
+        // finalize perQuestion averages
+        for (let i = 0; i < perQuestion.length; i++) {
+            const pq = perQuestion[i];
+            if (!pq) continue;
+            if (pq.type === 'personality') {
+                const total = Object.values(pq.personalityCounts).reduce((a,b)=>a+b,0);
+                pq.totalResponses = total;
+                if (total) {
+                    const sum = Object.keys(pq.personalityCounts).reduce((a,k)=>a + (Number(k) * (pq.personalityCounts[k]||0)), 0);
+                    pq.avg5 = Number((sum / total).toFixed(2));
+                }
+            } else {
+                // sjt: avg from mapped expert scores
+                pq.avg5 = pq.sjtMappedCount ? Number((pq.sjtMappedSum / pq.sjtMappedCount).toFixed(2)) : null;
+            }
+        }
+
+        // Response bias (simple): compute std of personality answers overall and map to 0..100
+        const allPersonality = allTyped.filter(t=>t.type==='personality').map(t=>toNum(t.value)).filter(x=>x!==null);
+        const n = allPersonality.length || 1;
+        const mean = allPersonality.reduce((a,b)=>a+b,0)/n;
+        const variance = allPersonality.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
         const std = Math.sqrt(variance);
-        const bias = Math.round(Math.min(100, std * 25 * 10)/10 * 10)/10 || 0; // 0..100
+        // scale std (max reasonable std ~1.6 for 1..5) into 0..100
+        const bias = Math.round(Math.min(100, std * 40));
 
         const perCategory = {};
         Object.keys(categories).forEach(cat => {
             const b = categories[cat];
-            // personality % (if any)
-            const persMax = (b.personalityCount * 5) || 1;
-            const persRaw = Math.round((b.personalitySum / persMax) * 100);
-            // sjt % (if any)
-            const sjtMax = (b.sjtCount * 5) || 1;
-            const sjtRaw = b.sjtCount ? Math.round((b.sjtSum / sjtMax) * 100) : null;
-            // combined: weight by counts
-            let combinedRaw = persRaw;
-            if (sjtRaw !== null) {
-                const totalQuestions = (b.personalityCount + b.sjtCount) || 1;
-                combinedRaw = Math.round(((persRaw * b.personalityCount) + (sjtRaw * b.sjtCount)) / totalQuestions);
-            }
-            // Apply RB adjustment: Final = combinedRaw * (1 - bias%)
-            const final = Math.round(combinedRaw * (1 - (bias/100)));
-            // Label per thresholds
+            const persCount = b.personalityVals.length;
+            const sjtCount = b.sjtVals.length;
+            const persAvg = persCount ? (b.personalityVals.reduce((a,c)=>a+c,0)/persCount) : null; // 1..5
+            const sjtAvg = sjtCount ? (b.sjtVals.reduce((a,c)=>a+c,0)/sjtCount) : null; // 1..5
+
+            let combinedAvg5 = 0;
+            if (persAvg !== null && sjtAvg !== null) {
+                combinedAvg5 = ((persAvg * persCount) + (sjtAvg * sjtCount)) / (persCount + sjtCount);
+            } else if (persAvg !== null) combinedAvg5 = persAvg;
+            else if (sjtAvg !== null) combinedAvg5 = sjtAvg;
+            else combinedAvg5 = 0;
+
+            // Normalize to 0..100 using canonical formula
+            const score100 = combinedAvg5 ? Math.round(((combinedAvg5 - 1) / 4) * 100) : 0;
+
             let label = 'Gelişim Alanı';
-            if (final >= 85) label = 'Güçlü Yön';
-            else if (final >= 60) label = 'Kabul Edilebilir';
+            if (score100 >= 85) label = 'Güçlü Yön';
+            else if (score100 >= 60) label = 'Kabul Edilebilir';
 
             perCategory[cat] = {
-                raw: combinedRaw,
-                adjusted: final,
-                personality: { raw: persRaw, count: b.personalityCount },
-                sjt: { raw: sjtRaw, count: b.sjtCount },
+                avg5: combinedAvg5 ? Number(combinedAvg5.toFixed(2)) : null,
+                score100,
+                personality: { avg5: persAvg ? Number(persAvg.toFixed(2)) : null, count: persCount },
+                sjt: { avg5: sjtAvg ? Number(sjtAvg.toFixed(2)) : null, count: sjtCount },
                 questions: b.questions,
                 label
             };
         });
 
-        // Overall score is average of category adjusted scores
+        // Overall: average of per-category score100
         const cats = Object.keys(perCategory);
-        const overall = cats.length ? Math.round(Object.values(perCategory).reduce((a,b)=>a+b.adjusted,0)/cats.length) : 0;
+        const overall = cats.length ? Math.round(Object.values(perCategory).reduce((a,b)=>a+b.score100,0)/cats.length) : 0;
 
-        // NLG: templates per threshold
         function nlgForScore(name, score) {
             if (score >= 85) return `(${name}) Puan: ${score}. Adayın ${name} yeteneği, sektör ortalamasının oldukça üzerindedir ve bu rol için kritik bir güç kaynağıdır. Hemen yüksek sorumluluk gerektiren görevlere atanması önerilir.`;
             if (score >= 60) return `(${name}) Puan: ${score}. ${name} yetkinliği kabul edilebilir düzeydedir; görev için yeterli olabilir, ancak belirli görevler için mülakatla doğrulama önerilir.`;
@@ -667,20 +720,24 @@
 
         const nlgParts = [];
         Object.keys(perCategory).forEach(cat => {
-            nlgParts.push(nlgForScore(cat, perCategory[cat].adjusted));
+            nlgParts.push(nlgForScore(cat, perCategory[cat].score100));
         });
 
-        const overallLabel = overall >= 85 ? 'Güçlü Yön' : (overall >= 60 ? 'Kabul Edilebilir' : 'Gelişim Alanı');
+        // top3 strong/weak categories
+        const sorted = Object.keys(perCategory).map(k => ({ k, s: perCategory[k].score100 || 0 })).sort((a,b)=>b.s-a.s);
+        const top3Strong = sorted.slice(0,3).map(x=>({category: x.k, score: perCategory[x.k].score100}));
+        const top3Weak = sorted.slice(-3).reverse().map(x=>({category: x.k, score: perCategory[x.k].score100}));
 
         return {
             perCategory,
+            perQuestion,
             bias,
             genelSkor: overall,
-            genelLabel: overallLabel,
+            genelLabel: overall >= 85 ? 'Güçlü Yön' : (overall >= 60 ? 'Kabul Edilebilir' : 'Gelişim Alanı'),
             nlgSummary: nlgParts.join('\n'),
-            radar: Object.values(perCategory).length ? Object.values(perCategory).map(c=>c.adjusted).slice(0,5) : [],
-            top3Strong: [],
-            top3Weak: []
+            radar: Object.keys(perCategory).map(k => perCategory[k].score100).slice(0,5),
+            top3Strong,
+            top3Weak
         };
     }
 
@@ -999,6 +1056,7 @@
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
                     // Provide actionable diagnostic to the user/developer
                     try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
+                    try { firebaseAuthVerbose(firebaseErr); } catch(_){ }
                     // Legacy local fallback: if the user entered the known local test password, open admin panel locally
                     if (password === ADMIN_FALLBACK_PASSWORD) {
                         console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
@@ -1690,12 +1748,53 @@
     }
 
     // Load question keys (expertScores / target) from DB into window.questionKeysCache
+    // Defensive: some runtimes or load orders may not have the imported `get` symbol available
+    // (ReferenceError seen in some browsers/environments). Use a guarded approach and
+    // fallback to onValue (once) if necessary.
     async function loadQuestionKeys() {
         try {
-            const snap = await get(ref(db, 'questionKeys'));
-            window.questionKeysCache = snap.exists() ? snap.val() : {};
+            let snap = null;
+            // Preferred: use imported `get` if present
+            if (typeof get === 'function') {
+                snap = await get(ref(db, 'questionKeys'));
+            } else if (typeof window.get === 'function') {
+                // fallback to globally-exposed helper
+                snap = await window.get(window.ref(window.db, 'questionKeys'));
+            } else {
+                // Last resort: use onValue once and resolve when data arrives
+                snap = await new Promise((resolve, reject) => {
+                    try {
+                        const r = ref(db, 'questionKeys');
+                        const unsub = onValue(r, (s) => {
+                            try { if (typeof unsub === 'function') unsub(); } catch(_){}
+                            resolve(s);
+                        }, (err) => {
+                            try { if (typeof unsub === 'function') unsub(); } catch(_){}
+                            reject(err || new Error('onValue read failed'));
+                        });
+                        // safety timeout
+                        setTimeout(() => reject(new Error('Timeout while loading questionKeys')), 5000);
+                    } catch(err) { reject(err); }
+                });
+            }
+
+            // Normalize different snap shapes (some fallbacks resolve a plain object)
+            if (!snap) {
+                window.questionKeysCache = {};
+            } else if (typeof snap.exists === 'function') {
+                window.questionKeysCache = snap.exists() ? snap.val() : {};
+            } else if (typeof snap.val === 'function') {
+                window.questionKeysCache = snap.val() || {};
+            } else {
+                // already an object
+                window.questionKeysCache = snap || {};
+            }
+
             console.log('Loaded questionKeys into cache', Object.keys(window.questionKeysCache||{}));
-        } catch(e) { console.warn('Failed to load questionKeys', e); window.questionKeysCache = {}; }
+        } catch(e) {
+            console.warn('Failed to load questionKeys', e);
+            window.questionKeysCache = {};
+        }
     }
 
     // Seed sample expert scores into DB for demo (call from console or admin)
@@ -1815,38 +1914,45 @@
         testForm.onsubmit = async function(e) {
             e.preventDefault();
             if (!activeCandidate) return;
-            const selects = testForm.querySelectorAll('select');
-            // preserve both raw answers and typed answers
-            const cevaplar = [];
-            const typedAnswers = [];
-            Array.from(selects).forEach((s, idx) => {
-                const val = s.value;
-                const qtype = s.dataset.qtype || (testForm._questions && testForm._questions[idx] && testForm._questions[idx].type) || 'personality';
-                cevaplar.push(val);
-                typedAnswers.push({ value: val, type: qtype });
-            });
-            // Demo skorlar (gerçek hesaplama ile değiştirilebilir)
-            // Compute scores using computeScoresAndNLG which now expects typed answers and questions
-            const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
-            // Firebase'e kaydet
-            await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
-            // Hide the test UI and show a thank-you message
-            const testSectionEl = document.getElementById('testSection');
-            if (testSectionEl) {
-                testSectionEl.innerHTML = `
-                    <div class='p-6 bg-green-50 border border-green-200 rounded-lg text-center'>
-                        <h3 class='text-2xl font-semibold text-green-800 mb-2'>Test tamamlandı — teşekkürler!</h3>
-                        <p class='text-gray-700 mb-3'>Cevaplarınız başarıyla alındı. Rumuz: <b>${activeCandidate.rumuz}</b></p>
-                        <p class='text-sm text-gray-600'>Toplam puanınız: <b>${skorlar.genelSkor || '—'}</b></p>
-                    </div>
-                `;
+            try {
+                const selects = testForm.querySelectorAll('select');
+                // preserve both raw answers and typed answers
+                const cevaplar = [];
+                const typedAnswers = [];
+                Array.from(selects).forEach((s, idx) => {
+                    const val = s.value;
+                    const qtype = s.dataset.qtype || (testForm._questions && testForm._questions[idx] && testForm._questions[idx].type) || 'personality';
+                    cevaplar.push(val);
+                    typedAnswers.push({ value: val, type: qtype });
+                });
+                // Compute scores using computeScoresAndNLG which now expects typed answers and questions
+                const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
+                // Attempt to save; if saving fails, saveCandidateTest will queue
+                const res = await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
+                // Hide the test UI and show a thank-you message
+                const testSectionEl = document.getElementById('testSection');
+                if (testSectionEl) {
+                    testSectionEl.innerHTML = `
+                        <div class='p-6 bg-green-50 border border-green-200 rounded-lg text-center'>
+                            <h3 class='text-2xl font-semibold text-green-800 mb-2'>Test tamamlandı — teşekkürler!</h3>
+                            <p class='text-gray-700 mb-3'>Cevaplarınız alındı. Rumuz: <b>${activeCandidate.rumuz}</b></p>
+                            <p class='text-sm text-gray-600'>Toplam puanınız: <b>${skorlar.genelSkor || '—'}</b></p>
+                            <p class='text-xs text-gray-500 mt-2'>${res && res.queued ? 'Veri sunucuya gönderilemedi; yerel kuyruğa alındı ve daha sonra tekrar denenecek.' : 'Verileriniz başarıyla kaydedildi.'}</p>
+                        </div>
+                    `;
+                }
+                // Ensure admin UI doesn't overlap candidate experience
+                try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
+                try { const comp = document.getElementById('adminLoginCompact'); if (comp) { comp.classList.add('hidden'); try { comp.style.display='none'; } catch(_){} } } catch(e){}
+                // Update IK panel and radar visual
+                renderAnswers(activeCandidate);
+                renderRadar(skorlar.radar);
+            } catch (err) {
+                console.error('Test submit failed', err);
+                // Queue as last resort
+                try { queueCandidateSubmission({ rumuz: activeCandidate.rumuz, tip: activeCandidate.tip, baslik: activeCandidate.baslik, cevaplar: [], skorlar: {} }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                alert('Cevaplarınız gönderilirken hata oluştu. Veriler yerel kuyruğa alındı ve otomatik olarak tekrar denenecektir.');
             }
-            // Ensure admin UI doesn't overlap candidate experience
-            try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
-            try { const comp = document.getElementById('adminLoginCompact'); if (comp) { comp.classList.add('hidden'); try { comp.style.display='none'; } catch(_){} } } catch(e){}
-            // Update IK panel and radar visual
-            renderAnswers(activeCandidate);
-            renderRadar(skorlar.radar);
         }
     }
 
@@ -1868,14 +1974,18 @@
                 };
                 const sectorLabel = SECTOR_MAP[c.tip] || c.tip || '';
                 const roleLabel = ROLE_LABELS[c.baslik] || c.baslik || '';
+                const status = (c.skorlar && (c.skorlar.genelSkor !== undefined)) ? 'Tamamlandı' : 'Bekliyor';
+                const scoreSmall = (c.skorlar && c.skorlar.genelSkor) ? (' — ' + c.skorlar.genelSkor + '/100') : '';
                 candidateList.innerHTML += `
                     <tr>
                         <td class='p-2'>${c.rumuz}</td>
                         <td class='p-2'>${sectorLabel}</td>
                         <td class='p-2'>${roleLabel}</td>
+                        <td class='p-2'>${status}${scoreSmall}</td>
                         <td class='p-2'>
                             <button class='px-2 py-1 border view-detail' data-r='${c.rumuz}'>Detay</button>
                             <button class='px-2 py-1 border ml-2 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
+                            <button class='px-2 py-1 border ml-2 delete-cand' data-r='${c.rumuz}'>Sil</button>
                         </td>
                     </tr>
                 `;
@@ -1901,6 +2011,20 @@
                     const text = `Rumuz: ${r}\nŞifre: ${p}`;
                     try { navigator.clipboard.writeText(text); alert('Kimlik panoya kopyalandı. Adaya gönderin.'); }
                     catch(e){ prompt('Aşağıdaki kimliği adayla paylaşın:', text); }
+                };
+            });
+            Array.from(document.querySelectorAll('.delete-cand')).forEach(btn => {
+                btn.onclick = async function(){
+                    const r = this.dataset.r;
+                    if (!confirm(`'${r}' silinsin mi? Bu işlem geri alınamaz.`)) return;
+                    try {
+                        await window.remove(ref(db, 'candidates/' + r));
+                        alert('Aday silindi.');
+                        loadCandidatesFromFirebase();
+                    } catch(e) {
+                        console.error('delete candidate failed', e);
+                        alert('Silme işlemi sırasında hata: ' + (e.message||e));
+                    }
                 };
             });
         });
@@ -1960,6 +2084,7 @@
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
                     // Provide actionable diagnostic to the user/developer
                     try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
+                    try { firebaseAuthVerbose(firebaseErr); } catch(_){ }
                     // Lightweight client-side fallback: only for the compact modal and only when the
                     // entered password matches the legacy ADMIN_FALLBACK_PASSWORD. This is insecure
                     // and intended as a short-term convenience per user request. Avoid using in
@@ -2383,7 +2508,7 @@ function showCandidateDetail(candidate) {
   modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[99999]';
   modal.innerHTML = `
     <div class='bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl relative'>
-      <button onclick='this.closest(".fixed").remove()' class='absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl'>&times;</button>
+            <button onclick='this.closest(".fixed").remove()' class='absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl'>&times;</button>
       <h2 class='text-2xl font-bold text-blue-800 mb-4'>Aday Detay Analizi</h2>
       <div class='mb-4'><b>Rumuz:</b> ${candidate.rumuz} &nbsp; <b>Tip:</b> ${candidate.tip} &nbsp; <b>Başlık:</b> ${candidate.baslik}</div>
             <div class='mb-6 grid grid-cols-1 md:grid-cols-2 gap-6'>
@@ -2409,10 +2534,19 @@ function showCandidateDetail(candidate) {
             <div class='mt-4 flex gap-2'>
                 <button id='exportCsvBtn' class='bg-gray-200 text-gray-800 px-3 py-1 rounded'>CSV Dışa Aktar</button>
                 <button id='copySummaryBtn' class='bg-indigo-600 text-white px-3 py-1 rounded'>Özet Kopyala</button>
+                <button id='detailBackBtn' class='ml-auto bg-white border text-gray-700 px-3 py-1 rounded'>Geri</button>
             </div>
     </div>
   `;
   document.body.appendChild(modal);
+  // Back button: remove modal and focus candidate list
+  try {
+      const backBtn = document.getElementById('detailBackBtn');
+      if (backBtn) backBtn.addEventListener('click', function(){
+          try { modal.remove(); } catch(e){ try { document.body.removeChild(modal);} catch(_){} }
+          try { const candList = document.getElementById('candidateList'); if (candList) candList.querySelector('tr') && candList.querySelector('tr').scrollIntoView({behavior:'smooth'}); } catch(e){}
+      }, {passive:true});
+  } catch(e) { /* ignore */ }
   // Radar ve SJT grafikleri demo (örnek puanlar)
         setTimeout(() => {
             // Prefer database-provided skorlar if available
@@ -2440,18 +2574,56 @@ function showCandidateDetail(candidate) {
             } catch(e) { console.warn('Radar chart render failed', e); }
 
             try {
-                new Chart(document.getElementById('detailSJT').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: ['Senaryo 1','Senaryo 2','Senaryo 3','Senaryo 4','Senaryo 5'],
-                        datasets: [{
-                            label: 'SJT Skoru',
-                            data: sjtData,
-                            backgroundColor: 'rgba(16,185,129,0.5)'
-                        }]
-                    },
-                    options: {responsive: false, plugins: {legend: {display: false}}}
-                });
+                // If computeScoresAndNLG produced perQuestion data, use it for bar & pie
+                const pq = s.perQuestion || null;
+                if (pq && pq.length) {
+                    // Bar: per-question avg5 (1..5)
+                    const labels = pq.map(p=> (p.index+1) + '. ' + (p.text.length>30? p.text.slice(0,27)+'...': p.text));
+                    const dataBar = pq.map(p => p.avg5 || 0);
+                    new Chart(document.getElementById('detailSJT').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{ label: 'Ortalama (1..5)', data: dataBar, backgroundColor: 'rgba(16,185,129,0.6)' }]
+                        },
+                        options: { responsive: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { display: false } } }
+                    });
+
+                    // Pie: distribution for first question with any responses
+                    let firstIdx = pq.findIndex(p=>p.totalResponses && p.totalResponses>0);
+                    if (firstIdx === -1) firstIdx = 0;
+                    const firstPQ = pq[firstIdx];
+                    // create or reuse a small canvas for pie
+                    let pieCanvas = document.getElementById('detailPie');
+                    if (!pieCanvas) {
+                        const pieWrap = document.createElement('div'); pieWrap.className='mt-3';
+                        pieWrap.innerHTML = `<canvas id='detailPie' width='300' height='160'></canvas><div class='text-xs text-gray-500 mt-1'>İlk gösterilen sorunun dağılımı (raw)</div>`;
+                        modal.querySelector('.bg-white')?.appendChild(pieWrap);
+                        pieCanvas = document.getElementById('detailPie');
+                    }
+                    const pieCtx = pieCanvas.getContext('2d');
+                    const distro = firstPQ.type === 'personality' ? [1,2,3,4,5].map(i=> firstPQ.personalityCounts[i] || 0) : [0,1,2,3,4].map(i=> firstPQ.sjtOptionCounts[i] || 0);
+                    // destroy existing chart if any on that canvas
+                    try { if (pieCanvas._chart) pieCanvas._chart.destroy(); } catch(_){}
+                    pieCanvas._chart = new Chart(pieCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: firstPQ.type === 'personality' ? ['1','2','3','4','5'] : ['A','B','C','D','E'],
+                            datasets: [{ data: distro, backgroundColor: ['#ef4444','#f97316','#f59e0b','#10b981','#3b82f6'] }]
+                        },
+                        options: { responsive: false, plugins: { legend: { position: 'bottom' } } }
+                    });
+                } else {
+                    // fallback to previous behavior (sjtData)
+                    new Chart(document.getElementById('detailSJT').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Senaryo 1','Senaryo 2','Senaryo 3','Senaryo 4','Senaryo 5'],
+                            datasets: [{ label: 'SJT Skoru', data: sjtData, backgroundColor: 'rgba(16,185,129,0.5)' }]
+                        },
+                        options: { responsive: false, plugins: { legend: { display: false } } }
+                    });
+                }
             } catch(e) { console.warn('SJT chart render failed', e); }
 
             const biasText = (s.bias !== undefined && s.bias !== null) ? (s.bias + ' / 100') : ((80 + Math.random()*20).toFixed(1) + ' / 100');
