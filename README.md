@@ -417,6 +417,17 @@
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.signOutFirebase = signOut;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+    // Expose realtime-database helpers so non-module scripts (older inline code) can call set/update/get
+    window.db = db;
+    window.ref = ref;
+    window.set = set;
+    window.push = push;
+    window.onValue = onValue;
+    window.get = get;
+    window.update = update;
+    window.query = query;
+    window.orderByChild = orderByChild;
+    window.equalTo = equalTo;
 
   // ADAY TEST SONUÇLARINI KAYDETME
     window.saveCandidateTest = async function(rumuz, tip, baslik, cevaplar, skorlar) {
@@ -733,9 +744,13 @@
 
     // Try retrying pending submissions on load and when IK panel opens
     window.addEventListener('load', function(){ setTimeout(retryPendingSubmissions, 1500); });
-    if (ikPanel) {
-        ikPanel.addEventListener('transitionend', function(){ setTimeout(retryPendingSubmissions, 500); });
-    }
+    // safe lookup for ikPanel element (avoid TDZ or early-reference errors)
+    (function(){
+        const _ik = document.getElementById('ikPanel');
+        if (_ik) {
+            _ik.addEventListener('transitionend', function(){ setTimeout(retryPendingSubmissions, 500); });
+        }
+    })();
 
     // Giriş işlemi (Firebase üzerinden kontrol)
     const hrLoginFormEl = document.getElementById('hrLoginForm');
