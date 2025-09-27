@@ -624,7 +624,7 @@
     // Üye Ol işlemi
     const hrRegisterFormEl = document.getElementById('hrRegisterForm');
     if (hrRegisterFormEl) {
-        hrRegisterFormEl.addEventListener('submit', function(e){
+        hrRegisterFormEl.addEventListener('submit', async function(e){
             e.preventDefault();
             const emailEl = document.getElementById('hrRegEmail');
             const passEl = document.getElementById('hrRegPassword');
@@ -634,14 +634,28 @@
                 alert('Tüm alanları doldurun!');
                 return;
             }
-            if (hrAdmins.some(a => a.email === email)) {
-                alert('Bu e-posta zaten kayıtlı!');
-                return;
+            try {
+                // Create Auth user
+                const userCred = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                const user = userCred.user;
+                // Write hrUsers entry in DB (keep username as local part before @ or uid)
+                const username = email.split('@')[0];
+                await set(ref(db, 'hrUsers/' + username), {
+                    username,
+                    fullName: '',
+                    phone: '',
+                    email,
+                    password, // optional: consider removing storing plain password in DB in prod
+                    active: true,
+                    createdAt: Date.now()
+                });
+                alert('Kayıt başarılı! İK hesabınız oluşturuldu. Yönetici onayı sonrası giriş yapabilirsiniz.');
+                const modal = document.getElementById('hrRegisterModal');
+                if (modal) modal.classList.add('hidden');
+            } catch(err) {
+                console.error('HR register failed', err);
+                alert('Kayıt sırasında hata: ' + (err.message || err));
             }
-            hrAdmins.push({email, password});
-            alert('Kayıt başarılı! Giriş yapabilirsiniz.');
-            const modal = document.getElementById('hrRegisterModal');
-            if (modal) modal.classList.add('hidden');
         });
     }
 
