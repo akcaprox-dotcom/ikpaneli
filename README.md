@@ -145,20 +145,16 @@
             <div id="adminLoginCompact" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9998]">
                 <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm relative">
                     <button onclick="document.getElementById('adminLoginCompact').classList.add('hidden')" class="absolute top-3 right-3 text-gray-400 hover:text-red-500">&times;</button>
-                    <h3 class="text-lg font-bold text-red-700 mb-3">Yönetici Girişi</h3>
+                    <h3 class="text-lg font-bold text-blue-700 mb-3">Yönetici Girişi</h3>
                     <form id="adminLoginFormCompact" class="space-y-3">
-                        <div class="p-2 bg-red-50 border border-red-200 rounded">
-                            <strong class="text-red-600">TEST MODE — INSECURE</strong>
-                            <div class="text-xs text-red-500">Bu giriş sadece lokal test amaçlıdır. Production için kaldırın.</div>
-                        </div>
-                        <!-- Email hidden: password-only quick access for testing -->
+                        <!-- Quick password-only access for local admin (legacy behavior) -->
                         <input type="hidden" id="adminEmailCompact" value="" />
                         <div>
                             <label class="block text-sm text-gray-700 mb-1">Şifre (sadece şifre ile giriş)</label>
                             <input type="password" id="adminPasswordCompact" class="w-full px-3 py-2 border rounded" placeholder="Yönetici şifresi" required />
                         </div>
                         <div>
-                            <button type="submit" class="w-full bg-red-600 text-white py-2 rounded">Giriş Yap (Şifre ile)</button>
+                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Giriş Yap (Şifre ile)</button>
                         </div>
                     </form>
                 </div>
@@ -440,9 +436,46 @@
     window.sendPasswordResetEmail = sendPasswordResetEmail;
     // Default admin email used when user enters only password in compact login
     const DEFAULT_ADMIN_EMAIL = 'admin@firma.com';
-    // WARNING: fallback password grants local admin panel access if Firebase Auth fails.
-    // Keep this only for quick local testing; remove for production.
+    // NOTE: legacy TEST fallback password (kept for reference). Do NOT rely on this in production.
+    // Production: remove this constant and use server-side custom claims instead.
     const ADMIN_FALLBACK_PASSWORD = 'Ba030714..';
+    // Expose admin constants to non-module scripts (they run in global scope)
+    try {
+        window.DEFAULT_ADMIN_EMAIL = DEFAULT_ADMIN_EMAIL; // allow non-module handlers to read default
+        window.ADMIN_FALLBACK_PASSWORD = ADMIN_FALLBACK_PASSWORD;
+    } catch(e) { /* ignore if assignment fails */ }
+
+    // Helper: produce actionable diagnostic for Firebase Auth failures
+    function firebaseAuthDiagnostic(err) {
+        try {
+            console.error('FirebaseAuth diagnostic:', err);
+            const code = err && err.code ? String(err.code) : null;
+            const message = err && err.message ? String(err.message) : JSON.stringify(err);
+            // Try to extract nested server response if available
+            let server = null;
+            try { server = err.customData && err.customData._tokenResponse ? err.customData._tokenResponse : null; } catch(_){}
+            let details = '';
+            if (code) details += 'Hata kodu: ' + code + '\n';
+            details += 'Açıklama: ' + (message || '—') + '\n';
+            if (server) details += 'Sunucu yanıtı: ' + JSON.stringify(server) + '\n';
+
+            // Common actionable tips
+            let tips = [];
+            tips.push('1) Firebase Console -> Authentication -> Sign-in method içinde "Email/Password" etkin mi kontrol edin.');
+            tips.push('2) `firebaseConfig.apiKey` değerinin doğru projeye ait olduğundan emin olun.');
+            tips.push('3) Eğer hata "invalid-credential" veya 400 ise, API anahtarınız veya istek formatı reddedilmiş olabilir.');
+            tips.push('4) Gerekirse proje sahibi hesabıyla Firebase Console üzerinden test kullanıcı oluşturun veya auth kayıtlarını kontrol edin.');
+
+            const alertMsg = 'Firebase Auth hatası oluştu:\n\n' + details + '\nÖneriler:\n' + tips.join('\n');
+            // Show a concise alert for users and full info to console
+            alert(alertMsg);
+            return {code, message, server};
+        } catch(e) {
+            console.error('firebaseAuthDiagnostic failed', e, err);
+            alert('Giriş sırasında beklenmeyen bir hata oluştu. Konsolu kontrol edin.');
+            return null;
+        }
+    }
     // Expose realtime-database helpers so non-module scripts (older inline code) can call set/update/get
     window.db = db;
     window.ref = ref;
@@ -888,7 +921,9 @@
                     return;
                 } catch(firebaseErr) {
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
-                    // Fallback: allow local password-only admin access for quick testing
+                    // Provide actionable diagnostic to the user/developer
+                    try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
+                    // Legacy local fallback: if the user entered the known local test password, open admin panel locally
                     if (password === ADMIN_FALLBACK_PASSWORD) {
                         console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
                         const panel = document.getElementById('adminPanel');
@@ -1733,19 +1768,9 @@
                     return;
                 } catch(firebaseErr) {
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
-                    // Fall back to local password check
-                    if (pw === ADMIN_FALLBACK_PASSWORD) {
-                        console.warn('ADMIN FALLBACK used: opening admin panel locally. This is insecure and for testing only.');
-                        const adminLoginCompactNow = document.getElementById('adminLoginCompact');
-                        if (adminLoginCompactNow) {
-                            adminLoginCompactNow.classList.add('hidden');
-                            try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
-                        }
-                        const panelNow = document.getElementById('adminPanel');
-                        if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
-                        const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
-                        return;
-                    }
+                    // Provide actionable diagnostic to the user/developer and do NOT open admin panel via client-side fallback
+                    try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){}
+                    // Always fail here; removing client-side fallback for security.
                     throw firebaseErr;
                 }
             } catch(err) {
@@ -1800,22 +1825,8 @@
         });
     }
 
-    // --- TEST MODE: auto-open compact admin login on load for quick access ---
-    window.addEventListener('load', function(){
-        try {
-            const adminLoginCompactEl = document.getElementById('adminLoginCompact');
-            if (adminLoginCompactEl) {
-                adminLoginCompactEl.classList.remove('hidden');
-                adminLoginCompactEl.style.display = 'flex';
-                try { adminLoginCompactEl.style.zIndex = '100000'; } catch(e){}
-                // focus password input
-                setTimeout(function(){
-                    const pw = adminLoginCompactEl.querySelector('#adminPasswordCompact');
-                    if (pw) { pw.focus(); pw.select && pw.select(); }
-                }, 200);
-            }
-        } catch(e){ console.warn('Failed to auto-open admin test modal', e); }
-    });
+    // NOTE: Auto-open for TEST MODE removed to avoid showing insecure modal on main page load.
+    // Compact admin modal is opened only when the floating Yönetici button is clicked.
 
     // Admin panelindeki butonların işlevselliği
     if (adminPanel) {
@@ -2293,6 +2304,22 @@ function showCandidateDetail(candidate) {
                         if (el && el.parentElement !== document.body) document.body.appendChild(el);
                     } catch(inner){ /* ignore single element failures */ }
                 });
+                        // Ensure the admin-panel close button reliably hides all admin UI (fix for close X not working)
+                        try {
+                            const closeBtn = document.getElementById('closeAdminPanel');
+                            if (closeBtn) {
+                                closeBtn.addEventListener('click', function() {
+                                    try {
+                                        const panel = document.getElementById('adminPanel');
+                                        const compact = document.getElementById('adminLoginCompact');
+                                        if (panel) { panel.classList.add('hidden'); panel.style.display = 'none'; }
+                                        if (compact) { compact.classList.add('hidden'); try { compact.style.display = 'none'; } catch(_){} }
+                                        // restore main grid display if it was hidden
+                                        try { const anaGrid = document.querySelector('.grid'); if (anaGrid) anaGrid.style.display = ''; } catch(_){}
+                                    } catch(err) { console.warn('closeAdminPanel handler failed', err); }
+                                }, {passive: true});
+                            }
+                        } catch(e) { /* ignore */ }
             } catch (e) {
                 console.warn('Modal taşıma sırasında hata:', e);
             }
