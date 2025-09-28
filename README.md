@@ -2683,6 +2683,7 @@
 
                 // Ensure admin UI doesn't overlap candidate experience
                 try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
+                try { const ik = document.getElementById('ikPanel'); if (ik) { ik.classList.add('hidden'); ik.style.display='none'; } } catch(e){}
                 try { const comp = document.getElementById('adminLoginCompact'); if (comp) { comp.classList.add('hidden'); try { comp.style.display='none'; } catch(_){} } } catch(e){}
 
                 // Update IK panel and radar visual
@@ -3391,8 +3392,8 @@ function showCandidateDetail(candidate) {
                         const s = candidate.skorlar || {};
                         // If server-side perCategory present, use that
                         const perCat = s.perCategory || null;
-                        const radarData = (s.radar && s.radar.length) ? s.radar : (perCat ? Object.values(perCat).map(x=>x.adjusted) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]);
-                        const sjtData = (s.sjt && s.sjt.length) ? s.sjt : (perCat ? Object.values(perCat).map(x=>x.sjt && x.sjt.raw ? x.sjt.raw : Math.random()*100) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]);
+                        const radarData = (Object.keys(skorlar).length === 0) ? [0,0,0,0,0] : ((s.radar && s.radar.length) ? s.radar : (perCat ? Object.values(perCat).map(x=>x.adjusted) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]));
+                        const sjtData = (Object.keys(skorlar).length === 0) ? [0,0,0,0,0] : ((s.sjt && s.sjt.length) ? s.sjt : (perCat ? Object.values(perCat).map(x=>x.sjt && x.sjt.raw ? x.sjt.raw : Math.random()*100) : [Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100, Math.random()*100]));
 
             try {
                 new Chart(document.getElementById('detailRadar').getContext('2d'), {
@@ -3516,7 +3517,7 @@ function showCandidateDetail(candidate) {
                 }
             } catch(e) { console.warn('SJT chart render failed', e); }
 
-            const biasVal = (s.bias !== undefined && s.bias !== null) ? Number(s.bias) : Math.round(80 + Math.random()*20);
+            const biasVal = (Object.keys(skorlar).length === 0) ? 0 : ((s.bias !== undefined && s.bias !== null) ? Number(s.bias) : Math.round(80 + Math.random()*20));
             const biasText = biasVal + ' / 100';
             // determine color class
             let cls = 'apx-bias-blue';
@@ -3633,7 +3634,10 @@ function showCandidateDetail(candidate) {
                 const lowScoreCategories2 = Object.keys(pc).filter(cat => (pc[cat].score100 || 0) < 50);
                 const lowScoreCount2 = lowScoreCategories2.length;
                 let interviewScaleText = '';
-                if (overallScore >= 90) {
+                if (Object.keys(skorlar).length === 0) {
+                    // Test hiç çözülmemiş, öneri gösterme
+                    interviewScaleText = '';
+                } else if (overallScore >= 90) {
                     interviewScaleText = 'GÖRÜŞME ÖNERİSİ: LİDER ADAYI (Mükemmel Uyum)\nAdayın profili, organizasyonun standartlarını yükseltecek seviyede ustalık içermektedir. Bu aday, sadece mevcut pozisyon için değil, aynı zamanda gelecekteki liderlik pozisyonları için kilit bir yatırımdır. Aksiyon: Görüşme sonrası, adayın kariyer yolu haritasını (pathing) hemen oluşturunuz.';
                 } else if (overallScore >= 80 && biasScore <= 66) {
                     interviewScaleText = 'GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (Yüksek Uyum)\nAdayın tüm kritik yetkinliklerde beklenen normun oldukça üzerinde bir performans gösterdiği tespit edilmiştir. Güvenilirlik puanı (Response Bias) düşük düzeyde olduğu için skorlar yüksek güvenilirliğe sahiptir. Aday, bu rol için hızla terfi potansiyeli taşımaktadır. Aksiyon: Görüşme sürecini hızla başlatınız. Öncelikli olarak, adayın yüksek potansiyelini organizasyon içinde nasıl kullanacağınıza odaklanınız.';
@@ -3679,28 +3683,32 @@ function showCandidateDetail(candidate) {
 
                 const box2 = document.getElementById('interviewScaleBox');
                 if (box2) {
-                    const title = interviewScaleText.split('\n')[0] || 'Görüşme Önerisi';
-                    const body = interviewScaleText.split('\n').slice(1).join('<br>');
-                    let color2 = '#0b69d6';
-                    if (/LİDER ADAYI|Mükemmel/i.test(title)) color2 = '#0b6b3a';
-                    else if (/GÜÇLÜ TAVSİYE/i.test(title)) color2 = '#1e40af';
-                    else if (/İHTİYATLI ORTA DÜZEY/i.test(title)) color2 = '#b45309';
-                    else if (/İHTİYATLI YAKLAŞIM/i.test(title)) color2 = '#b91c1c';
-                    // hide long tables by default; add toggle so the tables remain in the DOM for persistence/calculation but hidden until needed
-                    const uniq2 = 'interview_details_' + Date.now() + '_2';
-                    box2.innerHTML = `
-                        <div style="border-left:4px solid ${color2};padding:10px;margin-bottom:10px;background:#fbfdff;border-radius:6px;">
-                            <div style="font-weight:800;color:${color2};margin-bottom:6px;">${title}</div>
-                            <div style="color:#334155;font-size:13px;line-height:1.35;">${body}</div>
-                        </div>
-                        <div style="margin-top:8px;text-align:right;"><button id="toggle_${uniq2}" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm">Ayrıntıları Göster</button></div>
-                        <div id="${uniq2}" style="display:none;margin-top:10px;">${tablesHTML2}</div>
-                    `;
-                    try {
-                        const btn2 = box2.querySelector('#toggle_' + uniq2);
-                        const det2 = box2.querySelector('#' + uniq2);
-                        if (btn2 && det2) btn2.addEventListener('click', function(){ if (det2.style.display === 'none'){ det2.style.display='block'; btn2.innerText='Ayrıntıları Gizle'; } else { det2.style.display='none'; btn2.innerText='Ayrıntıları Göster'; } });
-                    } catch(e) { console.warn('attach toggle failed', e); }
+                    if (interviewScaleText === '') {
+                        box2.style.display = 'none';
+                    } else {
+                        const title = interviewScaleText.split('\n')[0] || 'Görüşme Önerisi';
+                        const body = interviewScaleText.split('\n').slice(1).join('<br>');
+                        let color2 = '#0b69d6';
+                        if (/LİDER ADAYI|Mükemmel/i.test(title)) color2 = '#0b6b3a';
+                        else if (/GÜÇLÜ TAVSİYE/i.test(title)) color2 = '#1e40af';
+                        else if (/İHTİYATLI ORTA DÜZEY/i.test(title)) color2 = '#b45309';
+                        else if (/İHTİYATLI YAKLAŞIM/i.test(title)) color2 = '#b91c1c';
+                        // hide long tables by default; add toggle so the tables remain in the DOM for persistence/calculation but hidden until needed
+                        const uniq2 = 'interview_details_' + Date.now() + '_2';
+                        box2.innerHTML = `
+                            <div style="border-left:4px solid ${color2};padding:10px;margin-bottom:10px;background:#fbfdff;border-radius:6px;">
+                                <div style="font-weight:800;color:${color2};margin-bottom:6px;">${title}</div>
+                                <div style="color:#334155;font-size:13px;line-height:1.35;">${body}</div>
+                            </div>
+                            <div style="margin-top:8px;text-align:right;"><button id="toggle_${uniq2}" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm">Ayrıntıları Göster</button></div>
+                            <div id="${uniq2}" style="display:none;margin-top:10px;">${tablesHTML2}</div>
+                        `;
+                        try {
+                            const btn2 = box2.querySelector('#toggle_' + uniq2);
+                            const det2 = box2.querySelector('#' + uniq2);
+                            if (btn2 && det2) btn2.addEventListener('click', function(){ if (det2.style.display === 'none'){ det2.style.display='block'; btn2.innerText='Ayrıntıları Gizle'; } else { det2.style.display='none'; btn2.innerText='Ayrıntıları Göster'; } });
+                        } catch(e) { console.warn('attach toggle failed', e); }
+                    }
                 }
             } catch(e) { console.warn('interviewScaleBox populate failed', e); }
 
