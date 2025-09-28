@@ -11,6 +11,8 @@
     .apx-dark { background: linear-gradient(180deg,#0f172a,#07132a) !important; color: #e6eef8; }
     .apx-dark .bg-white { background-color: #0b1220 !important; }
     .apx-dark .text-gray-700, .apx-dark .text-gray-900 { color: #dbeafe !important; }
+    /* Test UI front class to ensure it appears above admin overlays during candidate flow */
+    .apx-test-front { position: relative !important; z-index: 10060 !important; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 min-h-screen flex items-center justify-center overflow-auto">
@@ -439,10 +441,15 @@
     // NOTE: legacy TEST fallback password (kept for reference). Do NOT rely on this in production.
     // Production: remove this constant and use server-side custom claims instead.
     const ADMIN_FALLBACK_PASSWORD = 'Ba030714..';
-    // Expose admin constants to non-module scripts (they run in global scope)
+    // Consolidate runtime config to avoid TDZ/ordering issues for inline/non-module handlers.
     try {
-        window.DEFAULT_ADMIN_EMAIL = DEFAULT_ADMIN_EMAIL; // allow non-module handlers to read default
-        window.ADMIN_FALLBACK_PASSWORD = ADMIN_FALLBACK_PASSWORD;
+        window.APX_CONFIG = window.APX_CONFIG || {};
+        // Only set defaults; allow environment or embedding to override by pre-setting window.APX_CONFIG
+        window.APX_CONFIG.DEFAULT_ADMIN_EMAIL = window.APX_CONFIG.DEFAULT_ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL;
+        window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD = window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD || ADMIN_FALLBACK_PASSWORD;
+        // Backwards-compatible legacy globals (some inline handlers still read these directly)
+        window.DEFAULT_ADMIN_EMAIL = window.APX_CONFIG.DEFAULT_ADMIN_EMAIL;
+        window.ADMIN_FALLBACK_PASSWORD = window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD;
     } catch(e) { /* ignore if assignment fails */ }
 
     // Helper: produce actionable diagnostic for Firebase Auth failures
@@ -502,7 +509,7 @@
     window.equalTo = equalTo;
 
   // ADAY TEST SONUÇLARINI KAYDETME
-    window.saveCandidateTest = async function(rumuz, tip, baslik, cevaplar, skorlar) {
+    window.saveCandidateTest = async function(rumuz, tip, baslik, cevaplar, skorlar, questions) {
         // skorlar: {radar: [...], sjt: [...], bias: ...}
         // Compute deterministic scored values + NLG summary on client side as fallback
         // More robust save strategy:
@@ -514,10 +521,30 @@
             const computed = computeScoresAndNLG(cevaplar, { tip, baslik });
             const finalSkorlar = Object.assign({}, skorlar || {}, computed);
 
+            // Format answers for RTDB: convert arrays -> object { q1: val, q2: val }
+            function formatAnswersForDB(ansArr) {
+                if (!ansArr) return {};
+                if (!Array.isArray(ansArr) && typeof ansArr === 'object') return ansArr; // already keyed
+                const obj = {};
+                for (let i = 0; i < ansArr.length; i++) {
+                    const v = ansArr[i];
+                    obj['q' + (i+1)] = (v === undefined || v === null || v === '') ? null : v;
+                }
+                return obj;
+            }
+
+            const formattedCevaplar = formatAnswersForDB(cevaplar);
+            // Questions to save (if provided) — fallback to testForm._questions when available
+            const questionsToSave = Array.isArray(questions) ? questions : (typeof testForm !== 'undefined' && Array.isArray(testForm._questions) ? testForm._questions : []);
+            // target path: candidates/<rumuz>/cevaplar/<tip>/<baslik>
+            const answersPath = `candidates/${rumuz}/cevaplar/${encodeURIComponent(tip||'default')}/${encodeURIComponent(baslik||'default')}`;
             // Try to write answers and skorlar separately (some DB rules allow per-child write)
-            try {
-                await set(ref(db, `candidates/${rumuz}/cevaplar`), cevaplar || []);
+                try {
+                // write formatted answers and the corresponding questions into a namespaced path
+                await set(ref(db, answersPath), { answers: formattedCevaplar, questions: questionsToSave, submittedAt: Date.now() });
+                // also keep a lightweight lastAnswers snapshot at top-level for quick access
                 await set(ref(db, `candidates/${rumuz}/skorlar`), finalSkorlar);
+                await update(ref(db, `candidates/${rumuz}`), { lastSubmission: { answers: formattedCevaplar, questions: questionsToSave, ts: Date.now() } });
                 // ensure metadata fields
                 await update(ref(db, `candidates/${rumuz}`), { rumuz, tip, baslik, timestamp: Date.now() });
                 console.log('saveCandidateTest: wrote cevaplar and skorlar separately for', rumuz);
@@ -528,11 +555,12 @@
 
             // Next try: replace/merge whole candidate node
             try {
+                // Full node update fallback: include formatted answers and questions
                 await update(ref(db, 'candidates/' + rumuz), {
                     rumuz,
                     tip,
                     baslik,
-                    cevaplar,
+                    cevaplar: { answers: formattedCevaplar, questions: questionsToSave, submittedAt: Date.now() },
                     skorlar: finalSkorlar,
                     timestamp: Date.now()
                 });
@@ -546,13 +574,13 @@
                     console.warn('Permission denied while saving candidate data. Check RTDB rules.');
                 }
                 // final failure -> queue locally
-                try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: finalSkorlar, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar: formattedCevaplar, questions: questionsToSave, skorlar: finalSkorlar, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
                 alert('Veri sunucuya gönderilemedi; otomatik olarak bekleyen gönderimler kuyruğuna alındı ve arka planda tekrar denenecektir. (Detay: ' + (msg||code||'unknown') + ')');
                 return { ok: false, queued: true };
             }
         } catch (outerErr) {
             console.error('saveCandidateTest: unexpected error', outerErr);
-            try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar, skorlar: skorlar || {}, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+            try { queueCandidateSubmission({ rumuz, tip, baslik, cevaplar: formatAnswersForDB(cevaplar), questions: Array.isArray(questions) ? questions : [], skorlar: skorlar || {}, ts: Date.now() }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
             alert('Kaydetme sırasında beklenmeyen bir hata oluştu ve veriler kuyruğa alındı. Konsolu kontrol edin.');
             return { ok: false, queued: true };
         }
@@ -656,8 +684,7 @@
                     pq.sjtMappedCount++;
                     pq.totalResponses++;
                 }
-            }
-        }
+            } // end for (let i = 0; i < allTyped.length; i++)
 
         // finalize perQuestion averages
         for (let i = 0; i < perQuestion.length; i++) {
@@ -749,6 +776,8 @@
             top3Weak
         };
     }
+    // Expose to global for non-module legacy handlers
+    try { window.computeScoresAndNLG = computeScoresAndNLG; } catch(e) { /* ignore in restricted envs */ }
 
     // Create candidate record (called by HR panel when adding candidate)
     window.addCandidateToDB = async function({rumuz, password, tip, baslik, createdBy}){
@@ -973,11 +1002,15 @@
         const remaining = [];
         for (const it of arr) {
             try {
-                await update(ref(db, 'candidates/' + (it.rumuz || ('pending_' + it.ts))), {
+                const rumuzKey = it.rumuz || ('pending_' + it.ts);
+                const tipKey = encodeURIComponent(it.tip || 'default');
+                const baslikKey = encodeURIComponent(it.baslik || 'default');
+                const answersPath = `candidates/${rumuzKey}/cevaplar/${tipKey}/${baslikKey}`;
+                await set(ref(db, answersPath), { answers: it.cevaplar || {}, questions: it.questions || [], submittedAt: it.ts || Date.now() });
+                await update(ref(db, 'candidates/' + rumuzKey), {
                     rumuz: it.rumuz || null,
                     tip: it.tip || null,
                     baslik: it.baslik || null,
-                    cevaplar: it.cevaplar || [],
                     skorlar: it.skorlar || {},
                     timestamp: it.ts || Date.now(),
                     pendingOriginally: true
@@ -1052,7 +1085,21 @@
             const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
             try {
                 if (!password) { alert('Şifre girin'); return; }
-                if (!email) email = DEFAULT_ADMIN_EMAIL;
+                if (!email) email = (window.APX_CONFIG && window.APX_CONFIG.DEFAULT_ADMIN_EMAIL) || window.DEFAULT_ADMIN_EMAIL || 'admin@firma.com';
+                // Defensive: if the auth helper isn't available (module import failed or blocked),
+                // allow a local dev fallback using ADMIN_FALLBACK_PASSWORD to open the admin panel.
+                if (typeof window.signInWithEmailAndPassword !== 'function') {
+                    console.warn('window.signInWithEmailAndPassword is not available — using local fallback check');
+                    const configuredFallback = (window.APX_CONFIG && window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD) || window.ADMIN_FALLBACK_PASSWORD || null;
+                    if (password === configuredFallback) {
+                        const panel = document.getElementById('adminPanel');
+                        if (panel) { panel.classList.remove('hidden'); panel.style.display = 'block'; }
+                        return;
+                    } else {
+                        alert('Authentication helper unavailable (module import may have failed). Lütfen ağ/console hatalarını kontrol edin.');
+                        return;
+                    }
+                }
                 // Try Firebase sign-in first
                 try {
                     const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
@@ -1734,9 +1781,18 @@
                 // set active candidate from DB object
                 activeCandidate = cand;
                 candidateLoginForm.classList.add('hidden');
+                // hide admin overlays to avoid overlap
+                try { const panel = document.getElementById('adminPanel'); if (panel) { panel.classList.add('hidden'); panel.style.display='none'; } } catch(e){}
+                try { const ik = document.getElementById('ikPanel'); if (ik) { ik.classList.add('hidden'); ik.style.display='none'; } } catch(e){}
+                try { const aC = document.getElementById('adminLoginCompact'); if (aC) { aC.classList.add('hidden'); aC.style.display='none'; } } catch(e){}
                 // render questions according to stored tip/baslik
                 renderTestQuestions(cand.tip, cand.baslik);
-                testSection.classList.remove('hidden');
+                // bring test section visually to front (above admin panels)
+                try {
+                    testSection.classList.remove('hidden');
+                    testSection.style.position = 'relative';
+                    testSection.style.zIndex = '10060';
+                } catch(e){}
             } catch (err) {
                 console.error(err);
                 alert('Giriş sırasında hata: ' + (err.message||err));
@@ -1795,22 +1851,44 @@
                 // fallback to global helpers
                 try { snap = await window.get(window.ref(window.db, 'questionKeys')); } catch(e){ console.warn('loadQuestionKeys: window.get(window.ref(...)) failed', e); snap = null; }
             } else {
-                // Last resort: use onValue once and resolve when data arrives
-                snap = await new Promise((resolve, reject) => {
+                // Last resort: try to use onValue if available on either local scope or window (some bundlers put it on window)
+                const onValueFn = (typeof onValue === 'function') ? onValue : ((typeof window !== 'undefined' && typeof window.onValue === 'function') ? window.onValue : null);
+                if (onValueFn) {
+                    snap = await new Promise((resolve, reject) => {
+                        try {
+                            const r = (localRef) ? localRef(db, 'questionKeys') : (typeof window.ref === 'function' ? window.ref(window.db, 'questionKeys') : null);
+                            let unsub = null;
+                            try {
+                                unsub = onValueFn(r, (s) => {
+                                    try { if (typeof unsub === 'function') unsub(); } catch(_){ }
+                                    resolve(s);
+                                }, (err) => {
+                                    try { if (typeof unsub === 'function') unsub(); } catch(_){ }
+                                    reject(err || new Error('onValue read failed'));
+                                });
+                            } catch(e) {
+                                // some implementations return an unsubscribe function instead of a handle
+                                resolve(null);
+                            }
+                            // safety timeout
+                            setTimeout(() => reject(new Error('Timeout while loading questionKeys')), 5000);
+                        } catch(err) { reject(err); }
+                    });
+                } else if (localGet && (typeof localRef === 'function' || typeof window.ref === 'function')) {
+                    // If onValue is missing but get/ref is available, try a get read
                     try {
-                        const r = (localRef) ? localRef(db, 'questionKeys') : (typeof window.ref === 'function' ? window.ref(window.db, 'questionKeys') : null);
-                        const unsub = onValue(r, (s) => {
-                            try { if (typeof unsub === 'function') unsub(); } catch(_){}
-                            resolve(s);
-                        }, (err) => {
-                            try { if (typeof unsub === 'function') unsub(); } catch(_){}
-                            reject(err || new Error('onValue read failed'));
-                        });
-                        // safety timeout
-                        setTimeout(() => reject(new Error('Timeout while loading questionKeys')), 5000);
-                    } catch(err) { reject(err); }
-                });
-            }
+                        const r = (localRef) ? localRef(db, 'questionKeys') : window.ref(window.db, 'questionKeys');
+                        snap = await localGet(r);
+                    } catch(e) {
+                        console.warn('loadQuestionKeys: fallback get failed', e);
+                        snap = null;
+                    }
+                } else {
+                    // Give up gracefully — set empty cache
+                    console.warn('loadQuestionKeys: no suitable DB read function available (onValue/get/ref missing)');
+                    snap = null;
+                }
+                }
 
             // Normalize different snap shapes (some fallbacks resolve a plain object)
             if (!snap) {
@@ -1944,13 +2022,39 @@
                 </select>`;
             }
             if (q.expertScores) html += `<div class='text-xs text-gray-500 mt-2'>Uzman skorları: ${JSON.stringify(q.expertScores)}</div>`;
+            // placeholder for inline warnings
+            html += `<div id='questionWarning' class='text-sm text-red-600 mt-2 hidden' aria-live='polite'></div>`;
             html += `</div>`;
             pane.innerHTML = html;
             // prefill if answer exists
             const sel = pane.querySelector('#curAnswer');
+            const warnEl = pane.querySelector('#questionWarning');
             if (sel && testForm._answers[i] !== undefined && testForm._answers[i] !== '') sel.value = testForm._answers[i];
             // focus select
             try { sel && sel.focus(); } catch(e){}
+
+            // Navigation enable/disable helper
+            function updateNavigation() {
+                const hasAnswer = sel && sel.value !== '' && sel.value !== null && sel.value !== undefined;
+                if (i === qObjs.length - 1) {
+                    // last question: control submit
+                    submitBtn.disabled = !hasAnswer;
+                } else {
+                    nextBtn.disabled = !hasAnswer;
+                }
+                // hide warning when answer present
+                if (hasAnswer && warnEl) warnEl.classList.add('hidden');
+            }
+
+            // wire change to enable next/submit
+            if (sel) {
+                sel.addEventListener('change', updateNavigation);
+                // run initially to reflect prefilled answers
+                updateNavigation();
+            } else {
+                // no select present: ensure navigation enabled to avoid lockout
+                nextBtn.disabled = false; submitBtn.disabled = false;
+            }
         }
 
         // wire buttons
@@ -1961,10 +2065,23 @@
             renderAt(testForm._currentQuestion);
         };
         nextBtn.onclick = function(){
-            const cur = document.getElementById('curAnswer'); if (cur) testForm._answers[testForm._currentQuestion] = cur.value;
+            const cur = document.getElementById('curAnswer');
+            const warnEl = document.getElementById('questionWarning');
+            const curVal = cur ? cur.value : '';
+            // validate answered
+            if (!curVal || curVal === '') {
+                // show inline warning and focus
+                if (warnEl) { warnEl.textContent = 'Lütfen önce bir seçenek seçin, sonra sonraki soruya geçin.'; warnEl.classList.remove('hidden'); }
+                if (cur) try { cur.focus(); } catch(e){}
+                return;
+            }
+            // save and advance
+            if (cur) testForm._answers[testForm._currentQuestion] = curVal;
             if (testForm._currentQuestion < qObjs.length - 1) testForm._currentQuestion++;
             renderAt(testForm._currentQuestion);
         };
+        // Ensure submit button is disabled until last question answered
+        submitBtn.disabled = true;
         // initial render
         renderAt(0);
     }
@@ -1985,7 +2102,7 @@
                 const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
 
                 // Attempt to save; if saving fails, saveCandidateTest will handle fallback/queue
-                const res = await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar);
+                const res = await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar, testForm._questions);
 
                 // Hide the test UI and show a thank-you message
                 const testSectionEl = document.getElementById('testSection');
@@ -2009,8 +2126,8 @@
                 renderRadar(skorlar.radar);
             } catch (err) {
                 console.error('Test submit failed', err);
-                // Queue as last resort
-                try { queueCandidateSubmission({ rumuz: activeCandidate.rumuz, tip: activeCandidate.tip, baslik: activeCandidate.baslik, cevaplar: (testForm._answers||[]), skorlar: {} }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
+                // Queue as last resort (store formatted answers + questions)
+                try { queueCandidateSubmission({ rumuz: activeCandidate.rumuz, tip: activeCandidate.tip, baslik: activeCandidate.baslik, cevaplar: (function(a){ const o={}; (a||[]).forEach((v,i)=>o['q'+(i+1)]=v); return o; })(testForm._answers||[]), questions: testForm._questions||[], skorlar: {} }); } catch(qe){ console.warn('queueCandidateSubmission failed', qe); }
                 alert('Cevaplarınız gönderilirken hata oluştu. Veriler yerel kuyruğa alındı ve otomatik olarak tekrar denenecektir.');
             }
         }
@@ -2090,22 +2207,74 @@
             });
             // Attach AI request handlers per row (opens detail modal and auto-invokes modal NLG button)
             Array.from(document.querySelectorAll('.request-ai')).forEach(btn => {
-                btn.onclick = function(){
+                btn.onclick = async function(){
                     const r = this.dataset.r;
                     const cand = (candidates || []).find(x=>x.rumuz===r);
                     if (!cand) return alert('Aday bulunamadı');
-                    // open detail modal
-                    showCandidateDetail(cand);
-                    // attempt to auto-click the modal's NLG button (retry for short period)
-                    const tryClick = function(attemptsLeft){
-                        const modalBtn = document.querySelector('.nlg-request-btn');
-                        if (modalBtn) {
-                            try { modalBtn.click(); } catch(e){ console.warn('auto invoke nlg failed', e); }
-                            return;
-                        }
-                        if (attemptsLeft > 0) setTimeout(()=> tryClick(attemptsLeft-1), 300);
+
+                    // Create a full-screen AI Report modal (separate from detail modal)
+                    const existing = document.getElementById('aiReportModal');
+                    if (existing) try { existing.remove(); } catch(e){}
+                    const modal = document.createElement('div');
+                    modal.id = 'aiReportModal';
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-start justify-center z-[100000] p-6 overflow-auto';
+                    modal.innerHTML = `
+                        <div class='bg-white rounded-2xl shadow-2xl p-6 w-full max-w-4xl relative'>
+                            <button id='aiReportClose' class='absolute top-3 right-3 text-gray-400 hover:text-red-600 text-2xl'>&times;</button>
+                            <h2 class='text-2xl font-bold text-indigo-700 mb-2'>Yapay Zeka Raporu — ${cand.rumuz}</h2>
+                            <div id='aiReportMeta' class='text-sm text-gray-600 mb-3'>Oluşturuluyor... Lütfen bekleyin.</div>
+                            <div id='aiReportContent' class='prose max-w-none text-gray-800 whitespace-pre-wrap'></div>
+                            <div class='mt-4 flex gap-2'>
+                                <button id='aiCopyBtn' class='bg-indigo-600 text-white px-3 py-1 rounded'>Kopyala</button>
+                                <button id='aiDownloadBtn' class='bg-gray-200 px-3 py-1 rounded'>İndir (.txt)</button>
+                                <button id='aiCloseBtn' class='ml-auto bg-white border px-3 py-1 rounded'>Kapat</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    const metaEl = document.getElementById('aiReportMeta');
+                    const contentEl = document.getElementById('aiReportContent');
+                    const closeHandler = function(){ try { modal.remove(); } catch(e){} };
+                    document.getElementById('aiReportClose').onclick = closeHandler;
+                    document.getElementById('aiCloseBtn').onclick = closeHandler;
+
+                    // Provide quick metadata if available
+                    try {
+                        const s = cand.skorlar || {};
+                        const metaText = [];
+                        metaText.push(`Rumuz: ${cand.rumuz}`);
+                        if (s.genelSkor !== undefined) metaText.push(`Genel Skor: ${s.genelSkor}/100`);
+                        if (s.bias !== undefined) metaText.push(`Güvenilirlik (bias): ${s.bias}/100`);
+                        metaEl.innerText = metaText.join(' — ');
+                    } catch(e){ console.warn('ai report meta failed', e); }
+
+                    // Call detailed NLG and fill content
+                    try {
+                        contentEl.innerText = 'Oluşturuluyor... Lütfen bekleyin.';
+                        const resp = (typeof requestCandidateNLGDetailed === 'function') ? await requestCandidateNLGDetailed(cand) : null;
+                        let text;
+                        if (resp && resp.text) text = resp.text;
+                        else if (resp && resp.result) text = resp.result;
+                        else if (resp && typeof resp === 'string') text = resp;
+                        else text = 'Yapay zeka özetlenemedi veya fonksiyon tarafından beklenmeyen bir cevap alındı.';
+                        contentEl.innerText = text;
+                    } catch(err) {
+                        console.error('AI report generation failed', err);
+                        contentEl.innerText = 'Rapor oluşturulurken hata oluştu: ' + (err && err.message ? err.message : String(err));
+                    }
+
+                    // copy and download handlers
+                    document.getElementById('aiCopyBtn').onclick = function(){
+                        try { navigator.clipboard.writeText(contentEl.innerText); alert('Rapor panoya kopyalandı'); }
+                        catch(e){ prompt('Rapor (kopyalayın):', contentEl.innerText); }
                     };
-                    tryClick(6); // try for ~1.8s
+                    document.getElementById('aiDownloadBtn').onclick = function(){
+                        try {
+                            const blob = new Blob([contentEl.innerText || ''], { type: 'text/plain;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a'); a.href = url; a.download = `${cand.rumuz}_ai_report.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                        } catch(e){ console.warn('download failed', e); }
+                    };
                 };
             });
         });
@@ -2139,8 +2308,27 @@
             const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.classList.remove('hidden');
             try {
                 // If email omitted, substitute default for Firebase attempt
-                if (!email) email = DEFAULT_ADMIN_EMAIL;
+                if (!email) email = (window.APX_CONFIG && window.APX_CONFIG.DEFAULT_ADMIN_EMAIL) || window.DEFAULT_ADMIN_EMAIL || 'admin@firma.com';
                 if (!pw) { alert('Şifre girin'); return; }
+                // Defensive: fallback if auth helper missing
+                if (typeof window.signInWithEmailAndPassword !== 'function') {
+                    console.warn('window.signInWithEmailAndPassword is not available (compact admin) — using local fallback check');
+                    const configuredFallback2 = (window.APX_CONFIG && window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD) || window.ADMIN_FALLBACK_PASSWORD || null;
+                    if (pw === configuredFallback2) {
+                        const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                        if (adminLoginCompactNow) {
+                            adminLoginCompactNow.classList.add('hidden');
+                            try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
+                        }
+                        const panelNow = document.getElementById('adminPanel');
+                        if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                        const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                        return;
+                    } else {
+                        alert('Authentication helper unavailable (module import may have failed). Lütfen ağ/console hatalarını kontrol edin.');
+                        return;
+                    }
+                }
                 // Try Firebase sign-in first
                 try {
                     const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, pw);
@@ -2517,8 +2705,9 @@
         if (!secret) throw new Error('APX secret girilmedi');
 
         // store for convenience in this session
-        window.GENERATE_NLG_URL = fnUrl;
-        window.APX_SECRET = secret;
+    window.GENERATE_NLG_URL = fnUrl;
+    window.APX_SECRET = secret;
+    try { window.APX_CONFIG = window.APX_CONFIG || {}; window.APX_CONFIG.GENERATE_NLG_URL = fnUrl; window.APX_CONFIG.APX_SECRET = secret; } catch(e) {}
 
         const res = await fetch(fnUrl, {
             method: 'POST',
@@ -2550,8 +2739,9 @@
         if (!secret) throw new Error('APX secret girilmedi');
 
         // persist for this session
-        window.CALL_GEMINI_URL = fnUrl;
-        window.APX_SECRET = secret;
+    window.CALL_GEMINI_URL = fnUrl;
+    window.APX_SECRET = secret;
+    try { window.APX_CONFIG = window.APX_CONFIG || {}; window.APX_CONFIG.CALL_GEMINI_URL = fnUrl; window.APX_CONFIG.APX_SECRET = secret; } catch(e) {}
 
         // Build a rich prompt using available local data
         // Prefer server/client computed skorlar if present
@@ -2986,7 +3176,8 @@ function showCandidateDetail(candidate) {
             } catch (e) {
                 console.warn('Modal taşıma sırasında hata:', e);
             }
-        });
-        </script>
+    });
+    }
+    </script>
 </body>
 </html>
