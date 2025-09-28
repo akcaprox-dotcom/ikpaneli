@@ -2502,57 +2502,26 @@ try {
     // Helper: produce question list (maintains type info) for a given sector/role
     // Prioritize CSV-based `window.customQuestionBank` when present (preserves CSV order).
     function getQuestionsFor(sector, role) {
-        // Try CSV custom bank first (loaded by loadCustomQuestionsFromCSV)
-        try {
-            const bank = window.customQuestionBank || {};
-            if (Object.keys(bank).length) {
-                function normalizePoolKeyFromRole(src) {
-                    const g = (src||'').toString().toLowerCase();
-                    if (g.includes('beyaz')) return 'beyaz yaka';
-                    if (g.includes('mavi')) return 'mavi yaka';
-                    if (g.includes('yonetici')) return 'yonetici';
-                    if (g.includes('hizmet')) return 'hizmet-personeli';
-                    return 'genel';
-                }
-                // prefer role, then sector when deciding pool
-                const poolKey = normalizePoolKeyFromRole(role) || normalizePoolKeyFromRole(sector);
-                const cats = bank[poolKey] || bank['genel'] || {};
-                const qs = [];
-                // preserve insertion order from CSV by iterating Object.keys
-                Object.keys(cats).forEach(cat => { (cats[cat]||[]).forEach(q=> qs.push(Object.assign({}, q, { category: cat }))); });
-                if (qs.length) return qs;
-            }
-        } catch(e) {
-            console.warn('getQuestionsFor custom bank error', e);
+        // Sadece CSV custom bank kullanılır, fallback asla yok
+        const bank = window.customQuestionBank || {};
+        if (!Object.keys(bank).length) return [];
+        function normalizePoolKeyFromRole(src) {
+            const g = (src||'').toString().toLowerCase();
+            if (g.includes('beyaz')) return 'beyaz yaka';
+            if (g.includes('mavi')) return 'mavi yaka';
+            if (g.includes('yonetici') && g.includes('idari')) return 'hizmet-yonetici';
+            if (g.includes('yonetici')) return 'yonetici';
+            if (g.includes('hizmet') && g.includes('idari')) return 'hizmet-yonetici';
+            if (g.includes('hizmet')) return 'hizmet-personeli';
+            return 'genel';
         }
-
-        // Fallback to built-in questionPool if CSV bank not present or empty
-        const ROLE_TO_POOL_KEY = {
-            'mavi_yaka': 'mavi yaka',
-            'beyaz_yaka': 'beyaz yaka',
-            'yonetici': 'yonetici',
-            'yonetici_idari': 'yonetici',
-            'hizmet_personeli': 'hizmet-on-cephe'
-        };
-        const poolKey = ROLE_TO_POOL_KEY[role] || ROLE_TO_POOL_KEY[sector] || null;
-        let questions = [];
-        if (poolKey && questionPool[poolKey]) {
-            const sub = questionPool[poolKey];
-            Object.keys(sub).forEach(k => {
-                const arr = Array.isArray(sub[k]) ? sub[k] : [];
-                const type = (/sjt|durumsal|problem|senaryo/i.test(k)) ? 'sjt' : 'personality';
-                arr.forEach(q => questions.push({text: q, type, category: k}));
-            });
-        }
-        // fallback generic questions
-        if (!questions.length) {
-            questions = [
-                {text: 'Takım çalışmasına yatkın mısınız?', type: 'personality'},
-                {text: 'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?', type: 'personality'},
-                {text: 'Bir senaryoda en uygun aksiyonu nasıl seçersiniz?', type: 'sjt'}
-            ];
-        }
-        return questions;
+        const poolKey = normalizePoolKeyFromRole(role) || normalizePoolKeyFromRole(sector);
+        const cats = bank[poolKey] || bank['genel'] || {};
+        const qs = [];
+        Object.keys(cats).forEach(cat => {
+            (cats[cat]||[]).forEach(q=> qs.push(Object.assign({}, q, { category: cat })));
+        });
+        return qs;
     }
 
     // Load question keys (expertScores / target) from DB into window.questionKeysCache
@@ -2845,20 +2814,14 @@ try {
             }
         } catch(e) { console.warn('enrich questions failed', e); }
 
-        // Defensive: ensure we always have at least a few questions to render
+        // Eğer hiç soru yoksa kullanıcıya açık uyarı göster ve test ekranını açma
         if (!Array.isArray(qObjs) || qObjs.length === 0) {
-            console.warn('renderTestQuestions: question pool empty for', sector, role, '- using fallback questions');
-            qObjs = [
-                { text: 'Takım çalışmasına yatkın mısınız?', type: 'personality', category: 'Genel' },
-                { text: 'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?', type: 'personality', category: 'Genel' },
-                { text: 'Bir senaryoda en uygun aksiyonu nasıl seçersiniz?', type: 'sjt', category: 'Genel' }
-            ];
-        }
-        // If very few questions were returned, duplicate them to create a minimum pagination length
-        if (qObjs.length < 3) {
-            const copy = [];
-            for (let i = 0; i < 3; i++) copy.push(Object.assign({}, qObjs[i % qObjs.length] || qObjs[0]));
-            qObjs = copy;
+            alert('CSV yüklenemedi veya uygun soru havuzu bulunamadı. Lütfen CSV dosyasını kontrol edin.');
+            testForm.innerHTML = `<div class='p-6 bg-red-50 border border-red-200 rounded-lg text-center'>
+                <h3 class='text-2xl font-semibold text-red-800 mb-2'>CSV Yüklenemedi</h3>
+                <p class='text-gray-700 mb-3'>Test başlatılamıyor. Lütfen CSV dosyasının mevcut ve erişilebilir olduğundan emin olun.</p>
+            </div>`;
+            return;
         }
 
         // Prepare paginated UI state
@@ -2891,8 +2854,13 @@ try {
             if (i === qObjs.length - 1) { nextBtn.classList.add('hidden'); submitBtn.classList.remove('hidden'); }
             else { nextBtn.classList.remove('hidden'); submitBtn.classList.add('hidden'); }
 
+            // Soru metninden parantezli numarayı sadece ekranda gizle
+            function displayText(t) {
+                return (t||'').replace(/\s*\(\d+\)\s*$/,'').trim();
+            }
+
             // create content
-            let html = `<div><label class='block text-gray-700 font-medium mb-2'>${i+1}. ${q.text || ('Soru ' + (i+1))}</label>`;
+            let html = `<div><label class='block text-gray-700 font-medium mb-2'>${i+1}. ${displayText(q.text) || ('Soru ' + (i+1))}</label>`;
             if ((q.type || '').toLowerCase() === 'personality') {
                 html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='personality'>`;
                 html += `<option value=''>Seçiniz</option>`;
