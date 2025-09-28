@@ -407,59 +407,35 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script type="module">
-    (async function(){
-        // Try dynamic ESM imports for Firebase (caught so we can show actionable diagnostic)
-        let initializeApp, getDatabase, ref, set, push, onValue, get, update, query, orderByChild, equalTo;
-        let getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, fetchSignInMethodsForEmail, sendPasswordResetEmail;
-        try {
-            const modApp = await import('https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js');
-            const modDb = await import('https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js');
-            const modAuth = await import('https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js');
-            initializeApp = modApp.initializeApp;
-            ({ getDatabase, ref, set, push, onValue, get, update, query, orderByChild, equalTo } = modDb);
-            ({ getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, fetchSignInMethodsForEmail, sendPasswordResetEmail } = modAuth);
-        } catch (impErr) {
-            console.error('Firebase dynamic import failed:', impErr);
-            // set a global diagnostic object so other code can check
-            window.FIREBASE_LOAD_ERROR = impErr;
-        }
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, get, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
-            authDomain: "ikpaneli.firebaseapp.com",
-            projectId: "ikpaneli",
-            storageBucket: "ikpaneli.appspot.com",
-            messagingSenderId: "645340845423",
-            appId: "1:645340845423:web:435b57f7093782422e449a",
-            measurementId: "G-6NBTKSBVYL",
-            databaseURL: "https://ikpaneli-default-rtdb.europe-west1.firebasedatabase.app/"
-        };
+  const firebaseConfig = {
+    apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
+    authDomain: "ikpaneli.firebaseapp.com",
+    projectId: "ikpaneli",
+    storageBucket: "ikpaneli.appspot.com",
+    messagingSenderId: "645340845423",
+    appId: "1:645340845423:web:435b57f7093782422e449a",
+    measurementId: "G-6NBTKSBVYL",
+    databaseURL: "https://ikpaneli-default-rtdb.europe-west1.firebasedatabase.app/"
+  };
 
-        if (typeof initializeApp === 'function' && typeof getDatabase === 'function') {
-            try {
-                const app = initializeApp(firebaseConfig);
-                const db = getDatabase(app);
-                const auth = (typeof getAuth === 'function') ? getAuth(app) : null;
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
 
-                // Expose auth and helpers to global window for legacy non-module handlers
-                try { window.firebaseAuth = auth; } catch(e){}
-                try { window.signInWithEmailAndPassword = signInWithEmailAndPassword; } catch(e){}
-                try { window.signOutFirebase = signOut; } catch(e){}
-                try { window.createUserWithEmailAndPassword = createUserWithEmailAndPassword; } catch(e){}
-                try { window.fetchSignInMethodsForEmail = fetchSignInMethodsForEmail; } catch(e){}
-                try { window.sendPasswordResetEmail = sendPasswordResetEmail; } catch(e){}
-                // Expose realtime-database helpers so non-module scripts (older inline code) can call set/update/get
-                try { window.db = db; } catch(e){}
-                try { window.ref = ref; window.set = set; window.push = push; window.onValue = onValue; window.get = get; window.update = update; window.remove = (typeof remove === 'function' ? remove : (window.remove || null)); window.query = query; window.orderByChild = orderByChild; window.equalTo = equalTo; } catch(e){}
-            } catch(initErr) {
-                console.error('Firebase initialize failed', initErr);
-                window.FIREBASE_INIT_ERROR = initErr;
-            }
-        } else {
-            console.warn('Firebase modules not available; Database/Auth helpers will be unavailable. Check network or CDN blocking. See window.FIREBASE_LOAD_ERROR for details.');
-        }
-    })();
+    // Expose auth and helpers to global window for legacy non-module handlers
+    // Note: avoid keeping any admin password on client in production
+    window.firebaseAuth = auth;
+    window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+    window.signOutFirebase = signOut;
+    window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+    // Expose newer auth helpers for non-module scripts
+    window.fetchSignInMethodsForEmail = fetchSignInMethodsForEmail;
+    window.sendPasswordResetEmail = sendPasswordResetEmail;
     // Default admin email used when user enters only password in compact login
     const DEFAULT_ADMIN_EMAIL = 'admin@firma.com';
     // NOTE: legacy TEST fallback password (kept for reference). Do NOT rely on this in production.
@@ -882,21 +858,6 @@
     window.setHRActive = async function(username, active) {
         if (!username) throw new Error('username required');
         await update(ref(db, 'hrUsers/' + username), { active: !!active });
-    };
-
-    // Save AI/human report for candidate
-    window.saveCandidateReport = async function(rumuz, report) {
-        if (!rumuz) throw new Error('rumuz required');
-        // report: { author, type: 'ai'|'human', text, ts }
-        const r = report || {};
-        const ts = r.ts || Date.now();
-        const type = r.type || 'human';
-        const key = `candidates/${rumuz}/reports/${type}/${ts}`;
-        // write report object
-        await set(ref(db, key), { author: r.author || null, text: r.text || '', ts });
-        // update a lightweight latestReport pointer
-        await update(ref(db, 'candidates/' + rumuz), { latestReport: { type, author: r.author || null, ts } });
-        return { ok: true };
     };
 
     // Count candidate tests created by given hrUsername between two timestamps
@@ -3076,7 +3037,7 @@ function showCandidateDetail(candidate) {
             const summaryElId = 'detailNLG';
             let summaryEl = document.getElementById(summaryElId);
             let container = summaryEl ? summaryEl.closest('.nlg-container') : null;
-                if (!summaryEl) {
+            if (!summaryEl) {
                 container = document.createElement('div');
                 container.className = 'mt-4 p-3 bg-gray-50 rounded nlg-container';
                 // create title and summary holder
@@ -3088,29 +3049,6 @@ function showCandidateDetail(candidate) {
                 summaryHolder.className = 'text-sm text-gray-700';
                 container.appendChild(title);
                 container.appendChild(summaryHolder);
-                    // Manual report textarea (HR can enter their own report)
-                    const manualLabel = document.createElement('label');
-                    manualLabel.className = 'block text-sm font-medium mt-3';
-                    manualLabel.innerText = 'İnsan Kaynakları Raporu (elle düzenleyebilir)';
-                    const manualTA = document.createElement('textarea');
-                    manualTA.id = 'manualReportTextarea';
-                    manualTA.className = 'w-full mt-1 p-2 border rounded text-sm';
-                    manualTA.rows = 5;
-                    container.appendChild(manualLabel);
-                    container.appendChild(manualTA);
-                    // Save manual report button
-                    const saveReportBtn = document.createElement('button');
-                    saveReportBtn.className = 'mt-2 inline-block bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700';
-                    saveReportBtn.innerText = 'Raporu Kaydet';
-                    saveReportBtn.onclick = async function(){
-                        try {
-                            const text = (document.getElementById('manualReportTextarea')||{}).value || '';
-                            if (!text) { alert('Rapor boş olamaz'); return; }
-                            await saveCandidateReport(candidate.rumuz, { author: window.currentHR || 'manual', type: 'human', text, ts: Date.now() });
-                            alert('Rapor kaydedildi');
-                        } catch(err) { console.error('save manual report failed', err); alert('Rapor kaydedilemedi: ' + (err.message||err)); }
-                    };
-                    container.appendChild(saveReportBtn);
                 // create button to request Gemini NLG
                 const btn = document.createElement('button');
                 btn.className = 'mt-3 inline-block bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700';
@@ -3123,10 +3061,6 @@ function showCandidateDetail(candidate) {
                         const resp = await requestCandidateNLGDetailed(candidate);
                         const text = resp && resp.text ? resp.text : (typeof resp === 'string' ? resp : JSON.stringify(resp));
                         summaryHolder.innerText = text || 'Gemini döndü fakat metin alınamadı.';
-                        // Persist AI report to DB under candidates/<rumuz>/reports/ai
-                        try {
-                            await saveCandidateReport(candidate.rumuz, { author: 'ai', type: 'ai', text: text || '', ts: Date.now() });
-                        } catch(saveErr) { console.warn('Saving AI report failed', saveErr); }
                     } catch (err) {
                         console.error('NLG isteği başarısız', err);
                         summaryHolder.innerText = 'NLG isteği sırasında hata oluştu: ' + (err.message||err);
@@ -3153,38 +3087,6 @@ function showCandidateDetail(candidate) {
             } else {
                 breakdownEl.innerHTML = '<div>Detaylı kategori verisi yok.</div>';
             }
-
-            // Reports list (AI + human) if present in candidate object
-            try {
-                const reportsWrapId = 'candidateReportsList';
-                let reportsWrap = document.getElementById(reportsWrapId);
-                if (!reportsWrap) {
-                    reportsWrap = document.createElement('div');
-                    reportsWrap.id = reportsWrapId;
-                    reportsWrap.className = 'mt-4';
-                    modal.querySelector('.bg-white')?.appendChild(reportsWrap);
-                }
-                reportsWrap.innerHTML = '<h4 class="font-semibold mb-2">Kayıtlı Raporlar</h4>';
-                const reports = candidate.reports || {};
-                const keys = Object.keys(reports);
-                if (!keys.length) {
-                    reportsWrap.innerHTML += '<div class="text-sm text-gray-600">Rapor bulunamadı.</div>';
-                } else {
-                    const list = document.createElement('ul'); list.className='text-sm text-gray-700 list-disc pl-5';
-                    keys.forEach(k => {
-                        try {
-                            const types = reports[k] || {};
-                            Object.keys(types).forEach(tk => {
-                                const rep = types[tk];
-                                const li = document.createElement('li');
-                                li.innerText = `${k} / ${tk} — ${rep.author||''} — ${new Date((rep.ts||0)).toLocaleString()}`;
-                                list.appendChild(li);
-                            });
-                        } catch(e){}
-                    });
-                    reportsWrap.appendChild(list);
-                }
-            } catch(e){ console.warn('reports list render failed', e); }
 
             // Question-by-question detail
             const qListEl = document.getElementById('questionDetailList');
@@ -3275,6 +3177,7 @@ function showCandidateDetail(candidate) {
                 console.warn('Modal taşıma sırasında hata:', e);
             }
     });
+    }
     </script>
 </body>
 </html>
