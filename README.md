@@ -22,6 +22,19 @@
     .apx-dark .text-gray-700, .apx-dark .text-gray-900 { color: #dbeafe !important; }
     /* Test UI front class to ensure it appears above admin overlays during candidate flow */
     .apx-test-front { position: relative !important; z-index: 10060 !important; }
+    /* Test modal / section explicit styles to ensure visibility and avoid parent clipping */
+    #testSection {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 18px 50px rgba(2,6,23,0.45);
+        padding: 18px;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        outline: none;
+    }
+    /* make sure select and inputs inside modal are visible on dark themes */
+    #testSection select, #testSection input, #testSection button { z-index: 10070; }
     /* Response bias badge styles */
     .apx-bias-badge { display:inline-block; min-width:110px; padding:10px 14px; border-radius:12px; color:#fff; font-weight:700; text-align:center; box-shadow:0 6px 18px rgba(2,6,23,0.25); }
     @keyframes apx-pulse {
@@ -2304,6 +2317,10 @@
                 renderTestQuestions(cand.tip, cand.baslik);
                 // bring test section visually to front (above admin panels)
                 try {
+                    // To avoid clipping when a parent element has transform/overflow, ensure the modal is a child of <body>
+                    if (testSection && testSection.parentElement !== document.body) {
+                        try { document.body.appendChild(testSection); } catch(e) { /* ignore if fails */ }
+                    }
                     testSection.classList.remove('hidden');
                     testSection.style.position = 'fixed';
                     testSection.style.top = '50%';
@@ -2507,6 +2524,22 @@
                 });
             }
         } catch(e) { console.warn('enrich questions failed', e); }
+
+        // Defensive: ensure we always have at least a few questions to render
+        if (!Array.isArray(qObjs) || qObjs.length === 0) {
+            console.warn('renderTestQuestions: question pool empty for', sector, role, '- using fallback questions');
+            qObjs = [
+                { text: 'Takım çalışmasına yatkın mısınız?', type: 'personality', category: 'Genel' },
+                { text: 'Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?', type: 'personality', category: 'Genel' },
+                { text: 'Bir senaryoda en uygun aksiyonu nasıl seçersiniz?', type: 'sjt', category: 'Genel' }
+            ];
+        }
+        // If very few questions were returned, duplicate them to create a minimum pagination length
+        if (qObjs.length < 3) {
+            const copy = [];
+            for (let i = 0; i < 3; i++) copy.push(Object.assign({}, qObjs[i % qObjs.length] || qObjs[0]));
+            qObjs = copy;
+        }
 
         // Prepare paginated UI state
         testForm._questions = qObjs;
