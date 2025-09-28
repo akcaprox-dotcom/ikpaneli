@@ -5,17 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giriş - Analiz Pro X</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script>
-        // Hide Tailwind CDN production warning in console (quick fix)
-        (function(){
-            var origWarn = console.warn;
-            console.warn = function(){
-                if (arguments.length && typeof arguments[0]==='string' && arguments[0].includes('cdn.tailwindcss.com should not be used in production')) return;
-                return origWarn.apply(console, arguments);
-            };
-        })();
-        </script>
+                <script>
+                    // Tailwind CDN warning suppress (must be before CDN load)
+                    const origWarn = window.console.warn;
+                    window.console.warn = function(msg, ...args) {
+                        if (typeof msg === 'string' && msg.includes('cdn.tailwindcss.com should not be used in production')) return;
+                        origWarn.call(this, msg, ...args);
+                    };
+                </script>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <script src='https://cdn.jotfor.ms/agent/embedjs/01999073f09e7be790118df82931922c1ccf/embed.js'></script>
     <style>
     /* Küçük tema destekleri */
     .apx-dark { background: linear-gradient(180deg,#0f172a,#07132a) !important; color: #e6eef8; }
@@ -23,6 +22,18 @@
     .apx-dark .text-gray-700, .apx-dark .text-gray-900 { color: #dbeafe !important; }
     /* Test UI front class to ensure it appears above admin overlays during candidate flow */
     .apx-test-front { position: relative !important; z-index: 10060 !important; }
+    /* Response bias badge styles */
+    .apx-bias-badge { display:inline-block; min-width:110px; padding:10px 14px; border-radius:12px; color:#fff; font-weight:700; text-align:center; box-shadow:0 6px 18px rgba(2,6,23,0.25); }
+    @keyframes apx-pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.06); opacity: 0.9; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .apx-bias-badge.pulse { animation: apx-pulse 1.6s ease-in-out infinite; }
+    .apx-bias-red { background: linear-gradient(90deg,#ef4444,#dc2626); }
+    .apx-bias-amber { background: linear-gradient(90deg,#f59e0b,#f97316); }
+    .apx-bias-green { background: linear-gradient(90deg,#10b981,#059669); }
+    .apx-bias-blue { background: linear-gradient(90deg,#2563eb,#7c3aed); }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 min-h-screen flex items-center justify-center overflow-auto">
@@ -89,12 +100,12 @@
                     <h3 class="text-xl font-bold text-green-700 mb-2">Kayıtlı Adaylar</h3>
                     <table class="w-full text-sm text-left border">
                         <thead class="bg-green-100">
-                            <tr><th class="p-2">Rumuz</th><th class="p-2">Tip</th><th class="p-2">Başlık</th></tr>
+                            <tr><th class="p-2">Rumuz</th><th class="p-2">Tip</th><th class="p-2">Başlık</th><th class="p-2">Durum</th><th class="p-2">İşlemler</th><th class="p-2">Sil</th></tr>
                         </thead>
                         <tbody id="candidateList"></tbody>
                     </table>
                 </div>
-                <div>
+                <div style="display: none;">
                     <h3 class="text-xl font-bold text-green-700 mb-2">Raporlama & Grafik</h3>
                     <div class="flex flex-col md:flex-row gap-6">
                         <div class="bg-green-50 rounded-lg p-4 flex-1">
@@ -780,9 +791,11 @@
             // Normalize to 0..100 using canonical formula
             const score100 = combinedAvg5 ? Math.round(((combinedAvg5 - 1) / 4) * 100) : 0;
 
-            let label = 'Gelişim Alanı';
-            if (score100 >= 85) label = 'Güçlü Yön';
-            else if (score100 >= 60) label = 'Kabul Edilebilir';
+            let label = 'Temel Gelişim Alanı / Riskli';
+            if (score100 >= 91) label = 'Ustalık Seviyesi / Kritik Katkı';
+            else if (score100 >= 81) label = 'Güçlü Yön / Yüksek Potansiyel';
+            else if (score100 >= 65) label = 'Kabul Edilebilir / Dengeli';
+            else if (score100 >= 50) label = 'Gelişim Alanı / Alt Sınır';
 
             perCategory[cat] = {
                 avg5: combinedAvg5 ? Number(combinedAvg5.toFixed(2)) : null,
@@ -798,16 +811,242 @@
         const cats = Object.keys(perCategory);
         const overall = cats.length ? Math.round(Object.values(perCategory).reduce((a,b)=>a+b.score100,0)/cats.length) : 0;
 
-        function nlgForScore(name, score) {
-            if (score >= 85) return `(${name}) Puan: ${score}. Adayın ${name} yeteneği, sektör ortalamasının oldukça üzerindedir ve bu rol için kritik bir güç kaynağıdır. Hemen yüksek sorumluluk gerektiren görevlere atanması önerilir.`;
-            if (score >= 60) return `(${name}) Puan: ${score}. ${name} yetkinliği kabul edilebilir düzeydedir; görev için yeterli olabilir, ancak belirli görevler için mülakatla doğrulama önerilir.`;
-            return `(${name}) Puan: ${score}. ${name} yetkinliği geliştirilmelidir; planlı gelişim programları ve hedefli eğitim önerilir.`;
+        // Norms for positions (score100 based)
+        const norms = {
+            'beyaz_yaka': {
+                'Detay Odaklılık (Vicdanlılık)': 80,
+                'Analitik Düşünme ve Veri İşleme': 75,
+                'Zaman Yönetimi ve Önceliklendirme': 75,
+                'Kurum İçi İşbirliği ve Koordinasyon': 75,
+                'Geri Bildirime Açıklık ve Kendini Geliştirme': 75,
+                'Öz Disiplin ve İç Motivasyon': 75,
+                'Organizasyon ve Düzen Becerisi': 75,
+                'Sözel Akıl Yürütme ve Anlama': 75,
+                'Yeni Sistemlere Öğrenme Çevikliği': 75
+            },
+            'mavi_yaka': {
+                'İş Güvenliği Bilinci ve Kurala Uyum': 75,
+                'Fiziksel ve Zihinsel Dayanıklılık': 75,
+                'Dikkat ve Odaklanma Yeteneği': 75,
+                'Problem Bildirme Yeteneği (SJT)': 75,
+                'Ekipman Sorumluluğu ve Özen': 75,
+                'Vardiya ve Esnekliğe Adaptasyon': 75,
+                'Hata Kontrolü ve İş Kalitesi': 75,
+                'Basit Talimat ve Yönerge Takibi': 75,
+                'Temel Takım Çalışması ve Destek': 75,
+                'Acil Durum Reaksiyonu': 75
+            },
+            'yonetici': {
+                'Stratejik Vizyon ve Planlama': 80,
+                'Problem Çözme Çevikliği (SJT)': 80,
+                'Delegasyon ve Yetkilendirme': 75,
+                'Baskı Altında Karar Alma': 75,
+                'Değişim Liderliği ve Adaptasyon': 75,
+                'Etkili İletişim ve Koordinasyon': 75,
+                'Takım Geliştirme ve Mentorluk': 75,
+                'Finansal ve Operasyonel Bilinç': 75,
+                'Etik Standartlar ve Dürüstlük': 75,
+                'Sonuç ve Performans Odaklılık': 75
+            },
+            'hizmet_personeli': {
+                'Empati ve Müşteri Bakış Açısı': 75,
+                'Dışadönüklük ve Sosyallik': 75,
+                'Duygu Regülasyonu (Duygusal Emeği)': 75,
+                'Güler Yüz ve Pozitiflik (Kişilik)': 75,
+                'Hızlı İşlem ve Dikkat Yeteneği': 75,
+                'İlk İzlenim ve Kişisel Bakım Bilinci': 75,
+                'Proaktif Hizmet Sunumu (SJT)': 75,
+                'Çatışma Sakinliği ve Yönetimi': 75,
+                'Sözel Akıcılık ve Anlaşılırlık': 75,
+                'Hizmet Değerleri Motivasyonu': 75
+            }
+        };
+
+        function nlgForScore(name, score, position) {
+            let norm = 75; // default norm
+            if (norms[position] && norms[position][name]) norm = norms[position][name];
+            const sapma = norm > 0 ? Math.round(((norm - score) / norm) * 100) : 0;
+            const sapmaText = sapma > 0 ? `Adayın puanı sektör normundan %${sapma} geridedir.` : sapma < 0 ? `Adayın puanı sektör normundan %${Math.abs(sapma)} ileridedir.` : 'Adayın puanı sektör normuna eşittir.';
+            if (score >= 91) return `(${name}) Puan: ${score}. Aday, bu yetkinliği bir üst düzeyde sergileme eğilimindedir. Organizasyonel düzeyde değişim yaratma ve standartları yükseltme potansiyeli taşır. Adayın kariyer yolu haritası (pathing) hızlandırılmalı ve hemen bir yönetici gelişim programına dahil edilmelidir. Gelecekteki liderlik pozisyonları için kilit adaydır. ${sapmaText}`;
+            if (score >= 81) return `(${name}) Puan: ${score}. Aday, bu yetkinlikte sektör ortalamasının üzerindedir. Pozisyon için kritik olan bu alanda, ekibe önemli bir değer katması ve öne çıkması muhtemeldir. Adayın güçlü olduğu bu alan, ekipteki diğer çalışanlara mentorluk yapması için kullanılabilir. Hızla yüksek sorumluluk gerektiren görevlere atanması önerilir. ${sapmaText}`;
+            if (score >= 65) return `(${name}) Puan: ${score}. Aday, bu yetkinlikte beklenen standartları karşılamaktadır. Ekibin genel performansına uyum sağlayacak, ortalama bir katkı sunması beklenir. Aday, rol için yeterlidir. Rutin performans yönetimi ve koçluk (coaching) ile mevcut seviyesini koruması sağlanmalıdır. ${sapmaText}`;
+            if (score >= 50) return `(${name}) Puan: ${score}. Adayın yetkinlik seviyesi, rolün minimum gerekliliklerini ancak karşılamaktadır. Gelişim için yüksek bir motivasyona ve yakın takibe ihtiyacı vardır. Performansı artırmak için hemen bir gelişim planına (IDP) dahil edilmelidir. Yöneticinin, bu yetkinlikteki gelişimini aylık olarak takip etmesi gereklidir. ${sapmaText}`;
+            // Low scores with position-specific and scientific references
+            if (position === 'beyaz_yaka') {
+                if (name.includes('Detay Odaklılık')) {
+                    return `(${name}) Puan: ${score}. Düşük Vicdanlılık eğilimi, görev tamamlama ve sorumluluk alma konusunda sürekli denetim ihtiyacı yaratacaktır. Bu durum, yöneticinin iş yükünü artırır. (Big Five Faktörü: Vicdanlılık). ${sapmaText}`;
+                } else if (name.includes('Analitik Düşünme')) {
+                    return `(${name}) Puan: ${score}. Bu skor, rolün gerektirdiği bilgi işleme ve muhakeme hızının altında kalındığını gösterir. Görev karmaşıklığı minimize edilmelidir. (Bilişsel Kapasite Testleri, iş karmaşıklığı ile doğrudan ilişkilidir). ${sapmaText}`;
+                } else if (name.includes('Geri Bildirime Açıklık')) {
+                    return `(${name}) Puan: ${score}. Adayın öğrenme potansiyeli düşük görünmektedir. Hata yapsa dahi, verilen geri bildirimleri davranışa dönüştürme motivasyonu zayıftır. (Adaptasyon ve Gelişim Potansiyeli'ni belirler). ${sapmaText}`;
+                } else if (name.includes('Zaman Yönetimi')) {
+                    return `(${name}) Puan: ${score}. Bu skor, teslim tarihlerine uyumda sürekli sorun yaşanacağını gösterir. Projelerin gecikmesine neden olabilir. ${sapmaText}`;
+                } else if (name.includes('Kurum İçi İşbirliği')) {
+                    return `(${name}) Puan: ${score}. Bu skor, departmanlar arası bilgi akışında tıkanıklık yaratacaktır. Çatışma çözme becerisi zayıftır. ${sapmaText}`;
+                } else if (name.includes('Öğrenme Çevikliği')) {
+                    return `(${name}) Puan: ${score}. Yeni sistemlere (ERP, CRM) geçişlerde direnç ve zorlanma beklenmelidir. Eğitim süresi uzayacaktır. ${sapmaText}`;
+                } else {
+                    return `(${name}) Puan: ${score}. Aday, bu yetkinlikte sektör ortalamasının oldukça altındadır. Rolün gerektirdiği temel davranış eğilimlerinden yoksundur ve ciddi bir potansiyel risk taşır. Bu yetkinlik pozisyon için kritikse, aday elenmelidir. Kritik değilse, göreve başlamadan önce kapsamlı bir eğitim ve mentorluk planı zorunludur. ${sapmaText}`;
+                }
+            } else if (position === 'mavi_yaka') {
+                if (name.includes('Detay Odaklılık')) {
+                    return `(${name}) Puan: ${score}. Bu skor, üretim hatalarına yol açma potansiyeli taşır. Kayıp maliyeti yüksektir. ${sapmaText}`;
+                } else if (name.includes('Zaman Yönetimi')) {
+                    return `(${name}) Puan: ${score}. Bu skor, teslim tarihlerine uyumda sürekli sorun yaşanacağını gösterir. Projelerin gecikmesine neden olabilir. ${sapmaText}`;
+                } else if (name.includes('Kurum İçi İşbirliği')) {
+                    return `(${name}) Puan: ${score}. Bu skor, departmanlar arası bilgi akışında tıkanıklık yaratacaktır. Çatışma çözme becerisi zayıftır. ${sapmaText}`;
+                } else if (name.includes('Öğrenme Çevikliği')) {
+                    return `(${name}) Puan: ${score}. Yeni sistemlere (ERP, CRM) geçişlerde direnç ve zorlanma beklenmelidir. Eğitim süresi uzayacaktır. ${sapmaText}`;
+                } else {
+                    return `(${name}) Puan: ${score}. Aday, bu yetkinlikte sektör ortalamasının oldukça altındadır. Rolün gerektirdiği temel davranış eğilimlerinden yoksundur ve ciddi bir potansiyel risk taşır. Bu yetkinlik pozisyon için kritikse, aday elenmelidir. Kritik değilse, göreve başlamadan önce kapsamlı bir eğitim ve mentorluk planı zorunludur. ${sapmaText}`;
+                }
+            } else {
+                return `(${name}) Puan: ${score}. Aday, bu yetkinlikte sektör ortalamasının oldukça altındadır. Rolün gerektirdiği temel davranış eğilimlerinden yoksundur ve ciddi bir potansiyel risk taşır. Bu yetkinlik pozisyon için kritikse, aday elenmelidir. Kritik değilse, göreve başlamadan önce kapsamlı bir eğitim ve mentorluk planı zorunludur. ${sapmaText}`;
+            }
         }
 
+        // Tavsiyeler: her satır ayrı, okunaklı ve kopyalanabilir bloklar
         const nlgParts = [];
-        Object.keys(perCategory).forEach(cat => {
-            nlgParts.push(nlgForScore(cat, perCategory[cat].score100));
+        const nlgRows = Object.keys(perCategory).map((cat, idx) => {
+            const score = perCategory[cat].score100;
+            const plainLine = `${cat} — Puan: ${score} — ${nlgForScore(cat, score, meta.baslik)}`.replace(/</g,'').replace(/>/g,'');
+            const safePlain = plainLine.replace(/"/g, '&quot;');
+            const bg = (idx % 2 === 0) ? '#ffffff' : '#fbfdff';
+            return `
+                <div class="apx-nlg-row" data-plain="${safePlain}">
+                    <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;border-bottom:1px solid #eef2f7;background:${bg};">
+                        <div style="flex:0 0 36%;font-weight:700;color:#0f172a;">${cat}</div>
+                        <div style="flex:0 0 12%;text-align:center;font-weight:600;color:#0b69d6;">${score}</div>
+                        <div style="flex:1;color:#334155;font-size:0.98em;line-height:1.35;">${nlgForScore(cat, score, meta.baslik)}</div>
+                    </div>
+                </div>`;
         });
+        nlgParts.push(`
+            <div style="border:1px solid #e6eef8;border-radius:10px;overflow:hidden;margin-bottom:14px;box-shadow:0 4px 12px rgba(6,8,23,0.06);">
+                <div style="background:linear-gradient(90deg,#2563eb,#7c3aed);color:#fff;padding:10px 14px;font-weight:700;">Tavsiyeler ve Değerlendirme</div>
+                <div style="padding:8px 12px;background:#fcfeff;color:#64748b;font-size:12px;border-bottom:1px solid #f1f5f9;">Her satır adayın yetkinlik başlığı, puanı ve kısa yorumunu içerir.</div>
+                <div style="background:#fff;">${nlgRows.join('')}</div>
+            </div>
+        `);
+
+        // Add bias commentary
+        let biasComment = '';
+        if (bias <= 33) {
+            biasComment = 'Güvenilirlik Puanı (Response Bias): Düşük Risk - Yüksek Tutarlılık. Adayın cevapları yüksek düzeyde tutarlılık göstermiştir. Sonuçlar manipülasyondan arınmış olup, güvenilirliği en üst seviyededir.';
+        } else if (bias <= 66) {
+            biasComment = 'Güvenilirlik Puanı (Response Bias): Orta Risk - İzlenmesi Gereken Tutarlılık. Adayda hafif bir sosyal olarak istenen cevap verme eğilimi tespit edilmiştir. Nihai değerlendirme için mülakat sırasında tutarlılık sorgulaması önerilir.';
+        } else {
+            biasComment = 'Güvenilirlik Puanı (Response Bias): Yüksek Risk - Yüksek Manipülasyon Riski. Yapay Zekâ, adayın kendini olduğundan iyi gösterme eğilimi yüksek olduğunu tespit etmiştir. Raporlanan yetkinlik skorları dikkatli kullanılmalı ve mülakat zorunlu tutulmalıdır.';
+        }
+        nlgParts.push(biasComment);
+
+        // Add interview evaluation scale based on overall score and bias
+        const lowScoreCategories = Object.keys(perCategory).filter(cat => perCategory[cat].score100 < 50);
+        const lowScoreCount = lowScoreCategories.length;
+        let interviewScale = '';
+        if (overall >= 90) {
+            interviewScale = 'GÖRÜŞME ÖNERİSİ: LİDER ADAYI (Mükemmel Uyum)\nAdayın profili, organizasyonun standartlarını yükseltecek seviyede ustalık içermektedir. Bu aday, sadece mevcut pozisyon için değil, aynı zamanda gelecekteki liderlik pozisyonları için kilit bir yatırımdır. Aksiyon: Görüşme sonrası, adayın kariyer yolu haritasını (pathing) hemen oluşturunuz.';
+        } else if (overall >= 80 && bias <= 66) {
+            interviewScale = 'GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (Yüksek Uyum)\nAdayın tüm kritik yetkinliklerde beklenen normun oldukça üzerinde bir performans gösterdiği tespit edilmiştir. Güvenilirlik puanı (Response Bias) düşük düzeyde olduğu için skorlar yüksek güvenilirliğe sahiptir. Aday, bu rol için hızla terfi potansiyeli taşımaktadır. Aksiyon: Görüşme sürecini hızla başlatınız. Öncelikli olarak, adayın yüksek potansiyelini organizasyon içinde nasıl kullanacağınıza odaklanınız.';
+        } else if (overall >= 65 && overall < 80 && bias <= 33) {
+            interviewScale = 'GÖRÜŞME SKALASI: ORTA DÜZEY (Yeterli Uyum)\nAdayın genel yetkinlik profili, pozisyonun beklentilerini kabul edilebilir sınırlar içinde karşılamaktadır. Ancak bazı alanlarda (rapora bakınız) gelişim ihtiyacı bulunmaktadır. Nihai karar ve takdir sizindir. Aksiyon: Görüşme, adayın düşük skor aldığı alanlarda (Örn: Kurum İçi İşbirliği) davranışsal örnekler isteyerek, rapor sonuçlarını doğrulamaya odaklanmalıdır.';
+        } else if (overall >= 65 && overall < 80 && bias > 33 && bias <= 66) {
+            interviewScale = 'GÖRÜŞME SKALASI: İHTİYATLI ORTA DÜZEY\nAday, yeterli skorlar almasına rağmen, orta düzeyde tutarsızlık veya sosyal olarak istenen cevap verme eğilimi tespit edilmiştir. Aday görüşmek için değerlendirilebilir, ancak nihai karar ve takdir sizindir. Aksiyon: Mülakatın ilk 15 dakikasında adayın verdiği cevaplardaki tutarlılık ve samimiyet iki farklı soruyla teyit edilmelidir.';
+        } else if (overall < 65 || lowScoreCount >= 3) {
+            interviewScale = 'GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (Riskli Uyum)\nAdayın yetkinlik profilinde sistemik zafiyet tespit edilmiş olup, skorları rolün minimum gerekliliklerinin altındadır. Bu profilin işe alınması, kuruma yüksek eğitim, denetim ve hata maliyeti getirme riski taşır. Adayın görüşme için değerlendirilmesi önerilmez, ancak son karar ve takdir sizindir.';
+        } else if (bias >= 67) {
+            interviewScale = 'UYARI: YÜKSEK GÜVENİLİRLİK RİSKİ\nAdayın puanlarından bağımsız olarak, Yüksek Manipülasyon Riski tespit edilmiştir. Rapor edilen tüm yetkinlik skorları, şartlı ve düzeltilmiş olarak ele alınmalıdır. Aksiyon: Görüşme sadece, adayın manipülasyon girişimini ve tutarsızlığını deşifre etmek amacıyla kullanılmalıdır. Aksi takdirde, görüşme süresinin daha uygun adaylara ayrılması tavsiye edilir.';
+        }
+        if (interviewScale) {
+            // Build human-readable reasons for why this recommendation was chosen
+            const reasonList = [];
+            try {
+                // Add numeric summary first for clarity
+                reasonList.push('Genel Skor = ' + Math.round(overall) + ' / 100');
+                reasonList.push('Response Bias = ' + Math.round(bias) + ' / 100');
+
+                if (overall >= 90) reasonList.push('Genel Skor ≥ 90 (mükemmel uyum)');
+                else if (overall >= 80 && bias <= 66) reasonList.push('Genel Skor ≥ 80 ve Response Bias ≤ Orta Risk (skorlar güvenilir)');
+                else if (overall >= 65 && overall < 80 && bias <= 33) reasonList.push('Genel Skor 65–79 ve Response Bias Düşük');
+                else if (overall >= 65 && overall < 80 && bias > 33 && bias <= 66) reasonList.push('Genel Skor 65–79 ancak Response Bias Orta Risk (tutarlılık sorgulanmalı)');
+                else if (overall < 65 || lowScoreCount >= 3) reasonList.push('Genel Skor < 65 veya en az 3 kritik kategori < 50 (yüksek risk)');
+                if (bias >= 67) reasonList.push('Response Bias yüksek (manipülasyon/uygunluk riski)');
+
+                // Also include low-score categories with numeric scores for traceability
+                if (lowScoreCount && lowScoreCount > 0) {
+                    const lowCats = Object.keys(perCategory).filter(c => (perCategory[c].score100 || 0) < 50).map(c => (c + ' — ' + (perCategory[c].score100 || 0) + '/100'));
+                    if (lowCats.length) reasonList.push('Kritik düşük kategoriler: ' + lowCats.join(', '));
+                }
+            } catch(e) { /* ignore */ }
+            const reasonsHTML = reasonList.length ? ('<div style="margin-top:8px;color:#374151;font-size:13px;"><strong>Nedeni:</strong><ul style="margin-top:6px;margin-left:18px;">' + reasonList.map(r=>('<li>'+r+'</li>')).join('') + '</ul></div>') : '';
+
+            // (BU YAZIYI GİZLE BU YAZI SENİN HESAPLAMA TABLON İÇİN KODLARDA KALACAK NASIL YORUM YAPTIĞININ YAZISI NE İŞİ VAR DASHBORDDA)
+            // NOTE: The detailed interview recommendation tables below are intentionally kept in the code
+            // for audit and calculation purposes only. They should NOT be shown by default on dashboards
+            // or summary popups. They are rendered into a hidden details area in the candidate modal and
+            // can be revealed by the HR user when explicitly requested.
+                        const tablesHTML = `
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (YÜKSEK POTANSİYEL)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın hem performans hem de güvenilirlik açısından en üst düzeyde olduğu durumu temsil eder.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum Metni</th></tr>
+        <tr><td style="padding: 5px;">Genel Skor ≥80 VE Response Bias ≤Orta Risk</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (Yüksek Uyum)</td><td style="padding: 5px;">Adayın tüm kritik yetkinliklerde beklenen normun oldukça üzerinde bir performans gösterdiği tespit edilmiştir. Güvenilirlik puanı (Response Bias) düşük düzeyde olduğu için skorlar yüksek güvenilirliğe sahiptir. Aday, bu rol için hızla terfi potansiyeli taşımaktadır. Aksiyon: Görüşme sürecini hızla başlatınız. Öncelikli olarak, adayın yüksek potansiyelini organizasyon içinde nasıl kullanacağınıza odaklanınız.</td></tr>
+        <tr><td style="padding: 5px;">Genel Skor ≥90</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: LİDER ADAYI (Mükemmel Uyum)</td><td style="padding: 5px;">Adayın profili, organizasyonun standartlarını yükseltecek seviyede ustalık içermektedir. Bu aday, sadece mevcut pozisyon için değil, aynı zamanda gelecekteki liderlik pozisyonları için kilit bir yatırımdır. Aksiyon: Görüşme sonrası, adayın kariyer yolu haritasını (pathing) hemen oluşturunuz.</td></tr>
+    </table>
+</div>
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: ORTA DÜZEY (ŞARTLI UYUM)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın rol için kabul edilebilir olduğu, ancak mülakatın skor tablosundaki zayıf alanları teyit etmek için kritik öneme sahip olduğu durumları içerir.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum</th></tr>
+        <tr><td style="padding: 5px;">65≤Genel Skor<80 VE RB Düşük</td><td style="padding: 5px;">GÖRÜŞME SKALASI: ORTA DÜZEY (Yeterli Uyum)</td><td style="padding: 5px;">Adayın genel yetkinlik profili, pozisyonun beklentilerini kabul edilebilir sınırlar içinde karşılamaktadır. Ancak bazı alanlarda (rapora bakınız) gelişim ihtiyacı bulunmaktadır. Nihai karar ve takdir sizindir. Aksiyon: Görüşme, adayın düşük skor aldığı alanlarda (Örn: Kurum İçi İşbirliği) davranışsal örnekler isteyerek, rapor sonuçlarını doğrulamaya odaklanmalıdır.</td></tr>
+        <tr><td style="padding: 5px;">65≤Genel Skor<80 VE RB Orta Risk</td><td style="padding: 5px;">GÖRÜŞME SKALASI: İHTİYATLI ORTA DÜZEY</td><td style="padding: 5px;">Aday, yeterli skorlar almasına rağmen, orta düzeyde tutarsızlık veya sosyal olarak istenen cevap verme eğilimi tespit edilmiştir. Aday görüşmek için değerlendirilebilir, ancak nihai karar ve takdir sizindir. Aksiyon: Mülakatın ilk 15 dakikasında adayın verdiği cevaplardaki tutarlılık ve samimiyet iki farklı soruyla teyit edilmelidir.</td></tr>
+    </table>
+</div>
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (YÜKSEK RİSK)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın skorlarının düşük olduğu ve görüşme kararının risk ve maliyet analizi sonrası verilmesi gerektiğini gösterir.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum</th></tr>
+        <tr><td style="padding: 5px;">Genel Skor<65 VEYA En Az 3 Kritik Skor<50</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (Riskli Uyum)</td><td style="padding: 5px;">Adayın yetkinlik profilinde sistemik zafiyet tespit edilmiş olup, skorları rolün minimum gerekliliklerinin altındadır. Bu profilin işe alınması, kuruma yüksek eğitim, denetim ve hata maliyeti getirme riski taşır. Adayın görüşme için değerlendirilmesi önerilmez, ancak son karar ve takdir sizindir.</td></tr>
+        <tr><td style="padding: 5px;">Özel Koşul: Response Bias ≥Yüksek Risk (Örn: 30%)</td><td style="padding: 5px;">UYARI: YÜKSEK GÜVENİLİRLİK RİSKİ</td><td style="padding: 5px;">Adayın puanlarından bağımsız olarak, Yüksek Manipülasyon Riski tespit edilmiştir. Rapor edilen tüm yetkinlik skorları, şartlı ve düzeltilmiş olarak ele alınmalıdır. Aksiyon: Görüşme sadece, adayın manipülasyon girişimini ve tutarsızlığını deşifre etmek amacıyla kullanılmalıdır. Aksi takdirde, görüşme süresinin daha uygun adaylara ayrılması tavsiye edilir.</td></tr>
+    </table>
+</div>
+`;
+            // Push only the compact interviewScale + reasons into the NLG summary so quick views stay concise.
+            nlgParts.push('GÖRÜŞME DEĞERLENDİRME SKALASI<br>' + interviewScale.replace(/\n/g, '<br>') + '<br><br>' + reasonsHTML);
+            // Render interviewScale into the dedicated modal box if present (add reasons for traceability)
+            try {
+                const box = document.getElementById('interviewScaleBox');
+                if (box) {
+                    // highlight the main recommendation
+                    let title = interviewScale.split('\n')[0] || 'Görüşme Önerisi';
+                    let body = interviewScale.split('\n').slice(1).join('<br>');
+                    let color = '#0b69d6';
+                    if (/LİDER ADAYI|Mükemmel/i.test(title)) color = '#0b6b3a';
+                    else if (/GÜÇLÜ TAVSİYE/i.test(title)) color = '#1e40af';
+                    else if (/İHTİYATLI ORTA DÜZEY/i.test(title)) color = '#b45309';
+                    else if (/İHTİYATLI YAKLAŞIM/i.test(title)) color = '#b91c1c';
+                    // hide long tables by default, add toggle button to reveal (tablesHTML kept in code for persistence)
+                    const uniq = 'interview_details_' + Date.now();
+                    box.innerHTML = `
+                        <div style="border-left:4px solid ${color};padding:10px;margin-bottom:10px;background:#fbfdff;border-radius:6px;">
+                            <div style="font-weight:800;color:${color};margin-bottom:6px;">${title}</div>
+                            <div style="color:#334155;font-size:13px;line-height:1.35;">${body}</div>
+                            ${reasonsHTML}
+                        </div>
+                        <div style="margin-top:8px;text-align:right;"><button id="toggle_${uniq}" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm">Ayrıntıları Göster</button></div>
+                        <div id="${uniq}" style="display:none;margin-top:10px;">${tablesHTML}</div>
+                    `;
+                    try {
+                        const btn = box.querySelector('#toggle_' + uniq);
+                        const det = box.querySelector('#' + uniq);
+                        if (btn && det) btn.addEventListener('click', function(){ if (det.style.display === 'none'){ det.style.display='block'; btn.innerText='Ayrıntıları Gizle'; } else { det.style.display='none'; btn.innerText='Ayrıntıları Göster'; } });
+                    } catch(e) { console.warn('attach toggle failed', e); }
+                }
+            } catch(e){ console.warn('render interviewScale failed', e); }
+        }
 
         // top3 strong/weak categories
         const sorted = Object.keys(perCategory).map(k => ({ k, s: perCategory[k].score100 || 0 })).sort((a,b)=>b.s-a.s);
@@ -820,7 +1059,7 @@
             bias,
             genelSkor: overall,
             genelLabel: overall >= 85 ? 'Güçlü Yön' : (overall >= 60 ? 'Kabul Edilebilir' : 'Gelişim Alanı'),
-            nlgSummary: nlgParts.join('\n'),
+            nlgSummary: nlgParts.join('<br><br>'),
             radar: Object.keys(perCategory).map(k => perCategory[k].score100).slice(0,5),
             top3Strong,
             top3Weak
@@ -931,7 +1170,16 @@
         const snap = await get(candRef);
         const data = snap.val() || {};
         const arr = Object.values(data);
-        const filtered = arr.filter(c => c.createdBy === hrUsername && c.timestamp && c.timestamp >= fromTs && c.timestamp <= toTs);
+        const filtered = arr.filter(c => {
+            let matches = false;
+            if (c.createdBy) {
+                const normalized = c.createdBy.split('@')[0];
+                if (normalized === hrUsername) matches = true;
+            } else if (hrUsername === 'admin') {
+                matches = true;
+            }
+            return matches && c.timestamp && c.timestamp >= fromTs && c.timestamp <= toTs;
+        });
         return filtered.length;
     };
 </script>
@@ -1344,10 +1592,17 @@
                         return;
                     }
                 }
+                // Check if HR user is active
+                const hrUser = await window.getHRUserByEmail(user.email);
+                if (!hrUser || !hrUser.active) {
+                    await window.signOutFirebase(window.firebaseAuth);
+                    alert('Bu İK hesabı pasif durumda. Giriş yapılamaz.');
+                    return;
+                }
                 // Başarılı giriş
                 const ikPanelEl = document.getElementById('ikPanel');
                 if (ikPanelEl) ikPanelEl.classList.remove('hidden');
-                try { window.currentHR = user.uid || user.email || 'hr_unknown'; } catch(e) { window.currentHR = 'hr_unknown'; }
+                try { window.currentHR = user.email ? user.email.split('@')[0] : (user.uid || 'hr_unknown'); } catch(e) { window.currentHR = 'hr_unknown'; }
             } catch (err) {
                 console.error(err);
                 alert('Giriş sırasında hata: ' + (err.message||err));
@@ -2223,6 +2478,15 @@
     // Ensure keys are loaded at startup
     try { loadQuestionKeys(); } catch(e) { console.warn('loadQuestionKeys init failed', e); }
 
+    // Clear JotForm agent localStorage on load to reset chat history
+    window.addEventListener('load', function() {
+        for (let key in localStorage) {
+            if (key.startsWith('jotform/')) {
+                localStorage.removeItem(key);
+            }
+        }
+    });
+
     // Test sorularını dinamik oluştur
     // Yeni davranış: test tek seferde role (görev) bazlı tüm alt kategorilerin sorularını birleştirerek gösterir.
     // Parametreler: sector (imalat/hizmet), role (mavi_yaka, beyaz_yaka, yonetici, yonetici_idari, hizmet_personeli)
@@ -2460,10 +2724,11 @@
                         <td class='p-2'>${roleLabel}</td>
                         <td class='p-2'>${status}${scoreSmall}</td>
                         <td class='p-2'>
-                            <button class='px-2 py-1 border view-detail' data-r='${c.rumuz}'>Detay</button>
-                            <button class='px-2 py-1 border ml-2 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
-                            <button class='px-2 py-1 border ml-2 request-ai' data-r='${c.rumuz}'>Yapay Zeka</button>
-                            <button class='px-2 py-1 border ml-2 delete-cand' data-r='${c.rumuz}'>Sil</button>
+                            <button class='px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 view-detail' data-r='${c.rumuz}'>Detay</button>
+                            <button class='px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 ml-4 send-creds' data-r='${c.rumuz}' data-p='${c.password||''}'>Kimlik Gönder</button>
+                        </td>
+                        <td class='p-2'>
+                            <button class='px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 delete-cand' data-r='${c.rumuz}'>Sil</button>
                         </td>
                     </tr>
                 `;
@@ -2503,12 +2768,6 @@
                         console.error('delete candidate failed', e);
                         alert('Silme işlemi sırasında hata: ' + (e.message||e));
                     }
-                };
-            });
-            // Attach AI request handlers per row (opens detail modal and auto-invokes modal NLG button)
-            Array.from(document.querySelectorAll('.request-ai')).forEach(btn => {
-                btn.onclick = function(){
-                    alert('Yapay zeka özetleme (Gemini) bu kurulumda devre dışı bırakıldı. Lütfen insan kaynakları raporu kullanın.');
                 };
             });
         });
@@ -2774,7 +3033,20 @@
                 // refresh list from Firebase
                 if (typeof loadCandidatesFromFirebase === 'function') loadCandidatesFromFirebase();
                 else if (typeof renderCandidates === 'function') renderCandidates();
-                alert('Aday veritabanına eklendi.');
+                // Show dashboard welcome/thank you message
+                try {
+                  let msgId = 'apxCandidateWelcomeMsg';
+                  let old = document.getElementById(msgId); if (old) old.remove();
+                  let msg = document.createElement('div');
+                  msg.id = msgId;
+                  msg.className = 'mb-4 p-4 bg-green-100 border border-green-300 text-green-800 text-center rounded-lg font-semibold shadow';
+                  msg.innerText = 'Tercihiniz için teşekkür ederiz, iyi çalışmalar!';
+                  let parent = document.getElementById('candidateList')?.parentElement;
+                  if (parent) parent.insertBefore(msg, parent.firstChild);
+                  else document.body.prepend(msg);
+                  setTimeout(()=>{ try { msg.remove(); } catch(e){} }, 4000);
+                } catch(e){}
+                // alert('Aday veritabanına eklendi.'); // Sessizce mesaj gösteriyoruz
             } catch (err) {
                 console.error(err);
                 alert('Aday eklenirken hata: ' + (err.message||err));
@@ -2816,6 +3088,21 @@
     const refreshHrListBtn = document.getElementById('refreshHrListBtn');
     const applyFilterBtn = document.getElementById('applyFilterBtn');
     const hrManageTableBody = document.getElementById('hrManageTableBody');
+    function parseDate(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        const parts = dateStr.split('.');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // months are 0-based
+            const year = parseInt(parts[2], 10);
+            if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+            const date = new Date(year, month, day);
+            if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+                return date.getTime();
+            }
+        }
+        return null;
+    }
     async function loadHRList() {
         hrManageTableBody.innerHTML = '<tr><td colspan="8" class="p-2">Yükleniyor...</td></tr>';
         listHRUsers(async function(list){
@@ -2823,8 +3110,8 @@
             hrManageTableBody.innerHTML = '';
             const fromDate = document.getElementById('filterFrom').value;
             const toDate = document.getElementById('filterTo').value;
-            const fromTs = fromDate ? new Date(fromDate).getTime() : 0;
-            const toTs = toDate ? new Date(toDate).getTime() + 24*3600*1000 - 1 : Date.now();
+            const fromTs = parseDate(fromDate) || 0;
+            const toTs = parseDate(toDate) ? parseDate(toDate) + 24*3600*1000 - 1 : Date.now();
             for (const u of list) {
                 const testCount = await countCandidateTestsByHRBetween(u.username, fromTs, toTs).catch(()=>0);
                 const status = u.active ? 'Aktif' : 'Pasif';
@@ -2994,40 +3281,79 @@ function showCandidateDetail(candidate) {
   // Modal oluştur
     let modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[99999] p-2 md:p-8';
-    modal.innerHTML = `
-        <div class='bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl h-[90vh] flex flex-col relative overflow-hidden animate-fadein'>
-            <button onclick='this.closest(".fixed").remove()' class='absolute top-5 right-6 text-gray-400 hover:text-red-500 text-3xl font-bold z-10' style='background:rgba(255,255,255,0.7);border-radius:50%;width:44px;height:44px;line-height:44px;text-align:center;'>&times;</button>
-            <div class='flex-1 overflow-y-auto p-4 md:p-8'>
-                <h2 class='text-3xl font-bold text-blue-800 mb-4 text-center tracking-tight'>Aday Detay Analizi</h2>
-                <div class='mb-4 text-center text-lg'><b>Rumuz:</b> ${candidate.rumuz} &nbsp; <b>Tip:</b> ${candidate.tip} &nbsp; <b>Başlık:</b> ${candidate.baslik}</div>
-                <div class='mb-8 grid grid-cols-1 md:grid-cols-2 gap-8'>
-                    <div class='bg-blue-50 rounded-xl p-4 overflow-auto max-h-80 flex flex-col items-center'>
-                        <canvas id='detailRadar' width='340' height='220'></canvas>
-                        <div class='text-xs text-gray-500 mt-2'>Yetkinlik Dağılımı (Adjusted)</div>
+        modal.innerHTML = `
+            <div class='bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl h-[90vh] flex flex-col relative overflow-hidden animate-fadein'>
+                <button onclick='this.closest(".fixed").remove()' class='absolute top-5 right-6 text-gray-400 hover:text-red-500 text-3xl font-bold z-10' style='background:rgba(255,255,255,0.7);border-radius:50%;width:44px;height:44px;line-height:44px;text-align:center;'>&times;</button>
+                <div class='flex-1 overflow-y-auto p-4 md:p-8'>
+                    <h2 class='text-3xl font-bold text-blue-800 mb-6 text-center tracking-tight drop-shadow'>Aday Detay Analizi</h2>
+                    <div class='mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-center'>
+                        <div class='text-lg'><span class='font-semibold text-gray-700'>Rumuz:</span> <span class='text-blue-700'>${candidate.rumuz}</span></div>
+                        <div class='text-lg'><span class='font-semibold text-gray-700'>Tip:</span> <span class='text-blue-700'>${candidate.tip}</span></div>
+                        <div class='text-lg'><span class='font-semibold text-gray-700'>Başlık:</span> <span class='text-blue-700'>${candidate.baslik}</span></div>
                     </div>
-                    <div class='bg-blue-50 rounded-xl p-4 overflow-auto max-h-80 flex flex-col items-center'>
-                        <h4 class='font-semibold mb-2'>SJT & Özet</h4>
-                        <canvas id='detailSJT' width='340' height='220'></canvas>
-                        <div class='text-xs text-gray-500 mt-2'>Durumsal Yargı Testi (Uzman Anahtarına Göre)</div>
+                                    <div class='mb-8 flex flex-col md:flex-row justify-center items-stretch gap-6'>
+                                        <!-- Tavsiyeler Dashboardu (Solda) -->
+                                        <div class='w-full md:w-1/2 flex flex-col'>
+                                            <div class='bg-gradient-to-br from-indigo-50 to-blue-100 rounded-2xl p-7 shadow flex flex-col items-center border border-blue-100 min-h-[320px] md:min-h-[360px] mb-4 md:mb-0'>
+                                                <div class='font-semibold text-indigo-800 mb-3 text-lg'>SJT Soru Performansı</div>
+                                                <canvas id='detailSJT' width='340' height='220' style='max-width:100%;'></canvas>
+                                                <div class='text-xs text-gray-500 mt-4'>Her SJT sorusunun ortalama puanını (1-5 arası) gösterir. Yüksek puan iyi performans anlamına gelir.</div>
+                                                <div class='text-xs text-gray-600 mt-2'>Grafik, adayının karar verme süreçlerindeki tutarlılığını ve genel eğilimlerini yansıtır.</div>
+                                            </div>
+                                        </div>
+                                        <!-- Detay Analiz Dashboardu (Sağda) -->
+                                        <div class='w-full md:w-1/2 flex flex-col'>
+                                            <div class='bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-7 shadow flex flex-col items-center border border-blue-100 min-h-[320px] md:min-h-[360px]'>
+                                                <div class='font-semibold text-blue-800 mb-3 text-lg'>Yetkinlik Dağılımı</div>
+                                                <canvas id='detailRadar' width='340' height='220' style='max-width:100%;'></canvas>
+                                                <div class='text-xs text-gray-500 mt-4'>Adjusted</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                    <div class='mb-4 flex flex-col md:flex-row md:items-center md:gap-6'>
+                        <div class='bg-green-50 border border-green-200 rounded-lg px-4 py-2 mb-2 md:mb-0 text-green-800 font-semibold text-center shadow-sm'>
+                            Güvenilirlik Puanı (Response Bias): <span id='detailBias' class='font-bold'></span>
+                        </div>
                     </div>
+                                    <div class='mb-6 w-full max-w-5xl mx-auto'>
+                                        <h4 class='font-semibold mb-2 text-blue-700 text-lg'>YETKİNLİK BAZLI DAĞILIM : ( Yorum desteği için adayın başvurduğu pozisyonu, güvenilirlik puanını, yetkinlik bazlı dağılım bilgilerini yapay zeka asistanınız Analiz Pro X ile paylaşıp, yorumlar hakkında görüşebilir, destek alabilirsiniz.)</h4>
+                                        <div id='perCategoryBreakdown' class='grid grid-cols-1 gap-2 text-sm text-gray-700 min-h-[300px] bg-white/80 rounded-xl p-5 shadow-md w-full overflow-y-auto'></div>
+                                    </div>
+                                    <!-- Interview evaluation scale: dynamic, generated from skorlar (overall) and bias -->
+                                    <div class='mb-6 w-full max-w-5xl mx-auto'>
+                                        <h4 class='font-semibold mb-2 text-blue-700 text-lg'>Görüşme Değerlendirme Skalası</h4>
+                                        <div id='interviewScaleBox' class='bg-white/90 rounded-xl p-4 shadow-sm text-sm text-gray-800 max-h-[360px] overflow-y-auto'></div>
+                                    </div>
+                                                    <div class='w-full max-w-5xl mx-auto'>
+                                                        <div class='bg-white/90 rounded-2xl shadow-lg p-0 flex flex-col'>
+                                                            <div class='px-7 pt-6 pb-2 border-b border-blue-100'>
+                                                                <h4 class='font-semibold text-blue-700 text-lg'>Soru / Cevap Detayları</h4>
+                                                            </div>
+                                                            <div id='questionDetailList' class='grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700 max-h-[340px] min-h-[220px] overflow-y-auto px-7 py-4'></div>
+                                                            <div class='flex flex-row justify-end gap-3 px-7 pb-6 pt-2 border-t border-blue-100'>
+                                                                <button id='exportCSVBtn' class='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition hidden'>CSV Dışa Aktar</button>
+                                                                <button id='copySummaryBtn' class='bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition'>Tavsiyeler</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                 </div>
-                <div class='mb-4'><b>Güvenilirlik Puanı (Response Bias):</b> <span id='detailBias'></span></div>
-                <div class='mb-4'>
-                    <h4 class='font-semibold mb-2'>Yetkinlik Bazlı Dağılım</h4>
-                    <div id='perCategoryBreakdown' class='space-y-2 text-sm text-gray-700'></div>
+                <!-- Removed unnecessary footer buttons -->
+                <!--
+                <div class='p-4 border-t flex gap-2 bg-gray-50'>
+                    <button id='exportCsvBtn' class='bg-gray-200 text-gray-800 px-4 py-2 rounded font-semibold hover:bg-gray-300' style="display: none;">CSV Dışa Aktar</button>
+                    <button id='copySummaryBtn' class='bg-indigo-600 text-white px-4 py-2 rounded font-semibold hover:bg-indigo-700' style="display: none;">Tavsiyeler</button>
+                    <button id='detailBackBtn' class='ml-auto bg-white border text-gray-700 px-4 py-2 rounded font-semibold hover:bg-gray-100'>Geri</button>
                 </div>
-                <div>
-                    <h4 class='font-semibold mb-2'>Soru / Cevap Detayları</h4>
-                    <div id='questionDetailList' class='text-sm text-gray-700 max-h-64 overflow-auto'></div>
+                -->
+                <div id="summaryPopup" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white p-4 rounded shadow-lg max-w-2xl w-full max-h-96 overflow-y-auto">
+                        <h3 class="text-lg font-bold mb-2">Tavsiyeler</h3>
+                        <div id="summaryText" class="text-sm"></div>
+                        <button id="closeSummaryPopup" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Tamam</button>
+                    </div>
                 </div>
             </div>
-            <div class='p-4 border-t flex gap-2 bg-gray-50'>
-                <button id='exportCsvBtn' class='bg-gray-200 text-gray-800 px-4 py-2 rounded font-semibold hover:bg-gray-300'>CSV Dışa Aktar</button>
-                <button id='copySummaryBtn' class='bg-indigo-600 text-white px-4 py-2 rounded font-semibold hover:bg-indigo-700'>Özet Kopyala</button>
-                <button id='detailBackBtn' class='ml-auto bg-white border text-gray-700 px-4 py-2 rounded font-semibold hover:bg-gray-100'>Geri</button>
-            </div>
-        </div>
-    `;
+        `;
   document.body.appendChild(modal);
   // Back button: remove modal and focus candidate list
   try {
@@ -3068,25 +3394,52 @@ function showCandidateDetail(candidate) {
                 const pq = s.perQuestion || null;
                 if (pq && pq.length) {
                     // Bar: per-question avg5 (1..5)
-                    const labels = pq.map(p=> (p.index+1) + '. ' + (p.text.length>30? p.text.slice(0,27)+'...': p.text));
+                    const labels = pq.map(p=> 'Soru ' + (p.index+1));
                     const dataBar = pq.map(p => p.avg5 || 0);
                     new Chart(document.getElementById('detailSJT').getContext('2d'), {
-                        type: 'bar',
+                        type: 'line',
                         data: {
                             labels,
-                            datasets: [{ label: 'Ortalama (1..5)', data: dataBar, backgroundColor: 'rgba(16,185,129,0.6)' }]
+                            datasets: [{ 
+                                label: 'Soru Bazlı Ortalama Puan', 
+                                data: dataBar, 
+                                fill: true,
+                                backgroundColor: 'rgba(16,185,129,0.3)',
+                                borderColor: 'rgba(16,185,129,1)',
+                                borderWidth: 3,
+                                pointBackgroundColor: 'rgba(16,185,129,1)',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 6,
+                                tension: 0.4
+                            }]
                         },
-                        options: { responsive: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { display: false } } }
+                        options: { 
+                            responsive: false, 
+                            scales: { 
+                                y: { min: 1, max: 5, grid: { color: 'rgba(0,0,0,0.1)' } },
+                                x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                            }, 
+                            plugins: { legend: { display: true } },
+                            elements: {
+                                point: {
+                                    hoverRadius: 8
+                                }
+                            }
+                        }
                     });
 
                     // Pie: distribution for first question with any responses
                     let firstIdx = pq.findIndex(p=>p.totalResponses && p.totalResponses>0);
                     if (firstIdx === -1) firstIdx = 0;
                     const firstPQ = pq[firstIdx];
+                    // Pie chart removed as unnecessary
+                    /*
                     // create or reuse a small canvas for pie
                     let pieCanvas = document.getElementById('detailPie');
                     if (!pieCanvas) {
                         const pieWrap = document.createElement('div'); pieWrap.className='mt-3';
+                        pieWrap.style.display = 'none'; // Hide the pie chart as it's unnecessary
                         pieWrap.innerHTML = `<canvas id='detailPie' width='300' height='160'></canvas><div class='text-xs text-gray-500 mt-1'>İlk gösterilen sorunun dağılımı (raw)</div>`;
                         modal.querySelector('.bg-white')?.appendChild(pieWrap);
                         pieCanvas = document.getElementById('detailPie');
@@ -3103,21 +3456,102 @@ function showCandidateDetail(candidate) {
                         },
                         options: { responsive: false, plugins: { legend: { position: 'bottom' } } }
                     });
+                    */
                 } else {
                     // fallback to previous behavior (sjtData)
                     new Chart(document.getElementById('detailSJT').getContext('2d'), {
-                        type: 'bar',
+                        type: 'line',
                         data: {
-                            labels: ['Senaryo 1','Senaryo 2','Senaryo 3','Senaryo 4','Senaryo 5'],
-                            datasets: [{ label: 'SJT Skoru', data: sjtData, backgroundColor: 'rgba(16,185,129,0.5)' }]
+                            labels: ['Soru 1','Soru 2','Soru 3','Soru 4','Soru 5'],
+                            datasets: [{ 
+                                label: 'Soru Bazlı Ortalama Puan', 
+                                data: sjtData, 
+                                fill: true,
+                                backgroundColor: 'rgba(16,185,129,0.3)',
+                                borderColor: 'rgba(16,185,129,1)',
+                                borderWidth: 3,
+                                pointBackgroundColor: 'rgba(16,185,129,1)',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 6,
+                                tension: 0.4
+                            }]
                         },
-                        options: { responsive: false, plugins: { legend: { display: false } } }
+                        options: { 
+                            responsive: false, 
+                            scales: { 
+                                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } },
+                                x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                            }, 
+                            plugins: { legend: { display: true } },
+                            elements: {
+                                point: {
+                                    hoverRadius: 8
+                                }
+                            }
+                        }
                     });
                 }
             } catch(e) { console.warn('SJT chart render failed', e); }
 
-            const biasText = (s.bias !== undefined && s.bias !== null) ? (s.bias + ' / 100') : ((80 + Math.random()*20).toFixed(1) + ' / 100');
-            document.getElementById('detailBias').innerText = biasText;
+            const biasVal = (s.bias !== undefined && s.bias !== null) ? Number(s.bias) : Math.round(80 + Math.random()*20);
+            const biasText = biasVal + ' / 100';
+            // determine color class
+            let cls = 'apx-bias-blue';
+            if (biasVal < 50) cls = 'apx-bias-red';
+            else if (biasVal < 66) cls = 'apx-bias-amber';
+            else if (biasVal >= 66 && biasVal < 85) cls = 'apx-bias-blue';
+            else cls = 'apx-bias-green';
+            // add pulse only for cautionary ranges (<66)
+            const pulse = (biasVal < 66) ? ' pulse' : '';
+            // insert bias badge and a right-aligned live AI comment button (blinking for attention)
+            const liveBtnId = 'liveAiBtn_' + Date.now();
+            document.getElementById('detailBias').innerHTML = `
+                <span class="apx-bias-badge ${cls}${pulse}">${biasText}</span>
+                <button id="${liveBtnId}" class="ml-3 inline-block bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 pulse" title="CANLI AI YORUM" style="float:right">CANLI AI YORUM</button>
+            `;
+            // attach handler to live AI button
+            (function(){
+                const btn = document.getElementById(liveBtnId);
+                if (!btn) return;
+                btn.onclick = async function(){
+                    try {
+                        btn.disabled = true; btn.style.opacity = '0.6';
+                        // ensure we have a visible summary holder
+                        const summaryHolder = document.getElementById('detailNLG') || (function(){
+                            const el = document.createElement('div'); el.id = 'detailNLG'; el.className='text-sm text-gray-700';
+                            const container = document.querySelector('.nlg-container') || document.createElement('div');
+                            if (!container.parentElement) { container.className='mt-4 p-3 bg-gray-50 rounded nlg-container'; container.style.display = 'block'; document.body.appendChild(container); }
+                            container.appendChild(el);
+                            return el;
+                        })();
+                        summaryHolder.innerText = 'CANLI Yorum oluşturuluyor... Lütfen bekleyin.';
+                        // collect payload: candidate basic info + skorlar + perCategory
+                        const payload = { candidate: { rumuz: candidate.rumuz, tip: candidate.tip, baslik: candidate.baslik }, skorlar: s || {}, perCategory: pc || {} };
+                        // get endpoint and key from global config if available, else prompt (note: prompting exposes key in client - for production use a server proxy)
+                        const endpoint = window.LIVE_AI_ENDPOINT || prompt('CANLI AI endpoint (ör. https://your-proxy/or/api):', '');
+                        if (!endpoint) { alert('Endpoint gerekli. İşlem iptal edildi.'); summaryHolder.innerText = 'CANLI Yorum iptal edildi.'; return; }
+                        const key = window.LIVE_AI_KEY || prompt('API anahtarınızı girin (prod için sunucu proxy kullanmanız önerilir):', '');
+                        // perform POST
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (key) headers['Authorization'] = 'Bearer ' + key;
+                        const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+                        let dataText = '';
+                        try {
+                            const j = await resp.json();
+                            dataText = j.text || j.result || JSON.stringify(j);
+                        } catch(e){
+                            dataText = await resp.text();
+                        }
+                        summaryHolder.innerText = dataText || 'CANLI AI yanıtı boş döndü.';
+                        // attempt to persist AI report
+                        try { await saveCandidateReport(candidate.rumuz, { author: 'ai_live', type: 'ai_live', text: dataText || '', ts: Date.now() }); } catch(e){ console.warn('AI live report save failed', e); }
+                    } catch(err){
+                        console.error('CANLI AI isteği başarısız', err);
+                        (document.getElementById('detailNLG')||{}).innerText = 'CANLI AI isteği sırasında hata: ' + (err.message||err);
+                    } finally { btn.disabled = false; btn.style.opacity = ''; }
+                };
+            })();
             // NLG summary (if available) + Yapay Zeka Yorumu butonu
             const summaryElId = 'detailNLG';
             let summaryEl = document.getElementById(summaryElId);
@@ -3125,6 +3559,7 @@ function showCandidateDetail(candidate) {
                 if (!summaryEl) {
                 container = document.createElement('div');
                 container.className = 'mt-4 p-3 bg-gray-50 rounded nlg-container';
+                container.style.display = 'none';
                 // create title and summary holder
                 const title = document.createElement('h4');
                 title.className = 'font-semibold mb-2';
@@ -3185,20 +3620,133 @@ function showCandidateDetail(candidate) {
                 summaryEl = document.getElementById(summaryElId);
             }
             summaryEl.innerText = s.nlgSummary || 'Detaylı yorum bulunmuyor.';
+            // Ensure we have a local reference to candidate responses early so fallback computations can use it
+            let cevaplarData = candidate.cevaplar || {};
             // Per-category breakdown
             const breakdownEl = document.getElementById('perCategoryBreakdown');
             breakdownEl.innerHTML = '';
-            const pc = s.perCategory || {};
+            let pc = s.perCategory || {};
+            // If perCategory is empty or undefined, compute it from answers and questions
+            if (!Object.keys(pc).length && cevaplarData && cevaplarData.answers && cevaplarData.questions) {
+                const answersArray = Object.values(cevaplarData.answers);
+                const computed = computeScoresAndNLG(answersArray, { tip: candidate.tip, baslik: candidate.baslik, questions: cevaplarData.questions });
+                pc = computed.perCategory || {};
+            }
             if (Object.keys(pc).length) {
                 Object.keys(pc).forEach(cat => {
                     const c = pc[cat];
                     const div = document.createElement('div');
-                    div.innerHTML = `<b>${cat}</b>: ${c.adjusted} (${c.label}) — raw: ${c.raw}`;
+                    div.innerHTML = `(${cat}) Puan: ${c.score100 || c.adjusted || 'N/A'} (Ortalama: ${c.avg5 || 'N/A'}). ${c.label || 'N/A'}`;
                     breakdownEl.appendChild(div);
                 });
             } else {
                 breakdownEl.innerHTML = '<div>Detaylı kategori verisi yok.</div>';
             }
+
+            // Ensure interviewScaleBox is populated — compute overall/bias if not present
+            try {
+                // If server provided skorlar lacks genelSkor or bias, try to compute from cevaplarData
+                let computedScores = null;
+                if ((!s || s.genelSkor === undefined || s.bias === undefined) && cevaplarData && cevaplarData.answers && cevaplarData.questions) {
+                    // answers array
+                    const answersArrayForCompute = Object.values(cevaplarData.answers);
+                    try { computedScores = computeScoresAndNLG(answersArrayForCompute, { tip: candidate.tip, baslik: candidate.baslik, questions: cevaplarData.questions }); } catch(e){ console.warn('computeScoresAndNLG fallback failed', e); }
+                }
+                const overallScore = (s && s.genelSkor !== undefined) ? s.genelSkor : (computedScores ? computedScores.genelSkor : (s && s.overall ? s.overall : 0));
+                const biasScore = (s && s.bias !== undefined) ? Number(s.bias) : (computedScores ? Number(computedScores.bias) : (s && s.bias ? Number(s.bias) : 0));
+                // Build interviewScale text using same rules as computeScoresAndNLG
+                const lowScoreCategories2 = Object.keys(pc).filter(cat => (pc[cat].score100 || 0) < 50);
+                const lowScoreCount2 = lowScoreCategories2.length;
+                let interviewScaleText = '';
+                if (overallScore >= 90) {
+                    interviewScaleText = 'GÖRÜŞME ÖNERİSİ: LİDER ADAYI (Mükemmel Uyum)\nAdayın profili, organizasyonun standartlarını yükseltecek seviyede ustalık içermektedir. Bu aday, sadece mevcut pozisyon için değil, aynı zamanda gelecekteki liderlik pozisyonları için kilit bir yatırımdır. Aksiyon: Görüşme sonrası, adayın kariyer yolu haritasını (pathing) hemen oluşturunuz.';
+                } else if (overallScore >= 80 && biasScore <= 66) {
+                    interviewScaleText = 'GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (Yüksek Uyum)\nAdayın tüm kritik yetkinliklerde beklenen normun oldukça üzerinde bir performans gösterdiği tespit edilmiştir. Güvenilirlik puanı (Response Bias) düşük düzeyde olduğu için skorlar yüksek güvenilirliğe sahiptir. Aday, bu rol için hızla terfi potansiyeli taşımaktadır. Aksiyon: Görüşme sürecini hızla başlatınız. Öncelikli olarak, adayın yüksek potansiyelini organizasyon içinde nasıl kullanacağınıza odaklanınız.';
+                } else if (overallScore >= 65 && overallScore < 80 && biasScore <= 33) {
+                    interviewScaleText = 'GÖRÜŞME SKALASI: ORTA DÜZEY (Yeterli Uyum)\nAdayın genel yetkinlik profili, pozisyonun beklentilerini kabul edilebilir sınırlar içinde karşılamaktadır. Ancak bazı alanlarda (rapora bakınız) gelişim ihtiyacı bulunmaktadır. Nihai karar ve takdir sizindir. Aksiyon: Görüşme, adayın düşük skor aldığı alanlarda (Örn: Kurum İçi İşbirliği) davranışsal örnekler isteyerek, rapor sonuçlarını doğrulamaya odaklanmalıdır.';
+                } else if (overallScore >= 65 && overallScore < 80 && biasScore > 33 && biasScore <= 66) {
+                    interviewScaleText = 'GÖRÜŞME SKALASI: İHTİYATLI ORTA DÜZEY\nAday, yeterli skorlar almasına rağmen, orta düzeyde tutarsızlık veya sosyal olarak istenen cevap verme eğilimi tespit edilmiştir. Aday görüşmek için değerlendirilebilir, ancak nihai karar ve takdir sizindir. Aksiyon: Mülakatın ilk 15 dakikasında adayın verdiği cevaplardaki tutarlılık ve samimiyet iki farklı soruyla teyit edilmelidir.';
+                } else if (overallScore < 65 || lowScoreCount2 >= 3) {
+                    interviewScaleText = 'GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (Riskli Uyum)\nAdayın yetkinlik profilinde sistemik zafiyet tespit edilmiş olup, skorları rolün minimum gerekliliklerinin altındadır. Bu profilin işe alınması, kuruma yüksek eğitim, denetim ve hata maliyeti getirme riski taşır. Adayın görüşme için değerlendirilmesi önerilmez, ancak son karar ve takdir sizindir.';
+                } else if (biasScore >= 67) {
+                    interviewScaleText = 'UYARI: YÜKSEK GÜVENİLİRLİK RİSKİ\nAdayın puanlarından bağımsız olarak, Yüksek Manipülasyon Riski tespit edilmiştir. Rapor edilen tüm yetkinlik skorları, şartlı ve düzeltilmiş olarak ele alınmalıdır. Aksiyon: Görüşme sadece, adayın manipülasyon girişimini ve tutarsızlığını deşifre etmek amacıyla kullanılmalıdır. Aksi takdirde, görüşme süresinin daha uygun adaylara ayrılması tavsiye edilir.';
+                }
+
+                                // Build the tables HTML (reuse same markup used in computeScoresAndNLG)
+                                const tablesHTML2 = `
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (YÜKSEK POTANSİYEL)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın hem performans hem de güvenilirlik açısından en üst düzeyde olduğu durumu temsil eder.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum Metni</th></tr>
+        <tr><td style="padding: 5px;">Genel Skor ≥80 VE Response Bias ≤Orta Risk</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: GÜÇLÜ TAVSİYE (Yüksek Uyum)</td><td style="padding: 5px;">Adayın tüm kritik yetkinliklerde beklenen normun oldukça üzerinde bir performans gösterdiği tespit edilmiştir. Güvenilirlik puanı (Response Bias) düşük düzeyde olduğu için skorlar yüksek güvenilirliğe sahiptir. Aday, bu rol için hızla terfi potansiyeli taşımaktadır. Aksiyon: Görüşme sürecini hızla başlatınız. Öncelikli olarak, adayın yüksek potansiyelini organizasyon içinde nasıl kullanacağınıza odaklanınız.</td></tr>
+        <tr><td style="padding: 5px;">Genel Skor ≥90</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: LİDER ADAYI (Mükemmel Uyum)</td><td style="padding: 5px;">Adayın profili, organizasyonun standartlarını yükseltecek seviyede ustalık içermektedir. Bu aday, sadece mevcut pozisyon için değil, aynı zamanda gelecekteki liderlik pozisyonları için kilit bir yatırımdır. Aksiyon: Görüşme sonrası, adayın kariyer yolu haritasını (pathing) hemen oluşturunuz.</td></tr>
+    </table>
+</div>
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: ORTA DÜZEY (ŞARTLI UYUM)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın rol için kabul edilebilir olduğu, ancak mülakatın skor tablosundaki zayıf alanları teyit etmek için kritik öneme sahip olduğu durumları içerir.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum</th></tr>
+        <tr><td style="padding: 5px;">65≤Genel Skor<80 VE RB Düşük</td><td style="padding: 5px;">GÖRÜŞME SKALASI: ORTA DÜZEY (Yeterli Uyum)</td><td style="padding: 5px;">Adayın genel yetkinlik profili, pozisyonun beklentilerini kabul edilebilir sınırlar içinde karşılamaktadır. Ancak bazı alanlarda (rapora bakınız) gelişim ihtiyacı bulunmaktadır. Nihai karar ve takdir sizindir. Aksiyon: Görüşme, adayın düşük skor aldığı alanlarda (Örn: Kurum İçi İşbirliği) davranışsal örnekler isteyerek, rapor sonuçlarını doğrulamaya odaklanmalıdır.</td></tr>
+        <tr><td style="padding: 5px;">65≤Genel Skor<80 VE RB Orta Risk</td><td style="padding: 5px;">GÖRÜŞME SKALASI: İHTİYATLI ORTA DÜZEY</td><td style="padding: 5px;">Aday, yeterli skorlar almasına rağmen, orta düzeyde tutarsızlık veya sosyal olarak istenen cevap verme eğilimi tespit edilmiştir. Aday görüşmek için değerlendirilebilir, ancak nihai karar ve takdir sizindir. Aksiyon: Mülakatın ilk 15 dakikasında adayın verdiği cevaplardaki tutarlılık ve samimiyet iki farklı soruyla teyit edilmelidir.</td></tr>
+    </table>
+</div>
+<div style="margin-bottom: 30px;">
+    <h4 style="margin-bottom: 10px;">GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (YÜKSEK RİSK)</h4>
+    <p style="margin-bottom: 10px;">Bu kategori, adayın skorlarının düşük olduğu ve görüşme kararının risk ve maliyet analizi sonrası verilmesi gerektiğini gösterir.</p>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr><th style="padding: 5px;">Kontrol Kriteri</th><th style="padding: 5px;">Sonuç Başlığı</th><th style="padding: 5px;">Yorum</th></tr>
+        <tr><td style="padding: 5px;">Genel Skor<65 VEYA En Az 3 Kritik Skor<50</td><td style="padding: 5px;">GÖRÜŞME ÖNERİSİ: İHTİYATLI YAKLAŞIM (Riskli Uyum)</td><td style="padding: 5px;">Adayın yetkinlik profilinde sistemik zafiyet tespit edilmiş olup, skorları rolün minimum gerekliliklerinin altındadır. Bu profilin işe alınması, kuruma yüksek eğitim, denetim ve hata maliyeti getirme riski taşır. Adayın görüşme için değerlendirilmesi önerilmez, ancak son karar ve takdir sizindir.</td></tr>
+        <tr><td style="padding: 5px;">Özel Koşul: Response Bias ≥Yüksek Risk (Örn: 30%)</td><td style="padding: 5px;">UYARI: YÜKSEK GÜVENİLİRLİK RİSKİ</td><td style="padding: 5px;">Adayın puanlarından bağımsız olarak, Yüksek Manipülasyon Riski tespit edilmiştir. Rapor edilen tüm yetkinlik skorları, şartlı ve düzeltilmiş olarak ele alınmalıdır. Aksiyon: Görüşme sadece, adayın manipülasyon girişimini ve tutarsızlığını deşifre etmek amacıyla kullanılmalıdır. Aksi takdirde, görüşme süresinin daha uygun adaylara ayrılması tavsiye edilir.</td></tr>
+    </table>
+</div>`;
+
+                // Build numeric reasons so HR sees exact trigger values in the modal
+                const reasonList2 = [];
+                try {
+                    reasonList2.push('Genel Skor = ' + Math.round(overallScore) + ' / 100');
+                    reasonList2.push('Response Bias = ' + Math.round(biasScore) + ' / 100');
+                    if (overallScore >= 90) reasonList2.push('Genel Skor ≥ 90 (mükemmel uyum)');
+                    else if (overallScore >= 80 && biasScore <= 66) reasonList2.push('Genel Skor ≥ 80 ve Response Bias ≤ Orta Risk (skorlar güvenilir)');
+                    else if (overallScore >= 65 && overallScore < 80 && biasScore <= 33) reasonList2.push('Genel Skor 65–79 ve Response Bias Düşük');
+                    else if (overallScore >= 65 && overallScore < 80 && biasScore > 33 && biasScore <= 66) reasonList2.push('Genel Skor 65–79 ancak Response Bias Orta Risk (tutarlılık sorgulanmalı)');
+                    else if (overallScore < 65 || lowScoreCount2 >= 3) reasonList2.push('Genel Skor < 65 veya en az 3 kritik kategori < 50 (yüksek risk)');
+                    if (biasScore >= 67) reasonList2.push('Response Bias yüksek (manipülasyon/uygunluk riski)');
+                    if (lowScoreCount2 && lowScoreCount2 > 0) {
+                        const lowCats2 = lowScoreCategories2.map(c => (c + ' — ' + (pc[c].score100 || 0) + '/100'));
+                        if (lowCats2.length) reasonList2.push('Kritik düşük kategoriler: ' + lowCats2.join(', '));
+                    }
+                } catch(e) { /* ignore */ }
+                const reasonsHTML2 = reasonList2.length ? ('<div style="margin-top:8px;color:#374151;font-size:13px;"><strong>Nedeni:</strong><ul style="margin-top:6px;margin-left:18px;">' + reasonList2.map(r=>('<li>'+r+'</li>')).join('') + '</ul></div>') : '';
+
+                const box2 = document.getElementById('interviewScaleBox');
+                if (box2) {
+                    const title = interviewScaleText.split('\n')[0] || 'Görüşme Önerisi';
+                    const body = interviewScaleText.split('\n').slice(1).join('<br>');
+                    let color2 = '#0b69d6';
+                    if (/LİDER ADAYI|Mükemmel/i.test(title)) color2 = '#0b6b3a';
+                    else if (/GÜÇLÜ TAVSİYE/i.test(title)) color2 = '#1e40af';
+                    else if (/İHTİYATLI ORTA DÜZEY/i.test(title)) color2 = '#b45309';
+                    else if (/İHTİYATLI YAKLAŞIM/i.test(title)) color2 = '#b91c1c';
+                    // hide long tables by default; add toggle so the tables remain in the DOM for persistence/calculation but hidden until needed
+                    const uniq2 = 'interview_details_' + Date.now() + '_2';
+                    box2.innerHTML = `
+                        <div style="border-left:4px solid ${color2};padding:10px;margin-bottom:10px;background:#fbfdff;border-radius:6px;">
+                            <div style="font-weight:800;color:${color2};margin-bottom:6px;">${title}</div>
+                            <div style="color:#334155;font-size:13px;line-height:1.35;">${body}</div>
+                            ${reasonsHTML2}
+                        </div>
+                        <div style="margin-top:8px;text-align:right;"><button id="toggle_${uniq2}" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm">Ayrıntıları Göster</button></div>
+                        <div id="${uniq2}" style="display:none;margin-top:10px;">${tablesHTML2}</div>
+                    `;
+                    try {
+                        const btn2 = box2.querySelector('#toggle_' + uniq2);
+                        const det2 = box2.querySelector('#' + uniq2);
+                        if (btn2 && det2) btn2.addEventListener('click', function(){ if (det2.style.display === 'none'){ det2.style.display='block'; btn2.innerText='Ayrıntıları Gizle'; } else { det2.style.display='none'; btn2.innerText='Ayrıntıları Göster'; } });
+                    } catch(e) { console.warn('attach toggle failed', e); }
+                }
+            } catch(e) { console.warn('interviewScaleBox populate failed', e); }
 
             // Reports list (AI + human) if present in candidate object
             try {
@@ -3210,6 +3758,7 @@ function showCandidateDetail(candidate) {
                     reportsWrap.className = 'mt-4';
                     modal.querySelector('.bg-white')?.appendChild(reportsWrap);
                 }
+                reportsWrap.style.display = 'none';
                 reportsWrap.innerHTML = '<h4 class="font-semibold mb-2">Kayıtlı Raporlar</h4>';
                 const reports = candidate.reports || {};
                 const keys = Object.keys(reports);
@@ -3234,11 +3783,26 @@ function showCandidateDetail(candidate) {
 
             // Question-by-question detail
             const qListEl = document.getElementById('questionDetailList');
+            // Add toggle button
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'mb-2 inline-block bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700';
+            toggleBtn.innerText = 'Soru/Cevap Detaylarını Göster';
+            let isVisible = false;
+            toggleBtn.onclick = function() {
+                isVisible = !isVisible;
+                qListEl.style.display = isVisible ? 'block' : 'none';
+                toggleBtn.innerText = isVisible ? 'Detayları Gizle' : 'Soru/Cevap Detaylarını Göster';
+            };
+            qListEl.parentNode.insertBefore(toggleBtn, qListEl);
+            qListEl.style.display = 'none';
             qListEl.innerHTML = '';
-            const questions = (candidate.cevaplar && candidate.cevaplar.length && (testForm && testForm._questions)) ? testForm._questions : null;
+            // reuse previously-declared cevaplarData (ensure it's up-to-date)
+            cevaplarData = candidate.cevaplar || {};
+            const questions = cevaplarData && cevaplarData.questions ? cevaplarData.questions : null;
+            const answersArray = cevaplarData && cevaplarData.answers ? Object.values(cevaplarData.answers) : [];
             if (questions && questions.length) {
                 questions.forEach((q, idx) => {
-                    const ans = candidate.cevaplar[idx] || '';
+                    const ans = answersArray[idx] || '';
                     const target = q.target || '';
                     const expert = Array.isArray(q.expertScores) ? q.expertScores.join(',') : '';
                     const row = document.createElement('div');
@@ -3246,8 +3810,8 @@ function showCandidateDetail(candidate) {
                     row.innerHTML = `<div class='font-semibold'>${idx+1}. ${q.text}</div><div class='text-sm text-gray-600'>Cevap: ${ans} ${target?('<br/>Target: '+target):''} ${expert?('<br/>Expert: '+expert):''}</div>`;
                     qListEl.appendChild(row);
                 });
-            } else if (candidate.cevaplar && candidate.cevaplar.length) {
-                candidate.cevaplar.forEach((cevap, i) => {
+            } else if (answersArray && answersArray.length) {
+                answersArray.forEach((cevap, i) => {
                     const row = document.createElement('div'); row.className='mb-2';
                     row.innerHTML = `<div class='font-semibold'>${i+1}. Soru metni yok</div><div class='text-sm text-gray-600'>Cevap: ${cevap}</div>`;
                     qListEl.appendChild(row);
@@ -3256,15 +3820,18 @@ function showCandidateDetail(candidate) {
                 qListEl.innerHTML = '<div>Henüz cevap yok.</div>';
             }
 
-            // Export CSV handler
-            const exportBtn = document.getElementById('exportCsvBtn');
+            const exportBtn = document.getElementById('exportCSVBtn');
             exportBtn.onclick = function(){
                 const rows = [];
                 rows.push(['Rumuz','Tip','Başlık','Kategori','Soru','Cevap','Target','ExpertScores','CategoryAdjusted']);
                 const pcKeys = Object.keys(pc);
+                // reuse previously-declared cevaplarData (ensure it's up-to-date)
+                cevaplarData = candidate.cevaplar || {};
+                const questions = cevaplarData && cevaplarData.questions ? cevaplarData.questions : null;
+                const answersArray = cevaplarData && cevaplarData.answers ? Object.values(cevaplarData.answers) : [];
                 if (questions && questions.length) {
                     questions.forEach((q, idx) => {
-                        const ans = candidate.cevaplar[idx] || '';
+                        const ans = answersArray[idx] || '';
                         // find category adjusted
                         let catAdj = '';
                         for (const k of pcKeys) {
@@ -3273,8 +3840,8 @@ function showCandidateDetail(candidate) {
                         }
                         rows.push([candidate.rumuz, candidate.tip, candidate.baslik, q.category||'', q.text, ans, q.target||'', Array.isArray(q.expertScores)?q.expertScores.join('|'): '', catAdj]);
                     });
-                } else if (candidate.cevaplar && candidate.cevaplar.length) {
-                    candidate.cevaplar.forEach((a,i)=> rows.push([candidate.rumuz, candidate.tip, candidate.baslik, '', 'Soru metni yok', a, '', '', '']));
+                } else if (answersArray && answersArray.length) {
+                    answersArray.forEach((a,i)=> rows.push([candidate.rumuz, candidate.tip, candidate.baslik, '', 'Soru metni yok', a, '', '', '']));
                 }
                 const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
                 const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
@@ -3284,8 +3851,12 @@ function showCandidateDetail(candidate) {
 
             const copyBtn = document.getElementById('copySummaryBtn');
             copyBtn.onclick = function(){
-                try { navigator.clipboard.writeText(s.nlgSummary || ''); alert('Özet panoya kopyalandı'); } catch(e){ prompt('Özet (kopyalayın):', s.nlgSummary || ''); }
+                const summary = s.nlgSummary || '';
+                document.getElementById('summaryText').innerHTML = summary;
+                document.getElementById('summaryPopup').classList.remove('hidden');
+                try { navigator.clipboard.writeText(summary.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '')); } catch(e){}
             };
+            document.getElementById('closeSummaryPopup').onclick = function(){ document.getElementById('summaryPopup').classList.add('hidden'); };
         }, 100);
 }
     </script>
