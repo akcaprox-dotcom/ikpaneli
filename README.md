@@ -2303,7 +2303,28 @@
             const password = document.getElementById('candidatePassword').value;
             if (!nickname) { alert('Lütfen rumuz girin'); return; }
             try {
-                const cand = await window.getCandidateByNickname(nickname);
+                let cand = await window.getCandidateByNickname(nickname);
+                // Fallback: if DB read returned null (offline queued candidate), check local pending submissions
+                if (!cand) {
+                    try {
+                        const raw = localStorage.getItem('apx_pending_submissions');
+                        if (raw) {
+                            const pending = JSON.parse(raw || '[]');
+                            for (const it of pending) {
+                                try {
+                                    // path may be like 'candidates/<rumuz>/...'
+                                    if (it.path && String(it.path).includes('candidates/' + nickname)) {
+                                        if (it.value && it.value.rumuz === nickname) { cand = it.value; break; }
+                                        // some queued actions store value directly as candidate object
+                                        if (it.value && it.value.rumuz === nickname) { cand = it.value; break; }
+                                    }
+                                    // also support queued full-node updates where value.rumuz exists
+                                    if (it.value && it.value.rumuz === nickname) { cand = it.value; break; }
+                                } catch(_){ }
+                            }
+                        }
+                    } catch(e2) { console.warn('local fallback candidate lookup failed', e2); }
+                }
                 if (!cand) { alert('Rumuz bulunamadı'); return; }
                 if ((cand.password||'') !== password) { alert('Şifre hatalı'); return; }
                 // set active candidate from DB object
@@ -2662,7 +2683,7 @@
     if (testForm) {
         testForm.onsubmit = async function(e) {
             e.preventDefault();
-            if (!activeCandidate) return;
+            if (!activeCandidate) { alert('Lütfen önce rumuz ile giriş yapın (Teste Başla).'); return; }
             try {
                 // Use accumulated answers from the paginated UI if present
                 const cevaplar = Array.isArray(testForm._answers) ? testForm._answers.slice() : [];
