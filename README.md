@@ -961,22 +961,12 @@
             // Build human-readable reasons for why this recommendation was chosen
             const reasonList = [];
             try {
-                // Add numeric summary first for clarity
-                reasonList.push('Genel Skor = ' + Math.round(overall) + ' / 100');
-                reasonList.push('Response Bias = ' + Math.round(bias) + ' / 100');
-
                 if (overall >= 90) reasonList.push('Genel Skor ≥ 90 (mükemmel uyum)');
                 else if (overall >= 80 && bias <= 66) reasonList.push('Genel Skor ≥ 80 ve Response Bias ≤ Orta Risk (skorlar güvenilir)');
                 else if (overall >= 65 && overall < 80 && bias <= 33) reasonList.push('Genel Skor 65–79 ve Response Bias Düşük');
                 else if (overall >= 65 && overall < 80 && bias > 33 && bias <= 66) reasonList.push('Genel Skor 65–79 ancak Response Bias Orta Risk (tutarlılık sorgulanmalı)');
                 else if (overall < 65 || lowScoreCount >= 3) reasonList.push('Genel Skor < 65 veya en az 3 kritik kategori < 50 (yüksek risk)');
                 if (bias >= 67) reasonList.push('Response Bias yüksek (manipülasyon/uygunluk riski)');
-
-                // Also include low-score categories with numeric scores for traceability
-                if (lowScoreCount && lowScoreCount > 0) {
-                    const lowCats = Object.keys(perCategory).filter(c => (perCategory[c].score100 || 0) < 50).map(c => (c + ' — ' + (perCategory[c].score100 || 0) + '/100'));
-                    if (lowCats.length) reasonList.push('Kritik düşük kategoriler: ' + lowCats.join(', '));
-                }
             } catch(e) { /* ignore */ }
             const reasonsHTML = reasonList.length ? ('<div style="margin-top:8px;color:#374151;font-size:13px;"><strong>Nedeni:</strong><ul style="margin-top:6px;margin-left:18px;">' + reasonList.map(r=>('<li>'+r+'</li>')).join('') + '</ul></div>') : '';
 
@@ -3248,14 +3238,19 @@
         const answerList = document.getElementById('answerList');
         if (!answerList) return;
         answerList.innerHTML = '';
-        if (!candidate || !candidate.cevaplar || !candidate.cevaplar.length) {
+        if (!candidate || !candidate.cevaplar || !candidate.cevaplar.answers) {
             answerList.innerHTML = '<li>Henüz cevap yok.</li>';
             return;
         }
-        candidate.cevaplar.forEach((a,i) => {
+        const answersObj = candidate.cevaplar.answers;
+        const questions = candidate.cevaplar.questions || [];
+        Object.keys(answersObj).forEach(key => {
+            const index = parseInt(key.replace('q', '')) - 1;
+            const answer = answersObj[key];
+            const questionText = questions[index] ? questions[index].text : `Soru ${index + 1}`;
             const li = document.createElement('li');
             li.className = 'text-sm text-gray-700';
-            li.innerText = `${i+1}. ${a}`;
+            li.innerText = `${index + 1}. ${questionText} — Cevap: ${answer}`;
             answerList.appendChild(li);
         });
     }
@@ -3504,54 +3499,7 @@ function showCandidateDetail(candidate) {
             else cls = 'apx-bias-green';
             // add pulse only for cautionary ranges (<66)
             const pulse = (biasVal < 66) ? ' pulse' : '';
-            // insert bias badge and a right-aligned live AI comment button (blinking for attention)
-            const liveBtnId = 'liveAiBtn_' + Date.now();
-            document.getElementById('detailBias').innerHTML = `
-                <span class="apx-bias-badge ${cls}${pulse}">${biasText}</span>
-                <button id="${liveBtnId}" class="ml-3 inline-block bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 pulse" title="CANLI AI YORUM" style="float:right">CANLI AI YORUM</button>
-            `;
-            // attach handler to live AI button
-            (function(){
-                const btn = document.getElementById(liveBtnId);
-                if (!btn) return;
-                btn.onclick = async function(){
-                    try {
-                        btn.disabled = true; btn.style.opacity = '0.6';
-                        // ensure we have a visible summary holder
-                        const summaryHolder = document.getElementById('detailNLG') || (function(){
-                            const el = document.createElement('div'); el.id = 'detailNLG'; el.className='text-sm text-gray-700';
-                            const container = document.querySelector('.nlg-container') || document.createElement('div');
-                            if (!container.parentElement) { container.className='mt-4 p-3 bg-gray-50 rounded nlg-container'; container.style.display = 'block'; document.body.appendChild(container); }
-                            container.appendChild(el);
-                            return el;
-                        })();
-                        summaryHolder.innerText = 'CANLI Yorum oluşturuluyor... Lütfen bekleyin.';
-                        // collect payload: candidate basic info + skorlar + perCategory
-                        const payload = { candidate: { rumuz: candidate.rumuz, tip: candidate.tip, baslik: candidate.baslik }, skorlar: s || {}, perCategory: pc || {} };
-                        // get endpoint and key from global config if available, else prompt (note: prompting exposes key in client - for production use a server proxy)
-                        const endpoint = window.LIVE_AI_ENDPOINT || prompt('CANLI AI endpoint (ör. https://your-proxy/or/api):', '');
-                        if (!endpoint) { alert('Endpoint gerekli. İşlem iptal edildi.'); summaryHolder.innerText = 'CANLI Yorum iptal edildi.'; return; }
-                        const key = window.LIVE_AI_KEY || prompt('API anahtarınızı girin (prod için sunucu proxy kullanmanız önerilir):', '');
-                        // perform POST
-                        const headers = { 'Content-Type': 'application/json' };
-                        if (key) headers['Authorization'] = 'Bearer ' + key;
-                        const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
-                        let dataText = '';
-                        try {
-                            const j = await resp.json();
-                            dataText = j.text || j.result || JSON.stringify(j);
-                        } catch(e){
-                            dataText = await resp.text();
-                        }
-                        summaryHolder.innerText = dataText || 'CANLI AI yanıtı boş döndü.';
-                        // attempt to persist AI report
-                        try { await saveCandidateReport(candidate.rumuz, { author: 'ai_live', type: 'ai_live', text: dataText || '', ts: Date.now() }); } catch(e){ console.warn('AI live report save failed', e); }
-                    } catch(err){
-                        console.error('CANLI AI isteği başarısız', err);
-                        (document.getElementById('detailNLG')||{}).innerText = 'CANLI AI isteği sırasında hata: ' + (err.message||err);
-                    } finally { btn.disabled = false; btn.style.opacity = ''; }
-                };
-            })();
+            document.getElementById('detailBias').innerHTML = `<span class="apx-bias-badge ${cls}${pulse}">${biasText}</span>`;
             // NLG summary (if available) + Yapay Zeka Yorumu butonu
             const summaryElId = 'detailNLG';
             let summaryEl = document.getElementById(summaryElId);
@@ -3702,24 +3650,6 @@ function showCandidateDetail(candidate) {
     </table>
 </div>`;
 
-                // Build numeric reasons so HR sees exact trigger values in the modal
-                const reasonList2 = [];
-                try {
-                    reasonList2.push('Genel Skor = ' + Math.round(overallScore) + ' / 100');
-                    reasonList2.push('Response Bias = ' + Math.round(biasScore) + ' / 100');
-                    if (overallScore >= 90) reasonList2.push('Genel Skor ≥ 90 (mükemmel uyum)');
-                    else if (overallScore >= 80 && biasScore <= 66) reasonList2.push('Genel Skor ≥ 80 ve Response Bias ≤ Orta Risk (skorlar güvenilir)');
-                    else if (overallScore >= 65 && overallScore < 80 && biasScore <= 33) reasonList2.push('Genel Skor 65–79 ve Response Bias Düşük');
-                    else if (overallScore >= 65 && overallScore < 80 && biasScore > 33 && biasScore <= 66) reasonList2.push('Genel Skor 65–79 ancak Response Bias Orta Risk (tutarlılık sorgulanmalı)');
-                    else if (overallScore < 65 || lowScoreCount2 >= 3) reasonList2.push('Genel Skor < 65 veya en az 3 kritik kategori < 50 (yüksek risk)');
-                    if (biasScore >= 67) reasonList2.push('Response Bias yüksek (manipülasyon/uygunluk riski)');
-                    if (lowScoreCount2 && lowScoreCount2 > 0) {
-                        const lowCats2 = lowScoreCategories2.map(c => (c + ' — ' + (pc[c].score100 || 0) + '/100'));
-                        if (lowCats2.length) reasonList2.push('Kritik düşük kategoriler: ' + lowCats2.join(', '));
-                    }
-                } catch(e) { /* ignore */ }
-                const reasonsHTML2 = reasonList2.length ? ('<div style="margin-top:8px;color:#374151;font-size:13px;"><strong>Nedeni:</strong><ul style="margin-top:6px;margin-left:18px;">' + reasonList2.map(r=>('<li>'+r+'</li>')).join('') + '</ul></div>') : '';
-
                 const box2 = document.getElementById('interviewScaleBox');
                 if (box2) {
                     const title = interviewScaleText.split('\n')[0] || 'Görüşme Önerisi';
@@ -3735,7 +3665,6 @@ function showCandidateDetail(candidate) {
                         <div style="border-left:4px solid ${color2};padding:10px;margin-bottom:10px;background:#fbfdff;border-radius:6px;">
                             <div style="font-weight:800;color:${color2};margin-bottom:6px;">${title}</div>
                             <div style="color:#334155;font-size:13px;line-height:1.35;">${body}</div>
-                            ${reasonsHTML2}
                         </div>
                         <div style="margin-top:8px;text-align:right;"><button id="toggle_${uniq2}" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm">Ayrıntıları Göster</button></div>
                         <div id="${uniq2}" style="display:none;margin-top:10px;">${tablesHTML2}</div>
