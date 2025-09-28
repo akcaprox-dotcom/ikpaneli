@@ -1418,7 +1418,7 @@
                         email,
                         company: company,
                         role: role,
-                        password: null,
+                        password: password,  // Şifreyi kaydet
                         active: true,
                         createdAt: Date.now(),
                         authCreated: createdAuth
@@ -1429,7 +1429,7 @@
                         const QK = 'apx_pending_hr_registrations';
                         const raw = localStorage.getItem(QK);
                         const arr = raw ? JSON.parse(raw) : [];
-                        arr.push({ username, fullName, email, company, role, authCreated, ts: Date.now() });
+                        arr.push({ username, fullName, email, company, role, password, authCreated, ts: Date.now() });  // Şifreyi queue'ye ekle
                         localStorage.setItem(QK, JSON.stringify(arr));
                         alert('Kayıt veritabanına yazılamadı; kayıt yerel kuyruğa alındı ve daha sonra otomatik olarak gönderilecektir.');
                     } catch(qe) { console.warn('Failed to queue HR registration', qe); alert('Kayıt sırasında ağ hatası oluştu ve kuyruğa alınamadı. Konsolu kontrol edin.'); }
