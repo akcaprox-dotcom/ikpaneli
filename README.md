@@ -1555,7 +1555,7 @@
     window.addEventListener('load', function(){ setTimeout(retryPendingHRRegistrations, 2000); });
     try { const _ik2 = document.getElementById('ikPanel'); if (_ik2) _ik2.addEventListener('transitionend', function(){ setTimeout(retryPendingHRRegistrations, 1000); }); } catch(e){}
 
-    // Giriş işlemi (Firebase üzerinden kontrol)
+    // Giriş işlemi (Firebase Auth olmadan, DB ile — test için)
     const hrLoginFormEl = document.getElementById('hrLoginForm');
     if (hrLoginFormEl) {
         hrLoginFormEl.addEventListener('submit', async function(e){
@@ -1566,33 +1566,15 @@
             const password = passEl ? passEl.value : '';
             try {
                 if (!email || !password) { alert('E-posta ve şifre girin'); return; }
-                // Use Firebase Auth
-                const cred = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
-                const user = cred.user;
-                const idToken = await user.getIdTokenResult();
-                // If hr claim missing, allow a development bypass for a trusted test account
-                if (!idToken || !idToken.claims || !idToken.claims.hr) {
-                    // Trusted test email bypass: remove or disable this in production
-                    const trustedEmail = 'bakca1980@gmail.com';
-                    if (user && user.email && user.email.toLowerCase() === trustedEmail) {
-                        console.warn('HR claim missing but trustedEmail bypass used for', trustedEmail);
-                    } else {
-                        await window.signOutFirebase(window.firebaseAuth);
-                        alert('Bu hesap İK yetkisine sahip değil.');
-                        return;
-                    }
-                }
-                // Check if HR user is active
-                const hrUser = await window.getHRUserByEmail(user.email);
-                if (!hrUser || !hrUser.active) {
-                    await window.signOutFirebase(window.firebaseAuth);
-                    alert('Bu İK hesabı pasif durumda. Giriş yapılamaz.');
-                    return;
-                }
+                // DB'den HR kullanıcısı kontrolü (Auth olmadan)
+                const hrUser = await window.getHRUserByEmail(email);
+                if (!hrUser) { alert('Bu e-posta ile kayıtlı İK kullanıcısı bulunamadı.'); return; }
+                if (hrUser.password !== password) { alert('Şifre hatalı'); return; }
+                if (!hrUser.active) { alert('Bu İK hesabı pasif durumda.'); return; }
                 // Başarılı giriş
                 const ikPanelEl = document.getElementById('ikPanel');
                 if (ikPanelEl) ikPanelEl.classList.remove('hidden');
-                try { window.currentHR = user.email ? user.email.split('@')[0] : (user.uid || 'hr_unknown'); } catch(e) { window.currentHR = 'hr_unknown'; }
+                try { window.currentHR = email.split('@')[0]; } catch(e) { window.currentHR = 'hr_unknown'; }
             } catch (err) {
                 console.error(err);
                 alert('Giriş sırasında hata: ' + (err.message||err));
