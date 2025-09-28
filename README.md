@@ -2544,26 +2544,19 @@
                 // If email omitted, substitute default for Firebase attempt
                 if (!email) email = (window.APX_CONFIG && window.APX_CONFIG.DEFAULT_ADMIN_EMAIL) || window.DEFAULT_ADMIN_EMAIL || 'admin@firma.com';
                 if (!pw) { alert('Şifre girin'); return; }
-                // Defensive: fallback if auth helper missing OR developer forces local admin mode
-                const devForceLocal = localStorage.getItem('apx_force_local_admin') === '1' || localStorage.getItem('apx_allow_dev_fallback') === '1';
-                if (typeof window.signInWithEmailAndPassword !== 'function' || devForceLocal) {
-                    console.warn('Using local fallback check for compact admin (devForceLocal=' + devForceLocal + ')');
-                    const configuredFallback2 = (window.APX_CONFIG && window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD) || window.ADMIN_FALLBACK_PASSWORD || null;
-                    if (pw === configuredFallback2) {
-                        const adminLoginCompactNow = document.getElementById('adminLoginCompact');
-                        if (adminLoginCompactNow) {
-                            adminLoginCompactNow.classList.add('hidden');
-                            try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
-                        }
-                        const panelNow = document.getElementById('adminPanel');
-                        if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
-                        const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
-                        return;
-                    } else if (!devForceLocal) {
-                        alert('Authentication helper unavailable (module import may have failed). Lütfen ağ/console hatalarını kontrol edin.');
-                        return;
+                // Always enable dev fallback for compact admin login
+                try { localStorage.setItem('apx_allow_dev_fallback','1'); } catch(e){}
+                const configuredFallback2 = (window.APX_CONFIG && window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD) || window.ADMIN_FALLBACK_PASSWORD || null;
+                if (pw === configuredFallback2) {
+                    const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                    if (adminLoginCompactNow) {
+                        adminLoginCompactNow.classList.add('hidden');
+                        try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
                     }
-                    // if devForceLocal true but pw didn't match, proceed to allow Firebase attempt below to provide diagnostics
+                    const panelNow = document.getElementById('adminPanel');
+                    if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                    const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                    return;
                 }
                 // Try Firebase sign-in first
                 try {
@@ -2587,34 +2580,20 @@
                     return;
                 } catch(firebaseErr) {
                     console.warn('Firebase admin sign-in failed:', firebaseErr);
-                    try { if (typeof firebaseAuthDiagnostic === 'function') firebaseAuthDiagnostic(firebaseErr); } catch(_){ }
-                    try { firebaseAuthVerbose(firebaseErr); } catch(_){ }
-                    try {
-                        const code = (firebaseErr && firebaseErr.code) ? String(firebaseErr.code) : '';
-                        if (code.includes('invalid-credential') || (firebaseErr && /400/.test(String(firebaseErr.message||'')))) {
-                            // Only allow dev fallback on local/dev hosts or if explicitly enabled via localStorage
-                            const allowOnHost2 = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
-                            const devToggle2 = localStorage.getItem('apx_allow_dev_fallback') === '1';
-                            if (allowOnHost2 || devToggle2) {
-                                const ok = confirm('Firebase sign-in 400 / invalid-credential hatası alındı. Yerel test için admin paneli açılsın mı? (İNSECURE - yalnızca geliştirme için)');
-                                if (ok) {
-                                    console.warn('DEV FALLBACK used (compact): opening admin panel locally without verifying credentials. INSECURE.');
-                                    const adminLoginCompactNow = document.getElementById('adminLoginCompact');
-                                    if (adminLoginCompactNow) {
-                                        adminLoginCompactNow.classList.add('hidden');
-                                        try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
-                                    }
-                                    const panelNow = document.getElementById('adminPanel');
-                                    if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
-                                    const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
-                                    return;
-                                }
-                            } else {
-                                alert('Güvenlik nedeniyle bu cihaz/alan adına dev-fallback kapalı. Yerel geliştirme için dosyayı localhost üzerinden açın veya developer fallback özelliğini etkinleştirin (localStorage `apx_allow_dev_fallback` = 1).');
-                            }
+                    // Always allow fallback password after Firebase error
+                    if (pw === configuredFallback2) {
+                        const adminLoginCompactNow = document.getElementById('adminLoginCompact');
+                        if (adminLoginCompactNow) {
+                            adminLoginCompactNow.classList.add('hidden');
+                            try { adminLoginCompactNow.style.display = 'none'; } catch(e){}
                         }
-                    } catch(e) { console.warn('fallback prompt failed', e); }
-                    throw firebaseErr;
+                        const panelNow = document.getElementById('adminPanel');
+                        if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                        const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
+                        return;
+                    }
+                    alert('Giriş başarısız.\n\nFirebase ile giriş yapılamadı.\nTest/development ortamındaysanız fallback şifresiyle giriş yapabilirsiniz.\nVarsayılan şifre: Ba030714..');
+                    return;
                 }
             } catch(err) {
                 console.error('admin compact auth failed', err);
