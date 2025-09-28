@@ -2500,7 +2500,33 @@ try {
     }
 
     // Helper: produce question list (maintains type info) for a given sector/role
+    // Prioritize CSV-based `window.customQuestionBank` when present (preserves CSV order).
     function getQuestionsFor(sector, role) {
+        // Try CSV custom bank first (loaded by loadCustomQuestionsFromCSV)
+        try {
+            const bank = window.customQuestionBank || {};
+            if (Object.keys(bank).length) {
+                function normalizePoolKeyFromRole(src) {
+                    const g = (src||'').toString().toLowerCase();
+                    if (g.includes('beyaz')) return 'beyaz yaka';
+                    if (g.includes('mavi')) return 'mavi yaka';
+                    if (g.includes('yonetici')) return 'yonetici';
+                    if (g.includes('hizmet')) return 'hizmet-personeli';
+                    return 'genel';
+                }
+                // prefer role, then sector when deciding pool
+                const poolKey = normalizePoolKeyFromRole(role) || normalizePoolKeyFromRole(sector);
+                const cats = bank[poolKey] || bank['genel'] || {};
+                const qs = [];
+                // preserve insertion order from CSV by iterating Object.keys
+                Object.keys(cats).forEach(cat => { (cats[cat]||[]).forEach(q=> qs.push(Object.assign({}, q, { category: cat }))); });
+                if (qs.length) return qs;
+            }
+        } catch(e) {
+            console.warn('getQuestionsFor custom bank error', e);
+        }
+
+        // Fallback to built-in questionPool if CSV bank not present or empty
         const ROLE_TO_POOL_KEY = {
             'mavi_yaka': 'mavi yaka',
             'beyaz_yaka': 'beyaz yaka',
@@ -2672,10 +2698,13 @@ try {
                 if (g.includes('beyaz')) return 'beyaz yaka';
                 if (g.includes('mavi')) return 'mavi yaka';
                 if (g.includes('yonetici')) return 'yonetici';
-                if (g.includes('hizmet')) return 'hizmet-on-cephe';
+                // normalize hizmet-related pools to match getQuestionsFor expectations
+                if (g.includes('hizmet')) return 'hizmet-personeli';
                 return 'genel';
             }
 
+            // Build a flat list per pool (preserve CSV order), then dedupe and cap per pool
+            const bankList = {}; // poolKey -> [{text, category, direction, target, options, scoreMap}]
             for (const k of Object.keys(groups)) {
                 const ent = groups[k];
                 const sample = ent.rows[0] || {};
@@ -2709,12 +2738,36 @@ try {
                 }
 
                 const qObj = { text: qtext, category, direction, target, options, scoreMap };
-                bank[poolKey] = bank[poolKey] || {};
-                bank[poolKey][category] = bank[poolKey][category] || [];
-                bank[poolKey][category].push(qObj);
+                bankList[poolKey] = bankList[poolKey] || [];
+                bankList[poolKey].push(qObj);
             }
 
-            window.customQuestionBank = bank;
+            // Normalize function for deduping: strip trailing ' (n)' suffixes and lowercase
+            function normalizeQText(t) {
+                if (!t) return '';
+                return t.replace(/\s*\(\d+\)\s*$/,'').trim().toLowerCase();
+            }
+
+            // Reconstruct bank object: per pool, keep first occurrence of each normalized question,
+            // preserve original order and category, and cap to 100 questions per pool.
+            const finalBank = {};
+            for (const pk of Object.keys(bankList)) {
+                const arr = bankList[pk] || [];
+                const seen = new Set();
+                finalBank[pk] = finalBank[pk] || {};
+                for (const q of arr) {
+                    const norm = normalizeQText(q.text);
+                    if (seen.has(norm)) continue;
+                    seen.add(norm);
+                    const cat = q.category || 'Genel';
+                    finalBank[pk][cat] = finalBank[pk][cat] || [];
+                    finalBank[pk][cat].push(q);
+                    if (seen.size >= 100) break; // cap per pool
+                }
+            }
+
+            window.customQuestionBank = finalBank;
+            console.log('Custom question bank loaded from CSV (deduped & capped):', Object.keys(finalBank));
             console.log('Custom question bank loaded from CSV:', Object.keys(bank));
         } catch(e) {
             console.warn('loadCustomQuestionsFromCSV failed', e);
