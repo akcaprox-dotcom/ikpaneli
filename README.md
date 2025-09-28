@@ -2606,10 +2606,21 @@ try {
     // Load custom questions from CSV if present in same folder (tam_set_500soru.csv)
     async function loadCustomQuestionsFromCSV() {
         try {
-            const pathsToTry = ['tam_set_500soru.csv', './tam_set_500soru.csv'];
-            let txt = null;
+            // Denenecek yolları genişlet: kök, ./, bulunduğu dizin, alt dizinler
+            const here = window.location.pathname.replace(/\/[^\/]*$/, '/');
+            const pathsToTry = [
+                'tam_set_500soru.csv',
+                './tam_set_500soru.csv',
+                (here + 'tam_set_500soru.csv'),
+                (here + './tam_set_500soru.csv'),
+                '/tam_set_500soru.csv',
+                '/ikpaneli/tam_set_500soru.csv',
+                (here + '../tam_set_500soru.csv')
+            ];
+            let txt = null, lastTried = '';
             for (const p of pathsToTry) {
                 try {
+                    lastTried = p;
                     const resp = await fetch(p);
                     if (!resp.ok) continue;
                     txt = await resp.text();
@@ -2618,7 +2629,9 @@ try {
             }
             if (!txt) {
                 window.customQuestionBank = window.customQuestionBank || {};
-                console.log('No local CSV found for custom questions');
+                const msg = 'CSV dosyası bulunamadı! Aranan yollar: ' + pathsToTry.join(' | ');
+                alert(msg);
+                console.log('No local CSV found for custom questions. Tried:', pathsToTry);
                 return;
             }
 
