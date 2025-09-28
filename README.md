@@ -397,6 +397,11 @@
                         </div>
                         <button type="submit" class="w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800">Cevapları Gönder</button>
                     </form>
+                    <!-- Persistent quick submit in case dynamic UI hides/disables the internal submit button -->
+                    <div class="mt-3 text-center">
+                        <button id="forceSubmit" type="button" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Cevapları Gönder (Hızlı)</button>
+                        <div class="text-xs text-gray-500 mt-2">Eğer "Cevapları Gönder" çalışmıyorsa bu düğmeye basın.</div>
+                    </div>
                 </div>
 
                 <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -419,6 +424,8 @@
         <div id="messageContainer" class="mt-8">
             <!-- Dynamic messages -->
         </div>
+        <!-- Quick action for retrying queued submissions to live Firebase -->
+        <!-- (Removed visible manual retry button from the default UI per production cleanup.) -->
 
         <!-- Footer -->
         <div class="text-center mt-12 text-blue-200">
@@ -591,7 +598,7 @@
         // 3) if that fails, try update on full node
         // 4) if still fails, queue locally
         try {
-            const computed = computeScoresAndNLG(cevaplar, { tip, baslik });
+            const computed = computeScoresAndNLG(cevaplar, { tip, baslik, questions: getQuestionsFor(tip, baslik) });
             const finalSkorlar = Object.assign({}, skorlar || {}, computed);
 
             // Format answers for RTDB: convert arrays -> object { q1: val, q2: val }
@@ -689,16 +696,70 @@
         if (!typed) inferredTyped = (cevaplar || []).map(v => ({ value: v, type: 'personality' }));
         const allTyped = typed || inferredTyped;
 
-        function toNum(val) {
+        // Map an answer to canonical numeric score (1..5) where higher is better.
+        // If question-specific mappings exist (q.scoreMap) they will be used first.
+        function toNum(val, q) {
             if (val === null || val === undefined) return null;
-            const n = Number(val);
-            if (!isNaN(n)) return Math.max(1, Math.min(5, Math.round(n)));
-            const s = String(val).toLowerCase();
-            if (s === 'evet' || s === '5') return 5;
-            if (s === 'hayir' || s === 'hay' || s === '1') return 1;
-            if (s === 'bazen' || s === 'sometimes' || s === '3') return 3;
-            if (s === 'iyi' || s === '4') return 4;
-            if (s === 'orta' || s === '2') return 3;
+            // If question has scoreMap from CSV (keys are 1-based option numbers) attempt to map
+            function tryScoreMap(rawVal) {
+                try {
+                    if (!q || !q.scoreMap) return null;
+                    // rawVal expected to be 1..5 (1-based) or 0..4 for option indices
+                    let key = rawVal;
+                    if (typeof key === 'number' && key >= 0 && key <= 4) key = key + 1; // convert 0-based index -> 1-based
+                    if (q.scoreMap && q.scoreMap[key] !== undefined) return Number(q.scoreMap[key]);
+                } catch(e) { /* ignore */ }
+                return null;
+            }
+
+            // Normalize incoming val to a raw numeric or index
+            let raw = null;
+            if (typeof val === 'number') raw = val;
+            else if (typeof val === 'object' && val !== null) {
+                if (val.value !== undefined) raw = Number(val.value);
+                else if (val.index !== undefined) raw = Number(val.index) + 1; // make 1-based
+            } else {
+                const s = String(val).toLowerCase().trim();
+                if (!isNaN(Number(s))) raw = Number(s);
+                else if (s === 'evet' || s === 'yes') raw = 5;
+                else if (s === 'hayir' || s === 'no') raw = 1;
+                else if (s === 'bazen' || s === 'sometimes') raw = 3;
+                else if (s === 'iyi') raw = 4;
+                else if (s === 'orta') raw = 3;
+                else {
+                    // try Turkish Likert labels
+                    if (s.match(/kesinlikle katılmıyorum|kesinlikle katilmiyorum/)) raw = 1;
+                    else if (s.match(/katılmıyorum|katilmiyorum/)) raw = 2;
+                    else if (s.match(/kararsızım|kararsizim|kararsiz/)) raw = 3;
+                    else if (s.match(/katılıyorum|katiliyorum/)) raw = 4;
+                    else if (s.match(/kesinlikle katılıyorum|kesinlikle katiliyorum/)) raw = 5;
+                }
+            }
+
+            // If we have a q.scoreMap, try to map raw to CSV Puan
+            if (raw !== null) {
+                const mapped = tryScoreMap(raw);
+                if (mapped !== null) {
+                    // If question direction is Ters, CSV Puan is expected to reflect reversed scoring (1 best).
+                    // We canonicalize so higher is better for downstream: if direction contains 'ters', invert 1..5
+                    if ((q && (q.direction||'').toLowerCase().includes('ters')) && mapped >=1 && mapped <=5) {
+                        return (6 - Number(mapped));
+                    }
+                    return Number(mapped);
+                }
+            }
+
+            // Fallback: if raw is numeric treat as 1..5 (or 0-based index)
+            if (raw !== null && !isNaN(raw)) {
+                let n = Number(raw);
+                // If it looks like a 0-based index (0..4), convert to 1..5
+                if (n >= 0 && n <= 4) n = n + 1;
+                n = Math.max(1, Math.min(5, Math.round(n)));
+                // If question direction is 'Ters', invert
+                if (q && (q.direction||'').toLowerCase().includes('ters')) return (6 - n);
+                return n;
+            }
+
             return null;
         }
 
@@ -731,7 +792,7 @@
             // ensure perQuestion slot exists
             const pq = perQuestion[i] || null;
             if (t.type === 'personality') {
-                const num = toNum(t.value);
+                const num = toNum(t.value, q);
                 if (num !== null) {
                     bucket.personalityVals.push(num);
                     if (pq) {
@@ -740,18 +801,40 @@
                     }
                 }
             } else if (t.type === 'sjt') {
-                const chosenIndex = (typeof t.value === 'string' && t.value !== '') ? Number(t.value) : NaN;
+                // SJT values: t.value is expected to be option index (0-based) or label. Use q.scoreMap or q.expertScores if present.
+                let chosenIndex = null;
+                if (typeof t.value === 'number') chosenIndex = Number(t.value);
+                else if (typeof t.value === 'string' && t.value !== '') {
+                    const maybe = Number(t.value);
+                    if (!isNaN(maybe)) chosenIndex = maybe;
+                } else if (typeof t.value === 'object' && t.value !== null && t.value.index !== undefined) {
+                    chosenIndex = Number(t.value.index);
+                }
                 let expertScore = null;
-                if (Array.isArray(q.expertScores) && !isNaN(chosenIndex) && q.expertScores[chosenIndex] !== undefined) {
+                // Try q.scoreMap (which uses 1-based keys). If chosenIndex is 0-based, convert to 1-based key
+                if (q && q.scoreMap && chosenIndex !== null && !isNaN(chosenIndex)) {
+                    const key = (chosenIndex >= 0 && chosenIndex <= 4) ? (chosenIndex + 1) : chosenIndex;
+                    if (q.scoreMap[key] !== undefined) {
+                        expertScore = Number(q.scoreMap[key]);
+                        // If direction is 'Ters', CSV Puan likely uses reversed scale; canonicalize to higher-is-better
+                        if ((q.direction||'').toLowerCase().includes('ters') && expertScore >=1 && expertScore <=5) {
+                            expertScore = (6 - expertScore);
+                        }
+                    }
+                }
+                // fallback to q.expertScores array
+                if (expertScore == null && Array.isArray(q.expertScores) && chosenIndex !== null && !isNaN(chosenIndex) && q.expertScores[chosenIndex] !== undefined) {
                     expertScore = Number(q.expertScores[chosenIndex]);
                 }
+                // final fallback: use option index +1 mapped to 1..5
                 if (expertScore == null) {
-                    if (!isNaN(chosenIndex)) expertScore = Math.max(1, Math.min(5, chosenIndex + 1));
+                    if (chosenIndex !== null && !isNaN(chosenIndex)) expertScore = Math.max(1, Math.min(5, chosenIndex + 1));
                     else expertScore = 3;
                 }
-                bucket.sjtVals.push(Math.max(1, Math.min(5, Number(expertScore))));
+                expertScore = Math.max(1, Math.min(5, Number(expertScore)));
+                bucket.sjtVals.push(expertScore);
                 if (pq) {
-                    const opt = isNaN(chosenIndex) ? null : chosenIndex;
+                    const opt = (chosenIndex !== null && !isNaN(chosenIndex)) ? chosenIndex : null;
                     if (opt !== null) pq.sjtOptionCounts[opt] = (pq.sjtOptionCounts[opt] || 0) + 1;
                     pq.sjtMappedSum += Number(expertScore);
                     pq.sjtMappedCount++;
@@ -778,7 +861,10 @@
         }
 
         // Response bias (simple): compute std of personality answers overall and map to 0..100
-        const allPersonality = allTyped.filter(t=>t.type==='personality').map(t=>toNum(t.value)).filter(x=>x!==null);
+        const allPersonality = allTyped.filter(t=>t.type==='personality').map((t, idx)=>{
+            const q = questions[idx] || {};
+            return toNum(t.value, q);
+        }).filter(x=>x!==null);
         const n = allPersonality.length || 1;
         const mean = allPersonality.reduce((a,b)=>a+b,0)/n;
         const variance = allPersonality.reduce((a,b)=>a + Math.pow(b-mean,2),0)/n;
@@ -1070,6 +1156,30 @@
     }
     // Expose to global for non-module legacy handlers
     try { window.computeScoresAndNLG = computeScoresAndNLG; } catch(e) { /* ignore in restricted envs */ }
+
+    // Helper to return questions for a given tip/baslik or fallback
+    function getQuestionsFor(tip, baslik) {
+        // If customQuestionBank loaded, try to find a matching pool
+        try {
+            const bank = window.customQuestionBank || {};
+            if (Object.keys(bank).length) {
+                // choose pool by tip/sector heuristics
+                const poolKey = (tip||'').toString().toLowerCase().includes('hizmet') ? 'hizmet-personeli' : ((tip||'').toString().toLowerCase().includes('imalat') ? 'mavi yaka' : 'genel');
+                // flatten bank pools into array of questions
+                const cats = bank[poolKey] || bank['genel'] || {};
+                const qs = [];
+                Object.keys(cats).forEach(cat => { (cats[cat]||[]).forEach(q=> qs.push(Object.assign({}, q, { category: cat }))); });
+                if (qs.length) return qs;
+            }
+        } catch(e) { console.warn('getQuestionsFor custom bank error', e); }
+        // fallback: try testForm._questions or window.questionPool
+        try { if (typeof testForm !== 'undefined' && Array.isArray(testForm._questions)) return testForm._questions; } catch(e){}
+        try { if (window.questionPool) return window.questionPool; } catch(e){}
+        return [];
+    }
+
+    // Load CSV at startup (non-blocking)
+    try { loadCustomQuestionsFromCSV().catch(e=>console.warn('CSV load failed', e)); } catch(e){ console.warn('start csv load failed', e); }
 
     // Create candidate record (called by HR panel when adding candidate)
     window.addCandidateToDB = async function({rumuz, password, tip, baslik, createdBy}){
@@ -1569,6 +1679,28 @@
     // attempt retry on load and when IK panel opens too
     window.addEventListener('load', function(){ setTimeout(retryPendingHRRegistrations, 2000); });
     try { const _ik2 = document.getElementById('ikPanel'); if (_ik2) _ik2.addEventListener('transitionend', function(){ setTimeout(retryPendingHRRegistrations, 1000); }); } catch(e){}
+
+// Expose a console-accessible manual retry helper instead of a visible button.
+// Call `window.retryPendingNow()` from the browser console to trigger retries.
+try {
+    window.retryPendingNow = async function(showAlert = true) {
+        try {
+            await retryPendingSubmissions();
+            await retryPendingHRRegistrations();
+            const pending = JSON.parse(localStorage.getItem('apx_pending_submissions')||'[]');
+            const pendingHR = JSON.parse(localStorage.getItem('apx_pending_hr_registrations')||'[]');
+            const msg = `Kuyruk gönderimi denendi. Kalan: cevaplar=${pending.length}, hr_registrations=${pendingHR.length}`;
+            if (showAlert) alert(msg);
+            try { const mc = document.getElementById('messageContainer'); if (mc) mc.innerHTML = `<div class="p-3 bg-blue-50 border border-blue-100 rounded">${msg}</div>`; } catch(_){ }
+            return { ok: true, pending: pending.length, pendingHR: pendingHR.length };
+        } catch(e) {
+            console.error('retryPendingNow failed', e);
+            if (showAlert) alert('Kuyruğu gönderme sırasında hata: ' + (e.message||e));
+            return { ok: false, error: String(e) };
+        }
+    };
+    // keep backward compatibility: if any legacy code queries the element, return null gracefully
+} catch(e) { console.warn('setup retryPendingNow failed', e); }
 
     // Giriş işlemi (Firebase Auth olmadan, DB ile — test için)
     const hrLoginFormEl = document.getElementById('hrLoginForm');
@@ -2476,6 +2608,120 @@
         }
     }
 
+    // Load custom questions from CSV if present in same folder (tam_set_500soru.csv)
+    async function loadCustomQuestionsFromCSV() {
+        try {
+            const pathsToTry = ['tam_set_500soru.csv', './tam_set_500soru.csv'];
+            let txt = null;
+            for (const p of pathsToTry) {
+                try {
+                    const resp = await fetch(p);
+                    if (!resp.ok) continue;
+                    txt = await resp.text();
+                    break;
+                } catch(e) { /* try next */ }
+            }
+            if (!txt) {
+                window.customQuestionBank = window.customQuestionBank || {};
+                console.log('No local CSV found for custom questions');
+                return;
+            }
+
+            // simple robust CSV parser (handles quoted fields)
+            function parseCSV(text) {
+                const rows = [];
+                let cur = '';
+                let row = [];
+                let inQuotes = false;
+                for (let i = 0; i < text.length; i++) {
+                    const ch = text[i];
+                    const next = text[i+1];
+                    if (ch === '"') {
+                        if (inQuotes && next === '"') { cur += '"'; i++; continue; }
+                        inQuotes = !inQuotes; continue;
+                    }
+                    if (!inQuotes && (ch === ',')) { row.push(cur); cur = ''; continue; }
+                    if (!inQuotes && (ch === '\n' || ch === '\r')) {
+                        if (ch === '\r' && next === '\n') continue; // let next iterate\n
+                        if (cur !== '' || row.length) { row.push(cur); rows.push(row); row = []; cur = ''; }
+                        continue;
+                    }
+                    cur += ch;
+                }
+                if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+                return rows;
+            }
+
+            const rows = parseCSV(txt);
+            if (!rows || rows.length < 2) { window.customQuestionBank = {}; return; }
+            const header = rows[0].map(h=>h.trim());
+            const data = rows.slice(1);
+            const groups = {}; // key -> array of rows
+            for (const r of data) {
+                if (r.length < 3) continue;
+                const obj = {};
+                for (let i=0;i<header.length;i++) obj[header[i]] = (r[i]||'').trim();
+                const key = (obj['Grup']||'') + '||' + (obj['Alt Başlık']||'') + '||' + (obj['Soru']||'');
+                groups[key] = groups[key] || { meta: obj, rows: [] };
+                groups[key].rows.push(obj);
+            }
+
+            const bank = {}; // poolKey -> category -> [questions]
+            function normalizePoolKey(grup){
+                const g = (grup||'').toLowerCase();
+                if (g.includes('beyaz')) return 'beyaz yaka';
+                if (g.includes('mavi')) return 'mavi yaka';
+                if (g.includes('yonetici')) return 'yonetici';
+                if (g.includes('hizmet')) return 'hizmet-on-cephe';
+                return 'genel';
+            }
+
+            for (const k of Object.keys(groups)) {
+                const ent = groups[k];
+                const sample = ent.rows[0] || {};
+                const poolKey = normalizePoolKey(sample['Grup']);
+                const category = sample['Alt Başlık'] || 'Genel';
+                const qtext = sample['Soru'] || ('Soru_' + Math.random().toString(36).slice(2,8));
+                const direction = (sample['Yön']||'').trim();
+                const target = sample['Target Score'] ? Number(sample['Target Score']) : null;
+                const options = [];
+                const scoreMap = {}; // map numeric response value -> effective score per CSV Puan
+
+                // Mapping known Turkish Likert labels to numeric values
+                const labelToVal = {
+                    'kesinlikle katılmıyorum':1,'katılmıyorum':2,'kararsızım':3,'katılıyorum':4,'kesinlikle katılıyorum':5
+                };
+                for (const row of ent.rows) {
+                    const optLabel = (row['Seçenek']||row['Secenek']||'').trim();
+                    const puan = row['Puan'] ? Number(row['Puan']) : null;
+                    let val = null;
+                    const low = optLabel.toLowerCase();
+                    if (labelToVal[low]) val = labelToVal[low];
+                    else if (/^[A-E]$/i.test(optLabel)) val = (optLabel.toUpperCase().charCodeAt(0) - 65); // 0..4 for SJT
+                    else if (/^[0-9]+$/.test(optLabel)) val = Number(optLabel);
+                    // store option and mapping
+                    options.push({ label: optLabel, puan, val });
+                    if (val !== null && puan !== null) {
+                        // If val seems 0..4 convert to 1..5 for personality UI mapping
+                        if (val >=0 && val <=4) { scoreMap[(val+1)] = Number(puan); }
+                        else { scoreMap[val] = Number(puan); }
+                    }
+                }
+
+                const qObj = { text: qtext, category, direction, target, options, scoreMap };
+                bank[poolKey] = bank[poolKey] || {};
+                bank[poolKey][category] = bank[poolKey][category] || [];
+                bank[poolKey][category].push(qObj);
+            }
+
+            window.customQuestionBank = bank;
+            console.log('Custom question bank loaded from CSV:', Object.keys(bank));
+        } catch(e) {
+            console.warn('loadCustomQuestionsFromCSV failed', e);
+            window.customQuestionBank = window.customQuestionBank || {};
+        }
+    }
+
     // Seed sample expert scores into DB for demo (call from console or admin)
     window.seedSampleExpertScores = async function() {
         // Example structure under questionKeys/<poolKey> = { '<category>': [ { text: '...', expertScores: [1.2,4.8,3.5, ...], target: 5 }, ... ] }
@@ -2595,23 +2841,42 @@
             // create content
             let html = `<div><label class='block text-gray-700 font-medium mb-2'>${i+1}. ${q.text || ('Soru ' + (i+1))}</label>`;
             if ((q.type || '').toLowerCase() === 'personality') {
-                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='personality'>
-                    <option value=''>Seçiniz</option>
-                    <option value='1'>1 — Kesinlikle Katılmıyorum</option>
-                    <option value='2'>2 — Katılmıyorum</option>
-                    <option value='3'>3 — Kararsız / Kısmen Katılıyorum</option>
-                    <option value='4'>4 — Katılıyorum</option>
-                    <option value='5'>5 — Kesinlikle Katılıyorum</option>
-                </select>`;
+                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='personality'>`;
+                html += `<option value=''>Seçiniz</option>`;
+                if (Array.isArray(q.options) && q.options.length) {
+                    // options may have val or be labels; map to 1..5 if possible
+                    for (let oi = 0; oi < q.options.length; oi++) {
+                        const opt = q.options[oi] || {};
+                        const val = (opt.val !== undefined && opt.val !== null) ? (opt.val >=0 && opt.val<=4 ? String(opt.val+1) : String(opt.val)) : String(oi+1);
+                        const label = opt.label || opt.Seçenek || opt.Secenek || (`${oi+1}`);
+                        html += `<option value='${val}'>${val} — ${label}</option>`;
+                    }
+                } else {
+                    html += `<option value='1'>1 — Kesinlikle Katılmıyorum</option>`;
+                    html += `<option value='2'>2 — Katılmıyorum</option>`;
+                    html += `<option value='3'>3 — Kararsız / Kısmen Katılıyorum</option>`;
+                    html += `<option value='4'>4 — Katılıyorum</option>`;
+                    html += `<option value='5'>5 — Kesinlikle Katılıyorum</option>`;
+                }
+                html += `</select>`;
             } else {
-                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='sjt'>
-                    <option value=''>Seçiniz</option>
-                    <option value='0'>A</option>
-                    <option value='1'>B</option>
-                    <option value='2'>C</option>
-                    <option value='3'>D</option>
-                    <option value='4'>E</option>
-                </select>`;
+                html += `<select id='curAnswer' class='w-full px-4 py-2 border rounded-lg' data-qtype='sjt'>`;
+                html += `<option value=''>Seçiniz</option>`;
+                if (Array.isArray(q.options) && q.options.length) {
+                    for (let oi = 0; oi < q.options.length; oi++) {
+                        const opt = q.options[oi] || {};
+                        const val = String(oi);
+                        const label = opt.label || opt.Seçenek || opt.Secenek || String.fromCharCode(65+oi);
+                        html += `<option value='${val}'>${String.fromCharCode(65+oi)} — ${label}</option>`;
+                    }
+                } else {
+                    html += `<option value='0'>A</option>`;
+                    html += `<option value='1'>B</option>`;
+                    html += `<option value='2'>C</option>`;
+                    html += `<option value='3'>D</option>`;
+                    html += `<option value='4'>E</option>`;
+                }
+                html += `</select>`;
             }
             if (q.expertScores) html += `<div class='text-xs text-gray-500 mt-2'>Uzman skorları: ${JSON.stringify(q.expertScores)}</div>`;
             // placeholder for inline warnings
@@ -2681,6 +2946,29 @@
     // Test cevaplarını kaydet ve İK paneline yansıt (Firebase ile tam entegrasyon)
     const testForm = document.getElementById('testForm');
     if (testForm) {
+        // Ensure the persistent quick-submit button triggers the same submit logic
+        try {
+            const forceBtn = document.getElementById('forceSubmit');
+            if (forceBtn) {
+                forceBtn.addEventListener('click', function(){
+                    console.debug('forceSubmit clicked — attempting to submit testForm programmatically');
+                    // If the form has an onsubmit handler, call it by dispatching a submit event
+                    try {
+                        if (typeof testForm.onsubmit === 'function') {
+                            // Create a synthetic submit event and dispatch
+                            const ev = new Event('submit', { bubbles: true, cancelable: true });
+                            testForm.dispatchEvent(ev);
+                        } else {
+                            // Fallback: call submit() which bypasses onsubmit; so call handler if defined
+                            testForm.submit();
+                        }
+                    } catch(e) {
+                        console.error('forceSubmit failed to trigger submit', e);
+                        alert('Gönderim tetiklenemedi. Konsolu kontrol edin.');
+                    }
+                });
+            }
+        } catch(e){ console.warn('attach forceSubmit failed', e); }
         testForm.onsubmit = async function(e) {
             e.preventDefault();
             if (!activeCandidate) { alert('Lütfen önce rumuz ile giriş yapın (Teste Başla).'); return; }
@@ -2691,7 +2979,7 @@
                 const typedAnswers = (testForm._questions || []).map((q, idx) => ({ value: cevaplar[idx] || '', type: q && q.type ? q.type : 'personality' }));
 
                 // Compute scores
-                const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm._questions, typedAnswers });
+                const skorlar = computeScoresAndNLG(cevaplar, { tip: activeCandidate.tip, baslik: activeCandidate.baslik, questions: testForm && Array.isArray(testForm._questions) ? testForm._questions : getQuestionsFor(activeCandidate.tip, activeCandidate.baslik), typedAnswers });
 
                 // Attempt to save; if saving fails, saveCandidateTest will handle fallback/queue
                 const res = await window.saveCandidateTest(activeCandidate.rumuz, activeCandidate.tip, activeCandidate.baslik, cevaplar, skorlar, testForm._questions);
@@ -3659,7 +3947,7 @@ function showCandidateDetail(candidate) {
             // If perCategory is empty or undefined, compute it from answers and questions
             if (!Object.keys(pc).length && cevaplarData && cevaplarData.answers && cevaplarData.questions) {
                 const answersArray = Object.values(cevaplarData.answers);
-                const computed = computeScoresAndNLG(answersArray, { tip: candidate.tip, baslik: candidate.baslik, questions: cevaplarData.questions });
+                const computed = computeScoresAndNLG(answersArray, { tip: candidate.tip, baslik: candidate.baslik, questions: Array.isArray(cevaplarData.questions) ? cevaplarData.questions : getQuestionsFor(candidate.tip, candidate.baslik) });
                 pc = computed.perCategory || {};
             }
             if (Object.keys(pc).length) {
@@ -3680,7 +3968,7 @@ function showCandidateDetail(candidate) {
                 if ((!s || s.genelSkor === undefined || s.bias === undefined) && cevaplarData && cevaplarData.answers && cevaplarData.questions) {
                     // answers array
                     const answersArrayForCompute = Object.values(cevaplarData.answers);
-                    try { computedScores = computeScoresAndNLG(answersArrayForCompute, { tip: candidate.tip, baslik: candidate.baslik, questions: cevaplarData.questions }); } catch(e){ console.warn('computeScoresAndNLG fallback failed', e); }
+                    try { computedScores = computeScoresAndNLG(answersArrayForCompute, { tip: candidate.tip, baslik: candidate.baslik, questions: Array.isArray(cevaplarData.questions) ? cevaplarData.questions : getQuestionsFor(candidate.tip, candidate.baslik) }); } catch(e){ console.warn('computeScoresAndNLG fallback failed', e); }
                 }
                 const overallScore = (s && s.genelSkor !== undefined) ? s.genelSkor : (computedScores ? computedScores.genelSkor : (s && s.overall ? s.overall : 0));
                 const biasScore = (s && s.bias !== undefined) ? Number(s.bias) : (computedScores ? Number(computedScores.bias) : (s && s.bias ? Number(s.bias) : 0));
