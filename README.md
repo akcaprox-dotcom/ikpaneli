@@ -2318,8 +2318,22 @@
                 // bring test section visually to front (above admin panels)
                 try {
                     testSection.classList.remove('hidden');
-                    testSection.style.position = 'relative';
+                    testSection.style.position = 'fixed';
+                    testSection.style.top = '50%';
+                    testSection.style.left = '50%';
+                    testSection.style.transform = 'translate(-50%, -50%)';
                     testSection.style.zIndex = '10060';
+                    testSection.style.width = '90%';
+                    testSection.style.maxWidth = '600px';
+                    testSection.style.maxHeight = '80vh';
+                    testSection.style.overflowY = 'auto';
+                    // Hide main grid and other elements for full test mode
+                    const mainGrid = document.querySelector('.grid');
+                    if (mainGrid) mainGrid.style.display = 'none';
+                    const logoSection = document.querySelector('.text-center.mb-12');
+                    if (logoSection) logoSection.style.display = 'none';
+                    const footer = document.querySelector('.text-center.mt-12');
+                    if (footer) footer.style.display = 'none';
                 } catch(e){}
             } catch (err) {
                 console.error(err);
@@ -2658,6 +2672,26 @@
                             <p class='text-xs text-gray-500 mt-2'>${msg}</p>
                         </div>
                     `;
+                    // Reset styles and show main elements after 5 seconds
+                    setTimeout(() => {
+                        testSectionEl.classList.add('hidden');
+                        testSectionEl.style.position = '';
+                        testSectionEl.style.top = '';
+                        testSectionEl.style.left = '';
+                        testSectionEl.style.transform = '';
+                        testSectionEl.style.zIndex = '';
+                        testSectionEl.style.width = '';
+                        testSectionEl.style.maxWidth = '';
+                        testSectionEl.style.maxHeight = '';
+                        testSectionEl.style.overflowY = '';
+                        const mainGrid = document.querySelector('.grid');
+                        if (mainGrid) mainGrid.style.display = '';
+                        const logoSection = document.querySelector('.text-center.mb-12');
+                        if (logoSection) logoSection.style.display = '';
+                        const footer = document.querySelector('.text-center.mt-12');
+                        if (footer) footer.style.display = '';
+                        candidateLoginForm.classList.remove('hidden');
+                    }, 5000);
                 }
 
                 // Ensure admin UI doesn't overlap candidate experience
@@ -2841,7 +2875,7 @@
                         const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
                         return;
                     }
-                    alert('Giriş başarısız.\n\nFirebase ile giriş yapılamadı.\nTest/development ortamındaysanız fallback şifresiyle giriş yapabilirsiniz.\nVarsayılan şifre: Ba030714..');
+                    alert('Giriş başarısız.\n\nFirebase ile giriş yapılamadı.\nTest/development ortamındaysanız, fallback şifresiyle giriş yapabilirsiniz (güvenlik nedeniyle şifre gösterilmiyor).');
                     return;
                 }
             } catch(err) {
