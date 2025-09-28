@@ -119,9 +119,26 @@
                     </table>
                 </div>
                 <div style="display: none;">
+                            <style>
+                                #soruTablo {
+                                    border-collapse: collapse;
+                                    width: 100%;
+                                }
+                                #soruTablo th, #soruTablo td {
+                                    border: 1px solid #ddd;
+                                    padding: 8px;
+                                }
+                                #soruTablo th {
+                                    background-color: #f2f2f2;
+                                }
+                            </style>
                     <h3 class="text-xl font-bold text-green-700 mb-2">Raporlama & Grafik</h3>
                     <div class="flex flex-col md:flex-row gap-6">
+
+
                         <div class="bg-green-50 rounded-lg p-4 flex-1">
+
+
                             <canvas id="radarChart" width="300" height="200"></canvas>
                         </div>
                         <div class="bg-green-50 rounded-lg p-4 flex-1">
@@ -376,27 +393,44 @@
 
                 <div id="testSection" class="hidden mt-8">
                     <h3 class="text-xl font-bold text-blue-700 mb-4">Test Soruları</h3>
-                    <form id="testForm" class="space-y-4">
-                        <div>
-                            <label class="block text-gray-700 font-medium mb-2">1. Takım çalışmasına yatkın mısınız?</label>
-                            <select class="w-full px-4 py-2 border rounded-lg" required>
-                                <option value="">Seçiniz</option>
-                                <option value="evet">Evet</option>
-                                <option value="hayir">Hayır</option>
-                                <option value="bazen">Bazen</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-gray-700 font-medium mb-2">2. Zaman yönetimi konusunda kendinizi nasıl değerlendirirsiniz?</label>
-                            <select class="w-full px-4 py-2 border rounded-lg" required>
-                                <option value="">Seçiniz</option>
-                                <option value="iyi">İyi</option>
-                                <option value="orta">Orta</option>
-                                <option value="zayıf">Zayıf</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800">Cevapları Gönder</button>
-                    </form>
+                    <form id="testForm" class="space-y-4"></form>
+    <script>
+    // Dinamik test soruları formu oluşturucu
+    document.addEventListener('DOMContentLoaded', function() {
+        var pool = window.questionPool || [];
+        var form = document.getElementById('testForm');
+        if (!form) return;
+        form.innerHTML = '';
+        pool.forEach(function(q, i) {
+            var div = document.createElement('div');
+            var label = document.createElement('label');
+            label.className = 'block text-gray-700 font-medium mb-2';
+            label.textContent = (i+1) + '. ' + q.text;
+            div.appendChild(label);
+            var select = document.createElement('select');
+            select.className = 'w-full px-4 py-2 border rounded-lg';
+            select.required = true;
+            var optDefault = document.createElement('option');
+            optDefault.value = '';
+            optDefault.textContent = 'Seçiniz';
+            select.appendChild(optDefault);
+            (q.options || []).forEach(function(opt) {
+                var option = document.createElement('option');
+                option.value = opt.val;
+                option.textContent = opt.label;
+                select.appendChild(option);
+            });
+            div.appendChild(select);
+            form.appendChild(div);
+        });
+        // Gönder butonu ekle
+        var btn = document.createElement('button');
+        btn.type = 'submit';
+        btn.className = 'w-full bg-blue-700 text-white py-2 rounded-lg mt-4 hover:bg-blue-800';
+        btn.textContent = 'Cevapları Gönder';
+        form.appendChild(btn);
+    });
+    </script>
                     <!-- Persistent quick submit in case dynamic UI hides/disables the internal submit button -->
                     <div class="mt-3 text-center">
                         <button id="forceSubmit" type="button" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Cevapları Gönder (Hızlı)</button>
@@ -1172,14 +1206,44 @@
                 if (qs.length) return qs;
             }
         } catch(e) { console.warn('getQuestionsFor custom bank error', e); }
-        // fallback: try testForm._questions or window.questionPool
-        try { if (typeof testForm !== 'undefined' && Array.isArray(testForm._questions)) return testForm._questions; } catch(e){}
-        try { if (window.questionPool) return window.questionPool; } catch(e){}
-        return [];
+            // fallback: try testForm._questions or window.questionPool
+            try { if (typeof testForm !== 'undefined' && Array.isArray(testForm._questions)) return testForm._questions; } catch(e){}
+            try { if (window.questionPool) return window.questionPool; } catch(e){}
+            // Eğer questionPool yoksa örnek sorular ekle
+            window.questionPool = [
+                {
+                    text: 'Takım çalışmasına yatkın mısınız?',
+                    category: 'Genel',
+                    direction: '',
+                    target: 5,
+                    options: [
+                        { label: 'Kesinlikle Katılmıyorum', puan: 1, val: 1 },
+                        { label: 'Katılmıyorum', puan: 2, val: 2 },
+                        { label: 'Kararsızım', puan: 3, val: 3 },
+                        { label: 'Katılıyorum', puan: 4, val: 4 },
+                        { label: 'Kesinlikle Katılıyorum', puan: 5, val: 5 }
+                    ],
+                    scoreMap: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }
+                },
+                {
+                    text: 'Zaman yönetiminde ne kadar iyisiniz?',
+                    category: 'Genel',
+                    direction: '',
+                    target: 5,
+                    options: [
+                        { label: 'Çok Kötü', puan: 1, val: 1 },
+                        { label: 'Kötü', puan: 2, val: 2 },
+                        { label: 'Orta', puan: 3, val: 3 },
+                        { label: 'İyi', puan: 4, val: 4 },
+                        { label: 'Çok İyi', puan: 5, val: 5 }
+                    ],
+                    scoreMap: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }
+                }
+            ];
+            return window.questionPool;
     }
 
-    // Load CSV at startup (non-blocking)
-    try { loadCustomQuestionsFromCSV().catch(e=>console.warn('CSV load failed', e)); } catch(e){ console.warn('start csv load failed', e); }
+
 
     // Create candidate record (called by HR panel when adding candidate)
     window.addCandidateToDB = async function({rumuz, password, tip, baslik, createdBy}){
@@ -2603,159 +2667,7 @@ try {
         }
     }
 
-    // Load custom questions from CSV if present in same folder (tam_set_500soru.csv)
-    async function loadCustomQuestionsFromCSV() {
-        try {
-            // Denenecek yolları genişlet: kök, ./, bulunduğu dizin, alt dizinler
-            const here = window.location.pathname.replace(/\/[^\/]*$/, '/');
-            const pathsToTry = [
-                'tam_set_500soru.csv',
-                './tam_set_500soru.csv',
-                (here + 'tam_set_500soru.csv'),
-                (here + './tam_set_500soru.csv'),
-                '/tam_set_500soru.csv',
-                '/ikpaneli/tam_set_500soru.csv',
-                (here + '../tam_set_500soru.csv')
-            ];
-            let txt = null, lastTried = '';
-            for (const p of pathsToTry) {
-                try {
-                    lastTried = p;
-                    const resp = await fetch(p);
-                    if (!resp.ok) continue;
-                    txt = await resp.text();
-                    break;
-                } catch(e) { /* try next */ }
-            }
-            if (!txt) {
-                window.customQuestionBank = window.customQuestionBank || {};
-                const msg = 'CSV dosyası bulunamadı! Aranan yollar: ' + pathsToTry.join(' | ');
-                alert(msg);
-                console.log('No local CSV found for custom questions. Tried:', pathsToTry);
-                return;
-            }
 
-            // simple robust CSV parser (handles quoted fields)
-            function parseCSV(text) {
-                const rows = [];
-                let cur = '';
-                let row = [];
-                let inQuotes = false;
-                for (let i = 0; i < text.length; i++) {
-                    const ch = text[i];
-                    const next = text[i+1];
-                    if (ch === '"') {
-                        if (inQuotes && next === '"') { cur += '"'; i++; continue; }
-                        inQuotes = !inQuotes; continue;
-                    }
-                    if (!inQuotes && (ch === ',')) { row.push(cur); cur = ''; continue; }
-                    if (!inQuotes && (ch === '\n' || ch === '\r')) {
-                        if (ch === '\r' && next === '\n') continue; // let next iterate\n
-                        if (cur !== '' || row.length) { row.push(cur); rows.push(row); row = []; cur = ''; }
-                        continue;
-                    }
-                    cur += ch;
-                }
-                if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
-                return rows;
-            }
-
-            const rows = parseCSV(txt);
-            if (!rows || rows.length < 2) { window.customQuestionBank = {}; return; }
-            const header = rows[0].map(h=>h.trim());
-            const data = rows.slice(1);
-            const groups = {}; // key -> array of rows
-            for (const r of data) {
-                if (r.length < 3) continue;
-                const obj = {};
-                for (let i=0;i<header.length;i++) obj[header[i]] = (r[i]||'').trim();
-                const key = (obj['Grup']||'') + '||' + (obj['Alt Başlık']||'') + '||' + (obj['Soru']||'');
-                groups[key] = groups[key] || { meta: obj, rows: [] };
-                groups[key].rows.push(obj);
-            }
-
-            const bank = {}; // poolKey -> category -> [questions]
-            function normalizePoolKey(grup){
-                const g = (grup||'').toLowerCase();
-                if (g.includes('beyaz')) return 'beyaz yaka';
-                if (g.includes('mavi')) return 'mavi yaka';
-                if (g.includes('yonetici')) return 'yonetici';
-                // normalize hizmet-related pools to match getQuestionsFor expectations
-                if (g.includes('hizmet')) return 'hizmet-personeli';
-                return 'genel';
-            }
-
-            // Build a flat list per pool (preserve CSV order), then dedupe and cap per pool
-            const bankList = {}; // poolKey -> [{text, category, direction, target, options, scoreMap}]
-            for (const k of Object.keys(groups)) {
-                const ent = groups[k];
-                const sample = ent.rows[0] || {};
-                const poolKey = normalizePoolKey(sample['Grup']);
-                const category = sample['Alt Başlık'] || 'Genel';
-                const qtext = sample['Soru'] || ('Soru_' + Math.random().toString(36).slice(2,8));
-                const direction = (sample['Yön']||'').trim();
-                const target = sample['Target Score'] ? Number(sample['Target Score']) : null;
-                const options = [];
-                const scoreMap = {}; // map numeric response value -> effective score per CSV Puan
-
-                // Mapping known Turkish Likert labels to numeric values
-                const labelToVal = {
-                    'kesinlikle katılmıyorum':1,'katılmıyorum':2,'kararsızım':3,'katılıyorum':4,'kesinlikle katılıyorum':5
-                };
-                for (const row of ent.rows) {
-                    const optLabel = (row['Seçenek']||row['Secenek']||'').trim();
-                    const puan = row['Puan'] ? Number(row['Puan']) : null;
-                    let val = null;
-                    const low = optLabel.toLowerCase();
-                    if (labelToVal[low]) val = labelToVal[low];
-                    else if (/^[A-E]$/i.test(optLabel)) val = (optLabel.toUpperCase().charCodeAt(0) - 65); // 0..4 for SJT
-                    else if (/^[0-9]+$/.test(optLabel)) val = Number(optLabel);
-                    // store option and mapping
-                    options.push({ label: optLabel, puan, val });
-                    if (val !== null && puan !== null) {
-                        // If val seems 0..4 convert to 1..5 for personality UI mapping
-                        if (val >=0 && val <=4) { scoreMap[(val+1)] = Number(puan); }
-                        else { scoreMap[val] = Number(puan); }
-                    }
-                }
-
-                const qObj = { text: qtext, category, direction, target, options, scoreMap };
-                bankList[poolKey] = bankList[poolKey] || [];
-                bankList[poolKey].push(qObj);
-            }
-
-            // Normalize function for deduping: strip trailing ' (n)' suffixes and lowercase
-            function normalizeQText(t) {
-                if (!t) return '';
-                return t.replace(/\s*\(\d+\)\s*$/,'').trim().toLowerCase();
-            }
-
-            // Reconstruct bank object: per pool, keep first occurrence of each normalized question,
-            // preserve original order and category, and cap to 100 questions per pool.
-            const finalBank = {};
-            for (const pk of Object.keys(bankList)) {
-                const arr = bankList[pk] || [];
-                const seen = new Set();
-                finalBank[pk] = finalBank[pk] || {};
-                for (const q of arr) {
-                    const norm = normalizeQText(q.text);
-                    if (seen.has(norm)) continue;
-                    seen.add(norm);
-                    const cat = q.category || 'Genel';
-                    finalBank[pk][cat] = finalBank[pk][cat] || [];
-                    finalBank[pk][cat].push(q);
-                    if (seen.size >= 100) break; // cap per pool
-                }
-            }
-
-            window.customQuestionBank = finalBank;
-            console.log('Custom question bank loaded from CSV (deduped & capped):', Object.keys(finalBank));
-            console.log('Custom question bank loaded from CSV:', Object.keys(bank));
-        } catch(e) {
-            console.warn('loadCustomQuestionsFromCSV failed', e);
-            window.customQuestionBank = window.customQuestionBank || {};
-        }
-    }
 
     // Seed sample expert scores into DB for demo (call from console or admin)
     window.seedSampleExpertScores = async function() {
@@ -2829,10 +2741,9 @@ try {
 
         // Eğer hiç soru yoksa kullanıcıya açık uyarı göster ve test ekranını açma
         if (!Array.isArray(qObjs) || qObjs.length === 0) {
-            alert('CSV yüklenemedi veya uygun soru havuzu bulunamadı. Lütfen CSV dosyasını kontrol edin.');
+
             testForm.innerHTML = `<div class='p-6 bg-red-50 border border-red-200 rounded-lg text-center'>
-                <h3 class='text-2xl font-semibold text-red-800 mb-2'>CSV Yüklenemedi</h3>
-                <p class='text-gray-700 mb-3'>Test başlatılamıyor. Lütfen CSV dosyasının mevcut ve erişilebilir olduğundan emin olun.</p>
+
             </div>`;
             return;
         }
