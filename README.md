@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giriş - Analiz Pro X</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
     /* Küçük tema destekleri */
     .apx-dark { background: linear-gradient(180deg,#0f172a,#07132a) !important; color: #e6eef8; }
@@ -723,7 +723,8 @@
                     pq.sjtMappedCount++;
                     pq.totalResponses++;
                 }
-            } // end for (let i = 0; i < allTyped.length; i++)
+            }
+        } // end for (let i = 0; i < allTyped.length; i++)
 
         // finalize perQuestion averages
         for (let i = 0; i < perQuestion.length; i++) {
@@ -1048,7 +1049,7 @@
                             <button id="apxDiagClear" title="Kapat" style="background:transparent;color:#9ca3af;border:none;padding:6px 8px;border-radius:6px;cursor:pointer">✕</button>
                         </div>
                         <div id="apxDiagContent" style="line-height:1.25;color:#d1d5db"></div>
-                        <div style="margin-top:8px;text-align:right;color:#9ca3af;font-size:11px">(görüntüleme sadece yerel tanılama içindir)</div>
+                        <div id="apxDiagNote" style="margin-top:8px;text-align:right;color:#9ca3af;font-size:11px;display:none;">(görüntüleme sadece yerel tanılama içindir)</div>
                     </div>
                 `;
                 document.body.appendChild(wrapper);
@@ -1079,8 +1080,16 @@
                 render();
             } catch(e){ console.warn('apx diag failed', e); }
         }
-        // show diag overlay after DOM ready
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildDiag); else buildDiag();
+        // show diag overlay only when explicitly enabled for development or when running from file/localhost
+        try {
+            // Only show diagnostics if explicitly enabled by developer via localStorage.
+            // This prevents the overlay from appearing automatically on file:// or localhost.
+            const showDiag = (localStorage.getItem('apx_show_diag') === '1');
+            if (showDiag) {
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildDiag); else buildDiag();
+            }
+            // Do nothing when not enabled — do not insert any hidden anchors or auto-open the panel.
+        } catch(e) { /* ignore errors and do not auto-open diagnostics */ }
     })();
     </script>
     <script>
@@ -1152,18 +1161,31 @@
                 const fullName = (document.getElementById('hrRegFullName') || {}).value || '';
                 const company = (document.getElementById('hrRegCompany') || {}).value || '';
                 const role = (document.getElementById('hrRegRole') || {}).value || '';
-                await set(ref(db, 'hrUsers/' + username), {
-                    username,
-                    fullName: fullName,
-                    phone: '',
-                    email,
-                    company: company,
-                    role: role,
-                    password: null,
-                    active: true,
-                    createdAt: Date.now(),
-                    authCreated: createdAuth
-                });
+                // Attempt DB write; if it fails (permissions/network), queue locally so admin can retry
+                try {
+                    await set(ref(db, 'hrUsers/' + username), {
+                        username,
+                        fullName: fullName,
+                        phone: '',
+                        email,
+                        company: company,
+                        role: role,
+                        password: null,
+                        active: true,
+                        createdAt: Date.now(),
+                        authCreated: createdAuth
+                    });
+                } catch(writeErr) {
+                    console.warn('HR DB write failed — queuing registration locally', writeErr);
+                    try {
+                        const QK = 'apx_pending_hr_registrations';
+                        const raw = localStorage.getItem(QK);
+                        const arr = raw ? JSON.parse(raw) : [];
+                        arr.push({ username, fullName, email, company, role, authCreated, ts: Date.now() });
+                        localStorage.setItem(QK, JSON.stringify(arr));
+                        alert('Kayıt veritabanına yazılamadı; kayıt yerel kuyruğa alındı ve daha sonra otomatik olarak gönderilecektir.');
+                    } catch(qe) { console.warn('Failed to queue HR registration', qe); alert('Kayıt sırasında ağ hatası oluştu ve kuyruğa alınamadı. Konsolu kontrol edin.'); }
+                }
 
                 if (createdAuth) {
                     alert('Kayıt başarılı! İK hesabınız oluşturuldu veya var olan hesabınıza bağlı olarak işlem yapıldı.');
@@ -1247,6 +1269,43 @@
             _ik.addEventListener('transitionend', function(){ setTimeout(retryPendingSubmissions, 500); });
         }
     })();
+
+    // Retry pending HR registrations (from local queue) — attempt to write them to DB
+    async function retryPendingHRRegistrations() {
+        const key = 'apx_pending_hr_registrations';
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        let arr = [];
+        try { arr = JSON.parse(raw); } catch(e){ arr = []; }
+        if (!arr.length) return;
+        const remaining = [];
+        for (const it of arr) {
+            try {
+                const uname = it.username;
+                await set(ref(db, 'hrUsers/' + uname), {
+                    username: it.username,
+                    fullName: it.fullName || '',
+                    phone: '',
+                    email: it.email || '',
+                    company: it.company || '',
+                    role: it.role || '',
+                    password: null,
+                    active: true,
+                    createdAt: it.ts || Date.now(),
+                    authCreated: it.authCreated || false,
+                    pendingOriginally: true
+                });
+                console.log('Pending HR registration sent for', it.username);
+            } catch(e) {
+                console.warn('Retry HR reg failed for', it, e);
+                remaining.push(it);
+            }
+        }
+        if (remaining.length) localStorage.setItem(key, JSON.stringify(remaining)); else localStorage.removeItem(key);
+    }
+    // attempt retry on load and when IK panel opens too
+    window.addEventListener('load', function(){ setTimeout(retryPendingHRRegistrations, 2000); });
+    try { const _ik2 = document.getElementById('ikPanel'); if (_ik2) _ik2.addEventListener('transitionend', function(){ setTimeout(retryPendingHRRegistrations, 1000); }); } catch(e){}
 
     // Giriş işlemi (Firebase üzerinden kontrol)
     const hrLoginFormEl = document.getElementById('hrLoginForm');
@@ -2420,74 +2479,8 @@
             });
             // Attach AI request handlers per row (opens detail modal and auto-invokes modal NLG button)
             Array.from(document.querySelectorAll('.request-ai')).forEach(btn => {
-                btn.onclick = async function(){
-                    const r = this.dataset.r;
-                    const cand = (candidates || []).find(x=>x.rumuz===r);
-                    if (!cand) return alert('Aday bulunamadı');
-
-                    // Create a full-screen AI Report modal (separate from detail modal)
-                    const existing = document.getElementById('aiReportModal');
-                    if (existing) try { existing.remove(); } catch(e){}
-                    const modal = document.createElement('div');
-                    modal.id = 'aiReportModal';
-                    modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-start justify-center z-[100000] p-6 overflow-auto';
-                    modal.innerHTML = `
-                        <div class='bg-white rounded-2xl shadow-2xl p-6 w-full max-w-4xl relative'>
-                            <button id='aiReportClose' class='absolute top-3 right-3 text-gray-400 hover:text-red-600 text-2xl'>&times;</button>
-                            <h2 class='text-2xl font-bold text-indigo-700 mb-2'>Yapay Zeka Raporu — ${cand.rumuz}</h2>
-                            <div id='aiReportMeta' class='text-sm text-gray-600 mb-3'>Oluşturuluyor... Lütfen bekleyin.</div>
-                            <div id='aiReportContent' class='prose max-w-none text-gray-800 whitespace-pre-wrap'></div>
-                            <div class='mt-4 flex gap-2'>
-                                <button id='aiCopyBtn' class='bg-indigo-600 text-white px-3 py-1 rounded'>Kopyala</button>
-                                <button id='aiDownloadBtn' class='bg-gray-200 px-3 py-1 rounded'>İndir (.txt)</button>
-                                <button id='aiCloseBtn' class='ml-auto bg-white border px-3 py-1 rounded'>Kapat</button>
-                            </div>
-                        </div>
-                    `;
-                    document.body.appendChild(modal);
-                    const metaEl = document.getElementById('aiReportMeta');
-                    const contentEl = document.getElementById('aiReportContent');
-                    const closeHandler = function(){ try { modal.remove(); } catch(e){} };
-                    document.getElementById('aiReportClose').onclick = closeHandler;
-                    document.getElementById('aiCloseBtn').onclick = closeHandler;
-
-                    // Provide quick metadata if available
-                    try {
-                        const s = cand.skorlar || {};
-                        const metaText = [];
-                        metaText.push(`Rumuz: ${cand.rumuz}`);
-                        if (s.genelSkor !== undefined) metaText.push(`Genel Skor: ${s.genelSkor}/100`);
-                        if (s.bias !== undefined) metaText.push(`Güvenilirlik (bias): ${s.bias}/100`);
-                        metaEl.innerText = metaText.join(' — ');
-                    } catch(e){ console.warn('ai report meta failed', e); }
-
-                    // Call detailed NLG and fill content
-                    try {
-                        contentEl.innerText = 'Oluşturuluyor... Lütfen bekleyin.';
-                        const resp = (typeof requestCandidateNLGDetailed === 'function') ? await requestCandidateNLGDetailed(cand) : null;
-                        let text;
-                        if (resp && resp.text) text = resp.text;
-                        else if (resp && resp.result) text = resp.result;
-                        else if (resp && typeof resp === 'string') text = resp;
-                        else text = 'Yapay zeka özetlenemedi veya fonksiyon tarafından beklenmeyen bir cevap alındı.';
-                        contentEl.innerText = text;
-                    } catch(err) {
-                        console.error('AI report generation failed', err);
-                        contentEl.innerText = 'Rapor oluşturulurken hata oluştu: ' + (err && err.message ? err.message : String(err));
-                    }
-
-                    // copy and download handlers
-                    document.getElementById('aiCopyBtn').onclick = function(){
-                        try { navigator.clipboard.writeText(contentEl.innerText); alert('Rapor panoya kopyalandı'); }
-                        catch(e){ prompt('Rapor (kopyalayın):', contentEl.innerText); }
-                    };
-                    document.getElementById('aiDownloadBtn').onclick = function(){
-                        try {
-                            const blob = new Blob([contentEl.innerText || ''], { type: 'text/plain;charset=utf-8' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a'); a.href = url; a.download = `${cand.rumuz}_ai_report.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-                        } catch(e){ console.warn('download failed', e); }
-                    };
+                btn.onclick = function(){
+                    alert('Yapay zeka özetleme (Gemini) bu kurulumda devre dışı bırakıldı. Lütfen insan kaynakları raporu kullanın.');
                 };
             });
         });
@@ -2523,9 +2516,10 @@
                 // If email omitted, substitute default for Firebase attempt
                 if (!email) email = (window.APX_CONFIG && window.APX_CONFIG.DEFAULT_ADMIN_EMAIL) || window.DEFAULT_ADMIN_EMAIL || 'admin@firma.com';
                 if (!pw) { alert('Şifre girin'); return; }
-                // Defensive: fallback if auth helper missing
-                if (typeof window.signInWithEmailAndPassword !== 'function') {
-                    console.warn('window.signInWithEmailAndPassword is not available (compact admin) — using local fallback check');
+                // Defensive: fallback if auth helper missing OR developer forces local admin mode
+                const devForceLocal = localStorage.getItem('apx_force_local_admin') === '1' || localStorage.getItem('apx_allow_dev_fallback') === '1';
+                if (typeof window.signInWithEmailAndPassword !== 'function' || devForceLocal) {
+                    console.warn('Using local fallback check for compact admin (devForceLocal=' + devForceLocal + ')');
                     const configuredFallback2 = (window.APX_CONFIG && window.APX_CONFIG.ADMIN_FALLBACK_PASSWORD) || window.ADMIN_FALLBACK_PASSWORD || null;
                     if (pw === configuredFallback2) {
                         const adminLoginCompactNow = document.getElementById('adminLoginCompact');
@@ -2537,10 +2531,11 @@
                         if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
                         const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
                         return;
-                    } else {
+                    } else if (!devForceLocal) {
                         alert('Authentication helper unavailable (module import may have failed). Lütfen ağ/console hatalarını kontrol edin.');
                         return;
                     }
+                    // if devForceLocal true but pw didn't match, proceed to allow Firebase attempt below to provide diagnostics
                 }
                 // Try Firebase sign-in first
                 try {
@@ -2837,7 +2832,7 @@
                     <td class='p-2'>${testCount}</td>
                     <td class='p-2 hr-status'>${status}</td>
                     <td class='p-2'><button class='px-2 py-1 border toggle-hr' data-user='${u.username}'>${u.active? 'Pasife Al' : 'Aktifleştir'}</button></td>
-                    <td class='p-2'><button class='px-2 py-1 bg-indigo-600 text-white rounded request-nlg' data-hr='${u.username}'>Gemini Özeti</button></td>
+                    <td class='p-2'><button class='px-2 py-1 bg-gray-300 text-gray-700 rounded request-nlg' data-hr='${u.username}'>Özet (AI kapalı)</button></td>
                 </tr>`;
                 const existing = document.getElementById(rowId);
                 if (existing) {
@@ -2873,14 +2868,7 @@
                     const nlgBtn = rowEl.querySelector('.request-nlg');
                     if (nlgBtn) {
                         nlgBtn.onclick = function(){
-                            const username = this.dataset.hr;
-                            if (!username) return alert('Kullanıcı seçili değil');
-                            if (!confirm(`'${username}' için Gemini ile özet oluşturulsun mu?`)) return;
-                            requestCandidateNLG(username).then(result => {
-                                alert('Gemini özeti oluşturuldu ve kaydedildi.');
-                                loadCandidatesFromFirebase();
-                                if (!document.getElementById('hrManageModal').classList.contains('hidden')) loadHRList();
-                            }).catch(err => { console.error(err); alert('Gemini özeti oluşturulurken hata: ' + (err.message||err)); });
+                            alert('Otomatik yapay zeka özetleme bu kurulumda devre dışı bırakıldı. Lütfen İnsan Kaynakları raporunu kullanın.');
                         };
                     }
                 } catch(e) { console.warn('attach hr row handlers failed', e); }
@@ -2893,142 +2881,17 @@
     // Attach handler for Gemini NLG request buttons
     document.addEventListener('click', function(e){
         if (e.target && e.target.classList && e.target.classList.contains('request-nlg')){
-            const username = e.target.dataset.hr;
-            if (!username) return alert('Kullanıcı seçili değil');
-            // ask confirmation
-            if (!confirm(`'${username}' için Gemini ile özet oluşturulsun mu?`)) return;
-            requestCandidateNLG(username).then(result => {
-                alert('Gemini özeti oluşturuldu ve kaydedildi.');
-                // refresh candidate list/details
-                loadCandidatesFromFirebase();
-                if (!document.getElementById('hrManageModal').classList.contains('hidden')) loadHRList();
-            }).catch(err => {
-                console.error(err);
-                alert('Gemini özeti oluşturulurken hata: ' + (err.message||err));
-            });
+            alert('Otomatik yapay zeka (Gemini) bu kurulumda devre dışı bırakıldı. Lütfen İnsan Kaynakları raporunu kullanın.');
         }
     });
 
-    // Call the generateCandidateNLG cloud function for a given candidate username
+    // Gemini / NLG disabled: provide stubs that inform the caller
     async function requestCandidateNLG(rumuz){
-        // function URL and secret can be configured in the global window for convenience
-        const fnUrl = window.GENERATE_NLG_URL || prompt('Fonksiyon URL (ör: https://REGION-PROJECT.cloudfunctions.net/generateCandidateNLG):');
-        if (!fnUrl) throw new Error('Fonksiyon URL girilmedi');
-        const secret = window.APX_SECRET || prompt('APX secret (x-apx-secret başlığı):');
-        if (!secret) throw new Error('APX secret girilmedi');
-
-        // store for convenience in this session
-    window.GENERATE_NLG_URL = fnUrl;
-    window.APX_SECRET = secret;
-    try { window.APX_CONFIG = window.APX_CONFIG || {}; window.APX_CONFIG.GENERATE_NLG_URL = fnUrl; window.APX_CONFIG.APX_SECRET = secret; } catch(e) {}
-
-        const res = await fetch(fnUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-apx-secret': secret
-            },
-            body: JSON.stringify({ rumuz })
-        });
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error('Fonksiyon hatası: ' + txt);
-        }
-        return res.json();
+        return Promise.reject(new Error('Yapay zeka özeti özelliği devre dışı bırakıldı.'));
     }
-    
-    // More detailed NLG request: compose an explicit prompt that instructs Gemini to
-    //  - inspect candidate answers and question texts
-    //  - inspect our technical inputs (perQuestion, perCategory, bias, genelSkor)
-    //  - inspect and respect our canonical math (score100 = ((avg5 - 1) / 4) * 100)
-    //  - produce a structured output (summary, strengths, development suggestions, candidate-friendly paragraph)
+
     async function requestCandidateNLGDetailed(candidate){
-        if (!candidate || !candidate.rumuz) throw new Error('Aday bilgisi eksik');
-        // Determine function URL and secret (reuse previous prompts if present)
-        const defaultFn = window.CALL_GEMINI_URL || window.GENERATE_NLG_URL || null;
-        const fnUrl = defaultFn || prompt('Gemini çağrısı için fonksiyon URL (ör: https://REGION-PROJECT.cloudfunctions.net/callGeminiHttp) :');
-        if (!fnUrl) throw new Error('Fonksiyon URL girilmedi');
-        const secret = window.APX_SECRET || prompt('APX secret (x-apx-secret başlığı):');
-        if (!secret) throw new Error('APX secret girilmedi');
-
-        // persist for this session
-    window.CALL_GEMINI_URL = fnUrl;
-    window.APX_SECRET = secret;
-    try { window.APX_CONFIG = window.APX_CONFIG || {}; window.APX_CONFIG.CALL_GEMINI_URL = fnUrl; window.APX_CONFIG.APX_SECRET = secret; } catch(e) {}
-
-        // Build a rich prompt using available local data
-        // Prefer server/client computed skorlar if present
-        const s = candidate.skorlar || {};
-        // Attempt to include question texts from the latest rendered test form if available
-        const questions = (testForm && testForm._questions && testForm._questions.length) ? testForm._questions : [];
-
-        // Compose answers with question text where possible
-        const qaPairs = (candidate.cevaplar || []).map((ans, idx) => {
-            const q = questions[idx] || {};
-            return { index: idx, question: q.text || (q.category? (q.category + ' — soru ' + (idx+1)) : ('Soru ' + (idx+1))), answer: ans, type: q.type || (q && q.type) || (typeof ans === 'number' ? 'personality' : 'sjt'), expertScores: q.expertScores || null, target: q.target || null };
-        });
-
-        // Explain which internal fields we will ask Gemini to use
-        const technicalInputs = {
-            perCategory: s.perCategory || null,
-            perQuestion: s.perQuestion || null,
-            bias: s.bias !== undefined ? s.bias : null,
-            genelSkor: s.genelSkor !== undefined ? s.genelSkor : null,
-            genelLabel: s.genelLabel || null
-        };
-
-        const promptLines = [];
-        promptLines.push(`You are an expert industrial/organizational psychologist and assessment writer. Produce a concise, professional evaluation using the candidate data provided.`);
-        promptLines.push(`Instructions for the model (follow exactly):`);
-        promptLines.push(`1) Inspect the candidate's answers (question texts + answers). Use question context when available.`);
-        promptLines.push(`2) Use the following technical inputs exactly where available: perQuestion, perCategory, bias (0..100), genelSkor (0..100), genelLabel.`);
-        promptLines.push(`3) Respect the canonical math used by the product: score100 = ((avg5 - 1) / 4) * 100. When you reference scores, mention that formula briefly if you convert or interpret values.`);
-        promptLines.push(`4) Produce the output in Turkish and in this structure (plain text):`);
-        promptLines.push(`- Kısa Özet (3-4 cümle): profession-level summary of candidate performance.`);
-        promptLines.push(`- En Güçlü 3 Yetkinlik (category name — score100): list top 3 with brief justification based on answers and expertScores/perQuestion evidence.`);
-        promptLines.push(`- En Zayıf 3 Yetkinlik (category name — score100): list bottom 3 with practical reasons and what the evidence shows.`);
-        promptLines.push(`- Gelişim Önerileri (3 somut adım): each step should be actionable, time-bound where possible.`);
-        promptLines.push(`- Adaya Yönelik Kısa Not (1 paragraf): friendly, motivating, 2-3 cümle.`);
-        promptLines.push(`5) Where you base a judgement on expertScores or perQuestion averages, briefly state which input you used (e.g., "kaynak: perCategory['X'].score100=" or "perQuestion[2].avg5=").`);
-        promptLines.push(`6) Keep output concise (max ~350-500 words). Use Turkish.`);
-
-        // Attach candidate metadata and data dumps (JSON) to the prompt for model to inspect
-        promptLines.push(`\n--- CANDIDATE METADATA ---`);
-        promptLines.push(JSON.stringify({ rumuz: candidate.rumuz, tip: candidate.tip, baslik: candidate.baslik, timestamp: candidate.timestamp || null }, null, 2));
-        promptLines.push(`\n--- TECHNICAL INPUTS (use these fields when justifying) ---`);
-        promptLines.push(JSON.stringify(technicalInputs, null, 2));
-        promptLines.push(`\n--- QUESTIONS & ANSWERS (use question text when available) ---`);
-        // List QA pairs compactly
-        qaPairs.forEach(q => {
-            promptLines.push(`${q.index+1}. Q: ${q.question} \n   A: ${q.answer} \n   type: ${q.type}${q.expertScores? ('\n   expertScores: '+ JSON.stringify(q.expertScores)) : ''}${q.target?('\n   target: '+q.target):''}`);
-        });
-
-        const finalPrompt = promptLines.join('\n');
-
-        // UX: disable potential duplicate calls by setting a global flag
-        if (requestCandidateNLGDetailed._running) throw new Error('Zaten bir NLG isteği oluşturuluyor, lütfen bekleyin.');
-        requestCandidateNLGDetailed._running = true;
-        try {
-            // call the function (expecting callGeminiHttp-like endpoint that accepts { prompt })
-            const resp = await fetch(fnUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-apx-secret': secret },
-                body: JSON.stringify({ prompt: finalPrompt })
-            });
-            if (!resp.ok) {
-                const txt = await resp.text();
-                throw new Error('Fonksiyon hatası: ' + txt);
-            }
-            const json = await resp.json();
-            // Response shape could be { result } or raw string
-            const text = (json && json.result) ? json.result : (typeof json === 'string' ? json : JSON.stringify(json));
-            return { ok: true, text };
-        } catch(err) {
-            console.error('requestCandidateNLGDetailed failed', err);
-            throw err;
-        } finally {
-            requestCandidateNLGDetailed._running = false;
-        }
+        return Promise.reject(new Error('Yapay zeka özeti özelliği devre dışı bırakıldı.'));
     }
     // Yönetici panelindeki 'Kullanıcıları Yönet' butonunu bağla
     const manageUsersBtnElm = document.getElementById('manageUsersBtn');
@@ -3449,7 +3312,6 @@ function showCandidateDetail(candidate) {
                 console.warn('Modal taşıma sırasında hata:', e);
             }
     });
-    }
     </script>
 </body>
 </html>
