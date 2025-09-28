@@ -1085,14 +1085,14 @@
     const candidatesRef = ref(db, 'candidates');
     onValue(candidatesRef, (snapshot) => {
       const data = snapshot.val() || {};
-                        const arr = Object.values(data);
-                        // keep a simple client cache on window for older code
-                        window.candidates = arr.map(x => ({rumuz: x.rumuz, password: x.password, tip: x.tip, baslik: x.baslik, cevaplar: x.cevaplar||[], skorlar: x.skorlar||{}}));
-                        callback(arr);
+      const arr = Object.values(data);
+      // HR için kendi adaylarını filtrele, admin tümünü görür
+      const filtered = window.currentHR && window.currentHR !== 'admin' ? arr.filter(c => c.createdBy === window.currentHR) : arr;
+      // keep a simple client cache on window for older code
+      window.candidates = filtered.map(x => ({rumuz: x.rumuz, password: x.password, tip: x.tip, baslik: x.baslik, cevaplar: x.cevaplar||[], skorlar: x.skorlar||{}}));
+      callback(filtered);
     });
-  };
-
-    // HR kullanıcı yönetimi helper'ları
+  };    // HR kullanıcı yönetimi helper'ları
     window.addHRUser = async function(user) {
         // user: {username, fullName, phone, email, password, active, company, role}
         if (!user || !user.username) throw new Error('username required');
@@ -1576,6 +1576,9 @@
                 // Başarılı giriş
                 const ikPanelEl = document.getElementById('ikPanel');
                 if (ikPanelEl) ikPanelEl.classList.remove('hidden');
+                // Admin panelini gizle
+                const adminPanelEl = document.getElementById('adminPanel');
+                if (adminPanelEl) adminPanelEl.classList.add('hidden');
                 try { window.currentHR = email.split('@')[0]; } catch(e) { window.currentHR = 'hr_unknown'; }
             } catch (err) {
                 console.error(err);
@@ -2843,6 +2846,9 @@
                     }
                     const panelNow = document.getElementById('adminPanel');
                     if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                    // İK panelini gizle
+                    const ikPanelNow = document.getElementById('ikPanel');
+                    if (ikPanelNow) ikPanelNow.classList.add('hidden');
                     const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
                     return;
                 } catch(firebaseErr) {
@@ -2856,6 +2862,9 @@
                         }
                         const panelNow = document.getElementById('adminPanel');
                         if (panelNow) { panelNow.classList.remove('hidden'); panelNow.style.display = 'block'; }
+                        // İK panelini gizle
+                        const ikPanelNow = document.getElementById('ikPanel');
+                        if (ikPanelNow) ikPanelNow.classList.add('hidden');
                         const btn = document.getElementById('manageUsersBtn'); if (btn) btn.focus();
                         return;
                     }
