@@ -1423,8 +1423,10 @@
                         createdAt: Date.now(),
                         authCreated: createdAuth
                     });
+                    console.log('HR user saved to DB:', username, password);  // Debug log
                 } catch(writeErr) {
-                    console.warn('HR DB write failed — queuing registration locally', writeErr);
+                    console.warn('HR DB write failed', writeErr);
+                    alert('DB yazma hatası: ' + (writeErr.message || writeErr));  // Alert ekle
                     try {
                         const QK = 'apx_pending_hr_registrations';
                         const raw = localStorage.getItem(QK);
