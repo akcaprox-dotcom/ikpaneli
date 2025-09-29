@@ -781,6 +781,15 @@
         let candidates = [];
         let testResults = [];
 
+        // Firebase'den adayları çek
+        function fetchCandidates(callback) {
+            db.ref('candidates').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                candidates = Object.values(val);
+                if (callback) callback();
+            });
+        }
+
         // Firebase'den İK yöneticilerini çek
         function fetchHrManagers(callback) {
             db.ref('hrManagers').once('value').then(snapshot => {
@@ -2340,6 +2349,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Kategori seçicileri başlat
             setupCategorySelectors();
+            // Adayları çek
+            fetchCandidates();
         });
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'986a6c4e22a4e321',t:'MTc1OTEzNzgyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
