@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <!-- Firebase SDK'ları -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script>
-        // Firebase config bilgilerinizi buraya girin
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-    </script>
+        <!-- Firebase SDK'ları -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+        <script>
+            const firebaseConfig = {
+                apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
+                authDomain: "ikpaneli.firebaseapp.com",
+                databaseURL: "https://ikpaneli-default-rtdb.europe-west1.firebasedatabase.app",
+                projectId: "ikpaneli",
+                storageBucket: "ikpaneli.firebasestorage.app",
+                messagingSenderId: "645340845423",
+                appId: "1:645340845423:web:435b57f7093782422e449a",
+                measurementId: "G-6NBTKSBVYL"
+            };
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+        </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İK Test Paneli</title>
