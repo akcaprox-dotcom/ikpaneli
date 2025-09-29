@@ -1,8 +1,9 @@
-    <!-- Chat Bot Widget -->
-    <!-- Jotform Chat Bot Widget -->
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <!-- Firebase SDK'ları -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script>
         // Firebase config bilgilerinizi buraya girin
         const firebaseConfig = {
@@ -17,9 +18,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
     </script>
-    <!-- Firebase SDK'ları -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İK Test Paneli</title>
