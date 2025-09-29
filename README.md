@@ -2242,13 +2242,29 @@
                 <div class="space-y-4">
                     ${questions.map((question, index) => {
                         const userAnswer = candidate.answers && candidate.answers[index] !== undefined ? candidate.answers[index] : null;
-                        const userAnswerText = userAnswer !== null ? (question.secenekler || question.options)[userAnswer] : 'Cevaplanmadı';
-                        
+                        let userAnswerText = 'Cevaplanmadı';
+                        let puanText = 'N/A';
+                        if (typeof question === 'string') {
+                            // Varsayılan 5'li Likert
+                            const options = ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"];
+                            userAnswerText = userAnswer !== null ? options[userAnswer] : 'Cevaplanmadı';
+                            // Puanı hesapla (varsayılan: 5 doğru, 1 yanlış, 3 nötr)
+                            if (userAnswer !== null) {
+                                if (userAnswer === 4) puanText = '1';
+                                else if (userAnswer === 3) puanText = '0.75';
+                                else if (userAnswer === 2) puanText = '0.5';
+                                else if (userAnswer === 1) puanText = '0.25';
+                                else puanText = '0';
+                            }
+                        } else {
+                            userAnswerText = userAnswer !== null ? (question.secenekler || question.options)[userAnswer] : 'Cevaplanmadı';
+                            puanText = userAnswer !== null && question.puanlar ? question.puanlar[userAnswer] : 'N/A';
+                        }
                         return `
                             <div class="border border-gray-200 rounded-lg p-4">
-                                <h4 class="font-semibold text-gray-800 mb-2">Soru ${index + 1}: ${question.soru || question.question}</h4>
+                                <h4 class="font-semibold text-gray-800 mb-2">Soru ${index + 1}: ${question.soru || question.question || question}</h4>
                                 <p class="text-gray-600 mb-2">Verilen Cevap: <span class="font-semibold text-blue-600">${userAnswerText}</span></p>
-                                <p class="text-gray-600">Puan: <span class="font-semibold text-green-600">${userAnswer !== null ? question.puanlar[userAnswer] : 'N/A'}</span></p>
+                                <p class="text-gray-600">Puan: <span class="font-semibold text-green-600">${puanText}</span></p>
                             </div>
                         `;
                     }).join('')}
@@ -2275,7 +2291,17 @@
                 return;
             }
             
-            const totalPossible = questions.reduce((sum, q) => sum + Math.max(...q.puanlar), 0);
+            // String sorular için varsayılan puanlar
+            let totalPossible = 0;
+            questions.forEach(q => {
+                if (typeof q === 'string') {
+                    totalPossible += 1; // max puan 1
+                } else if (q.puanlar) {
+                    totalPossible += Math.max(...q.puanlar);
+                } else {
+                    totalPossible += 1;
+                }
+            });
             const score = candidate.score || 0;
             const percentage = totalPossible > 0 ? Math.round((score / totalPossible) * 100) : 0;
             
