@@ -2,6 +2,14 @@
 <html lang="tr">
 <head>
     <script>
+    function showMethodology() {
+        document.getElementById('methodologyModal').classList.remove('hidden');
+    }
+    function closeMethodology() {
+        document.getElementById('methodologyModal').classList.add('hidden');
+    }
+    </script>
+    <script>
     function showDisclaimer() {
         document.getElementById('disclaimerModal').classList.remove('hidden');
     }
