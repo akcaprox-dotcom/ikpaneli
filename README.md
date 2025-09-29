@@ -2277,30 +2277,63 @@
         // İK Kayıt formu işleme
         document.getElementById('hrRegisterForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            
-            const newHrManager = {
-                id: Date.now().toString(),
-                organization: document.getElementById('regOrganization').value,
-                name: document.getElementById('regName').value,
-                phone: document.getElementById('regPhone').value,
-                email: document.getElementById('regEmail').value,
-                position: document.getElementById('regPosition').value,
-                password: document.getElementById('regPassword').value,
-                status: 'active',
-                createdAt: new Date().toISOString()
-            };
-            
-            // E-posta kontrolü
-            const existingHr = hrManagers.find(hr => hr.email === newHrManager.email);
-            if (existingHr) {
-                alert('Bu e-posta adresi zaten kayıtlı!');
-                return;
+            try {
+                // Zorunlu alan kontrolü
+                const org = document.getElementById('regOrganization').value.trim();
+                const name = document.getElementById('regName').value.trim();
+                const phone = document.getElementById('regPhone').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const position = document.getElementById('regPosition').value.trim();
+                const password = document.getElementById('regPassword').value.trim();
+                if (!org || !name || !phone || !email || !position || !password) {
+                    alert('Lütfen tüm alanları doldurun.');
+                    return;
+                }
+                // E-posta format kontrolü
+                if (!/^\S+@\S+\.\S+$/.test(email)) {
+                    alert('Geçerli bir e-posta adresi girin.');
+                    return;
+                }
+                const newHrManager = {
+                    id: Date.now().toString(),
+                    organization: org,
+                    name: name,
+                    phone: phone,
+                    email: email,
+                    position: position,
+                    password: password,
+                    status: 'active',
+                    createdAt: new Date().toISOString()
+                };
+                console.log('Yeni İK yöneticisi kaydı:', newHrManager);
+                if (typeof hrManagers === 'undefined') {
+                    alert('hrManagers dizisi tanımlı değil!');
+                    console.error('hrManagers undefined');
+                    return;
+                }
+                // E-posta tekrar kontrolü
+                const existingHr = hrManagers.find(hr => hr.email === newHrManager.email);
+                if (existingHr) {
+                    alert('Bu e-posta adresi zaten kayıtlı!');
+                    return;
+                }
+                if (typeof addHrManager !== 'function') {
+                    alert('addHrManager fonksiyonu tanımlı değil!');
+                    console.error('addHrManager undefined');
+                    return;
+                }
+                addHrManager(newHrManager);
+                // Kayıt sonrası yöneticiler listesini güncelle
+                if (typeof fetchHrManagers === 'function') {
+                    fetchHrManagers();
+                }
+                alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+                backToRoleLogin();
+                this.reset();
+            } catch (err) {
+                alert('Kayıt sırasında bir hata oluştu! Detay için konsola bakın.');
+                console.error('Kayıt hatası:', err);
             }
-            
-            addHrManager(newHrManager);
-            alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
-            backToRoleLogin();
-            this.reset();
         });
 
         // Sayfa yüklendiğinde
