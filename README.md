@@ -2,6 +2,9 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <!-- Firebase SDK'ları -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İK Test Paneli</title>
@@ -725,6 +728,8 @@
     </div>
 
     <script>
+                // Firebase başlatma
+                                // ...firebaseConfig ve db tanımı en başta var, tekrar etmeye gerek yok...
         // Ters ifadeler için cevap puanına göre anlam/yorum tablosu
         const tersYorumTablosu = {
             1: "Çok olumsuz davranış",
@@ -763,9 +768,30 @@
         };
 
         // Örnek veri yapıları (Firebase'e geçiş için hazır)
-        let hrManagers = JSON.parse(localStorage.getItem('hrManagers')) || [];
-        let candidates = JSON.parse(localStorage.getItem('candidates')) || [];
-        let testResults = JSON.parse(localStorage.getItem('testResults')) || [];
+        let hrManagers = [];
+        let candidates = [];
+        let testResults = [];
+
+        // Firebase'den İK yöneticilerini çek
+        function fetchHrManagers(callback) {
+            db.ref('hrManagers').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                hrManagers = Object.values(val);
+                if (callback) callback();
+            });
+        }
+
+        // Firebase'e yeni İK yöneticisi ekle
+        function addHrManager(hrObj) {
+            const newRef = db.ref('hrManagers').push();
+            hrObj.id = newRef.key;
+            newRef.set(hrObj);
+        }
+
+        // Firebase'den İK yöneticisi sil
+        function deleteHrManager(hrId) {
+            db.ref('hrManagers/' + hrId).remove();
+        }
 
         // Soru bankası (örnek format, 5 ana gruptan 100'er soru ile doldurulmalı)
         const questionBank = {
@@ -1073,44 +1099,51 @@
 
         // Admin panel fonksiyonları
         function loadAdminData() {
-            document.getElementById('totalHrManagers').textContent = hrManagers.length;
-            document.getElementById('activeUsers').textContent = hrManagers.filter(hr => hr.status === 'active').length;
-            document.getElementById('inactiveUsers').textContent = hrManagers.filter(hr => hr.status === 'inactive').length;
-            
-            const tbody = document.getElementById('hrManagersList');
-            tbody.innerHTML = '';
-            
-            hrManagers.forEach(hr => {
-                const row = document.createElement('tr');
-                row.className = 'border-b hover:bg-gray-50';
-                row.innerHTML = `
-                    <td class="px-4 py-3">${hr.organization}</td>
-                    <td class="px-4 py-3">${hr.name}</td>
-                    <td class="px-4 py-3">${hr.email}</td>
-                    <td class="px-4 py-3">${hr.phone}</td>
-                    <td class="px-4 py-3">${hr.position}</td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 rounded-full text-xs ${hr.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                            ${hr.status === 'active' ? 'Aktif' : 'Pasif'}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <button onclick="toggleHrStatus('${hr.id}')" class="px-3 py-1 rounded text-xs ${hr.status === 'active' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
-                            ${hr.status === 'active' ? 'Pasif Yap' : 'Aktif Yap'}
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
+            db.ref('hrManagers').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                const hrManagers = Object.values(val);
+                document.getElementById('totalHrManagers').textContent = hrManagers.length;
+                document.getElementById('activeUsers').textContent = hrManagers.filter(hr => hr.status === 'active').length;
+                document.getElementById('inactiveUsers').textContent = hrManagers.filter(hr => hr.status === 'inactive').length;
+                const tbody = document.getElementById('hrManagersList');
+                tbody.innerHTML = '';
+                hrManagers.forEach(hr => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${hr.organization}</td>
+                        <td class="px-4 py-3">${hr.name}</td>
+                        <td class="px-4 py-3">${hr.email}</td>
+                        <td class="px-4 py-3">${hr.phone}</td>
+                        <td class="px-4 py-3">${hr.position}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs ${hr.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${hr.status === 'active' ? 'Aktif' : 'Pasif'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <button onclick="toggleHrStatus('${hr.id}')" class="px-3 py-1 rounded text-xs ${hr.status === 'active' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
+                                ${hr.status === 'active' ? 'Pasif Yap' : 'Aktif Yap'}
+                            </button>
+                            <button onclick="deleteHrManager('${hr.id}'); loadAdminData();" class="ml-2 px-3 py-1 rounded text-xs bg-red-500 hover:bg-red-700 text-white">Sil</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
             });
         }
 
         function toggleHrStatus(hrId) {
-            const hr = hrManagers.find(h => h.id === hrId);
-            if (hr) {
-                hr.status = hr.status === 'active' ? 'inactive' : 'active';
-                localStorage.setItem('hrManagers', JSON.stringify(hrManagers));
-                loadAdminData();
-            }
+            // Firebase'den ilgili İK yöneticisini bul ve güncelle
+            db.ref('hrManagers/' + hrId).once('value').then(snapshot => {
+                const hr = snapshot.val();
+                if (hr) {
+                    const newStatus = hr.status === 'active' ? 'inactive' : 'active';
+                    db.ref('hrManagers/' + hrId + '/status').set(newStatus).then(() => {
+                        loadAdminData();
+                    });
+                }
+            });
         }
 
         // İK panel fonksiyonları
@@ -1219,9 +1252,9 @@
                 answers: [],
                 score: 0
             };
-            
-            candidates.push(newCandidate);
-            localStorage.setItem('candidates', JSON.stringify(candidates));
+            // Firebase'e kaydet
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
             
             alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
             this.reset();
@@ -1260,9 +1293,9 @@
                 answers: [],
                 score: 0
             };
-            
-            candidates.push(newCandidate);
-            localStorage.setItem('candidates', JSON.stringify(candidates));
+            // Firebase'e kaydet
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
             
             alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
             this.reset();
@@ -1277,71 +1310,51 @@
         function loadCandidatesList() {
             const tbody = document.getElementById('candidatesList');
             tbody.innerHTML = '';
-            
-            const userCandidates = candidates.filter(c => c.createdBy === currentUser.id);
-            
-            userCandidates.forEach(candidate => {
-                const categoryNames = {
-                    manufacturing_blue: 'İmalat - Mavi Yaka',
-                    manufacturing_white: 'İmalat - Beyaz Yaka',
-                    manufacturing_manager: 'İmalat - Yönetici',
-                    service_personnel: 'Hizmet - Personel',
-                    service_admin: 'Hizmet - İdari Yönetici'
-                };
-                const row = document.createElement('tr');
-                row.className = 'border-b hover:bg-gray-50';
-                row.innerHTML = `
-                    <td class="px-4 py-3">${candidate.alias}</td>
-                    <td class="px-4 py-3">${categoryNames[candidate.category]}</td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 rounded-full text-xs ${candidate.testCompleted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
-                            ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">${new Date(candidate.createdAt).toLocaleDateString('tr-TR')}</td>
-                    <td class="px-4 py-3 flex gap-2">
-                        <button onclick="viewCandidateDetails('${candidate.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
-                            Detay
-                        </button>
-                        <button onclick="deleteCandidate('${candidate.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">
-                            Sil
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
+            db.ref('candidates').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                // Sadece mevcut kullanıcının eklediği adaylar
+                const userCandidates = Object.values(val).filter(c => c.createdBy === currentUser.id);
+                userCandidates.forEach(candidate => {
+                    const categoryNames = {
+                        manufacturing_blue: 'İmalat - Mavi Yaka',
+                        manufacturing_white: 'İmalat - Beyaz Yaka',
+                        manufacturing_manager: 'İmalat - Yönetici',
+                        service_personnel: 'Hizmet - Personel',
+                        service_admin: 'Hizmet - İdari Yönetici'
+                    };
+                    const row = document.createElement('tr');
+                    row.className = 'border-b hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${candidate.alias}</td>
+                        <td class="px-4 py-3">${categoryNames[candidate.category]}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs ${candidate.testCompleted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
+                                ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">${new Date(candidate.createdAt).toLocaleDateString('tr-TR')}</td>
+                        <td class="px-4 py-3 flex gap-2">
+                            <button onclick="viewCandidateDetails('${candidate.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
+                                Detay
+                            </button>
+                            <button onclick="deleteCandidateFirebase('${candidate.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">
+                                Sil
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
             });
         }
 
         function viewCandidateDetails(candidateId) {
-// Aday silme fonksiyonu (global scope)
-function deleteCandidate(candidateId) {
-// HTML'den erişim için global scope'a ekle
-window.deleteCandidate = deleteCandidate;
-    if (!confirm('Bu adayı silmek istediğinize emin misiniz?')) return;
-    if (!currentUser) {
-        alert('Kullanıcı oturumu bulunamadı.');
-        return;
-    }
-    // Admin veya İK ise tüm adayları silebilir, diğerleri sadece kendi eklediklerini silebilir
-    let idx = -1;
-    if (currentUser.role === 'admin' || currentUser.role === 'hr') {
-        idx = candidates.findIndex(c => c.id === candidateId);
-    } else {
-        idx = candidates.findIndex(c => c.id === candidateId && c.createdBy === currentUser.id);
-    }
-    if (idx !== -1) {
-        candidates.splice(idx, 1);
-        localStorage.setItem('candidates', JSON.stringify(candidates));
-        loadCandidatesList();
-        alert('Aday başarıyla silindi.');
-    } else {
-        alert('Aday bulunamadı veya silme yetkiniz yok.');
-    }
-}
-            const candidate = candidates.find(c => c.id === candidateId);
-            if (candidate) {
-                alert(`Aday: ${candidate.alias}\nKategori: ${candidate.category}\nTest Durumu: ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}\nPuan: ${candidate.score}`);
-            }
+            db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
+                const val = snapshot.val();
+                if (val) {
+                    const candidate = Object.values(val)[0];
+                    alert(`Aday: ${candidate.alias}\nKategori: ${candidate.category}\nTest Durumu: ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}\nPuan: ${candidate.score}`);
+                }
+            });
         }
 
         // Test fonksiyonları
@@ -1642,7 +1655,6 @@ window.deleteCandidate = deleteCandidate;
             const candidateIndex = candidates.findIndex(c => c.id === currentUser.id);
             if (candidateIndex !== -1) {
                 candidates[candidateIndex] = currentUser;
-                localStorage.setItem('candidates', JSON.stringify(candidates));
             }
             
             // Test sonucu ekranını göster
@@ -2277,7 +2289,6 @@ window.deleteCandidate = deleteCandidate;
             }
             
             hrManagers.push(newHrManager);
-            localStorage.setItem('hrManagers', JSON.stringify(hrManagers));
             
             alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
             backToRoleLogin();
