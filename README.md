@@ -1,4 +1,6 @@
-    <script src='https://cdn.jotfor.ms/agent/embedjs/01999073f09e7be790118df82931922c1ccf/embed.js'></script>
+    <!-- Chat Bot Widget -->
+    <!-- Jotform Chat Bot Widget -->
+    <script src="https://cdn.jotfor.ms/agent/embedjs/01999073f09e7be790118df82931922c1ccf/embed.js"></script>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -2288,8 +2290,7 @@
                 return;
             }
             
-            hrManagers.push(newHrManager);
-            
+            addHrManager(newHrManager);
             alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
             backToRoleLogin();
             this.reset();
