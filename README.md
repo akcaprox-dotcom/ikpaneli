@@ -1,9 +1,22 @@
     <!-- Chat Bot Widget -->
     <!-- Jotform Chat Bot Widget -->
-    <script src="https://cdn.jotfor.ms/agent/embedjs/01999073f09e7be790118df82931922c1ccf/embed.js"></script>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script>
+        // Firebase config bilgilerinizi buraya girin
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+    </script>
     <!-- Firebase SDK'ları -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -765,10 +778,6 @@
         let disclaimerAccepted = false;
 
         // Firebase bağlantısı için hazır yapı (sonradan eklenecek)
-        const firebaseConfig = {
-            // Firebase config buraya gelecek
-        };
-
         // Örnek veri yapıları (Firebase'e geçiş için hazır)
         let hrManagers = [];
         let candidates = [];
