@@ -1007,6 +1007,8 @@
         function backToMain() {
             document.getElementById('roleLoginScreen').classList.add('hidden');
             document.getElementById('loginScreen').classList.remove('hidden');
+            // İK yöneticilerini güncel çek
+            fetchHrManagers();
             currentRole = null;
         }
 
@@ -1051,7 +1053,6 @@
             if (currentRole === 'candidate') {
                 const alias = document.getElementById('candidateAlias').value;
                 const password = document.getElementById('candidatePassword').value;
-                
                 const candidate = candidates.find(c => c.alias === alias && c.password === password);
                 if (candidate) {
                     currentUser = candidate;
@@ -1060,9 +1061,11 @@
                     alert('Geçersiz rumuz veya şifre!');
                 }
             } else {
-                const email = document.getElementById('adminHrEmail').value;
-                const password = document.getElementById('adminHrPassword').value;
-                
+                const email = document.getElementById('adminHrEmail').value.trim();
+                const password = document.getElementById('adminHrPassword').value.trim();
+                console.log('Girişte girilen e-posta:', email);
+                console.log('Girişte girilen şifre:', password);
+                console.log('hrManagers dizisi:', hrManagers);
                 if (currentRole === 'admin') {
                     // Admin giriş kontrolü (demo için basit kontrol)
                     if (email === 'akcaprox@gmail.com' && password === 'Ba030714') {
@@ -2349,8 +2352,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Kategori seçicileri başlat
             setupCategorySelectors();
-            // Adayları çek
+            // Adayları ve İK yöneticilerini çek
             fetchCandidates();
+            fetchHrManagers();
         });
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'986a6c4e22a4e321',t:'MTc1OTEzNzgyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
