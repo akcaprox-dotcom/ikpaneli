@@ -261,6 +261,21 @@
             
             <div class="bg-white rounded-xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">İK Yöneticileri</h3>
+                <!-- Tarih aralığı filtre alanı -->
+                <div class="flex flex-col md:flex-row md:items-end gap-4 mb-4">
+                    <div>
+                        <label for="adminFilterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="adminFilterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="adminFilterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                        <input type="date" id="adminFilterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <button id="adminFilterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                        <button id="adminClearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
+                    </div>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full table-auto">
                         <thead>
@@ -302,6 +317,21 @@
 
         <!-- İK Dashboard -->
         <div id="hrDashboard" class="max-w-7xl mx-auto p-6">
+            <!-- Tarih aralığı filtre alanı -->
+            <div class="flex flex-col md:flex-row md:items-end gap-4 mb-6">
+                <div>
+                    <label for="filterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                    <input type="date" id="filterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="filterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                    <input type="date" id="filterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <button id="filterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                    <button id="clearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
+                </div>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-2">Toplam Aday</h3>
@@ -466,6 +496,21 @@
             
             <div class="bg-white rounded-xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Adaylar Listesi</h3>
+                <!-- Tarih aralığı filtre alanı -->
+                <div class="flex flex-col md:flex-row md:items-end gap-4 mb-4">
+                    <div>
+                        <label for="candidatesFilterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="candidatesFilterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="candidatesFilterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                        <input type="date" id="candidatesFilterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <button id="candidatesFilterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                        <button id="candidatesClearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
+                    </div>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full table-auto">
                         <thead>
@@ -1593,10 +1638,12 @@
         }
 
         // Admin panel fonksiyonları
-        function loadAdminData() {
+        function loadAdminData(filteredList) {
             db.ref('hrManagers').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
-                const hrManagers = Object.values(val);
+                let hrManagers = Array.isArray(filteredList)
+                    ? filteredList
+                    : Object.values(val);
                 document.getElementById('totalHrManagers').textContent = hrManagers.length;
                 document.getElementById('activeUsers').textContent = hrManagers.filter(hr => hr.status === 'active').length;
                 document.getElementById('inactiveUsers').textContent = hrManagers.filter(hr => hr.status === 'inactive').length;
@@ -1627,6 +1674,38 @@
                 });
             });
         }
+// Admin paneli tarih filtreleme eventleri
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('adminFilterStartDate');
+    const endInput = document.getElementById('adminFilterEndDate');
+    const filterBtn = document.getElementById('adminFilterDateBtn');
+    const clearBtn = document.getElementById('adminClearDateBtn');
+    if (filterBtn && startInput && endInput) {
+        filterBtn.addEventListener('click', function() {
+            const start = startInput.value ? new Date(startInput.value) : null;
+            const end = endInput.value ? new Date(endInput.value) : null;
+            db.ref('hrManagers').once('value').then(snapshot => {
+                let hrManagers = Object.values(snapshot.val() || {});
+                if (start) {
+                    hrManagers = hrManagers.filter(hr => hr.createdAt && new Date(hr.createdAt) >= start);
+                }
+                if (end) {
+                    const endOfDay = new Date(end);
+                    endOfDay.setHours(23,59,59,999);
+                    hrManagers = hrManagers.filter(hr => hr.createdAt && new Date(hr.createdAt) <= endOfDay);
+                }
+                loadAdminData(hrManagers);
+            });
+        });
+    }
+    if (clearBtn && startInput && endInput) {
+        clearBtn.addEventListener('click', function() {
+            startInput.value = '';
+            endInput.value = '';
+            loadAdminData();
+        });
+    }
+});
 
         function toggleHrStatus(hrId) {
             // Firebase'den ilgili İK yöneticisini bul ve güncelle
@@ -1660,22 +1739,55 @@
             }
         }
 
-        function loadHrDashboard() {
-            const userCandidates = candidates.filter(c => c.createdBy === currentUser.id);
+        function loadHrDashboard(filteredList) {
+            // Eğer filtreli liste verilmişse onu kullan, yoksa tüm adayları kullan
+            const userCandidates = Array.isArray(filteredList)
+                ? filteredList
+                : candidates.filter(c => c.createdBy === currentUser.id);
             const completedTests = userCandidates.filter(c => c.testCompleted).length;
             const pendingTests = userCandidates.filter(c => !c.testCompleted).length;
-            
             // Ortalama puan hesaplama
             const completedCandidates = userCandidates.filter(c => c.testCompleted && c.score);
             const averageScore = completedCandidates.length > 0 
                 ? Math.round(completedCandidates.reduce((sum, c) => sum + c.score, 0) / completedCandidates.length)
                 : 0;
-            
             document.getElementById('totalCandidates').textContent = userCandidates.length;
             document.getElementById('completedTests').textContent = completedTests;
             document.getElementById('pendingTests').textContent = pendingTests;
             document.getElementById('averageScore').textContent = averageScore;
         }
+
+        // Dashboard tarih filtreleme eventleri
+        document.addEventListener('DOMContentLoaded', function() {
+            const startInput = document.getElementById('filterStartDate');
+            const endInput = document.getElementById('filterEndDate');
+            const filterBtn = document.getElementById('filterDateBtn');
+            const clearBtn = document.getElementById('clearDateBtn');
+            if (filterBtn && startInput && endInput) {
+                filterBtn.addEventListener('click', function() {
+                    const start = startInput.value ? new Date(startInput.value) : null;
+                    const end = endInput.value ? new Date(endInput.value) : null;
+                    let filtered = candidates.filter(c => c.createdBy === currentUser.id);
+                    if (start) {
+                        filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) >= start);
+                    }
+                    if (end) {
+                        // Bitiş gününü de dahil et
+                        const endOfDay = new Date(end);
+                        endOfDay.setHours(23,59,59,999);
+                        filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) <= endOfDay);
+                    }
+                    loadHrDashboard(filtered);
+                });
+            }
+            if (clearBtn && startInput && endInput) {
+                clearBtn.addEventListener('click', function() {
+                    startInput.value = '';
+                    endInput.value = '';
+                    loadHrDashboard();
+                });
+            }
+        });
 
         // Kategori seçim fonksiyonları
         function setupCategorySelectors() {
@@ -1802,13 +1914,15 @@
             loadCandidatesList();
         });
 
-        function loadCandidatesList() {
+        function loadCandidatesList(filteredList) {
             const tbody = document.getElementById('candidatesList');
             tbody.innerHTML = '';
             db.ref('candidates').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
                 // Sadece mevcut kullanıcının eklediği adaylar
-                const userCandidates = Object.values(val).filter(c => c.createdBy === currentUser.id);
+                let userCandidates = Array.isArray(filteredList)
+                    ? filteredList
+                    : Object.values(val).filter(c => c.createdBy === currentUser.id);
                 userCandidates.forEach(candidate => {
                     const categoryNames = {
                         manufacturing_blue: 'İmalat - Mavi Yaka',
@@ -1842,16 +1956,64 @@
                 });
             });
         }
+// Adaylar sekmesi tarih filtreleme eventleri
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('candidatesFilterStartDate');
+    const endInput = document.getElementById('candidatesFilterEndDate');
+    const filterBtn = document.getElementById('candidatesFilterDateBtn');
+    const clearBtn = document.getElementById('candidatesClearDateBtn');
+    if (filterBtn && startInput && endInput) {
+        filterBtn.addEventListener('click', function() {
+            const start = startInput.value ? new Date(startInput.value) : null;
+            const end = endInput.value ? new Date(endInput.value) : null;
+            let filtered = candidates.filter(c => c.createdBy === currentUser.id);
+            if (start) {
+                filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) >= start);
+            }
+            if (end) {
+                // Bitiş gününü de dahil et
+                const endOfDay = new Date(end);
+                endOfDay.setHours(23,59,59,999);
+                filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) <= endOfDay);
+            }
+            loadCandidatesList(filtered);
+        });
+    }
+    if (clearBtn && startInput && endInput) {
+        clearBtn.addEventListener('click', function() {
+            startInput.value = '';
+            endInput.value = '';
+            loadCandidatesList();
+        });
+    }
+});
 
-        function viewCandidateDetails(candidateId) {
-            db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
-                const val = snapshot.val();
-                if (val) {
-                    const candidate = Object.values(val)[0];
-                    alert(`Aday: ${candidate.alias}\nKategori: ${candidate.category}\nTest Durumu: ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}\nPuan: ${candidate.score}`);
-                }
-            });
-        }
+    function viewCandidateDetails(candidateId) {
+        db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
+            const val = snapshot.val();
+            if (val) {
+                const candidate = Object.values(val)[0];
+                alert(`Aday: ${candidate.alias}\nKategori: ${candidate.category}\nTest Durumu: ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}\nPuan: ${candidate.score}`);
+            }
+        });
+    }
+
+    // Aday silme fonksiyonu (Firebase'den siler ve tabloyu günceller) - GLOBAL SCOPE
+    function deleteCandidateFirebase(candidateId) {
+        if (!confirm('Bu adayı silmek istediğinize emin misiniz?')) return;
+        db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
+            const val = snapshot.val();
+            if (val) {
+                const key = Object.keys(val)[0];
+                db.ref('candidates/' + key).remove().then(() => {
+                    alert('Aday başarıyla silindi.');
+                    loadCandidatesList();
+                });
+            } else {
+                alert('Aday bulunamadı!');
+            }
+        });
+    }
 
         // Test fonksiyonları
         function startTest() {
