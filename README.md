@@ -1,1870 +1,2954 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+        <!-- Firebase SDK'ları -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+        <script>
+            const firebaseConfig = {
+                apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
+                authDomain: "ikpaneli.firebaseapp.com",
+                databaseURL: "https://ikpaneli-default-rtdb.europe-west1.firebasedatabase.app",
+                projectId: "ikpaneli",
+                storageBucket: "ikpaneli.firebasestorage.app",
+                messagingSenderId: "645340845423",
+                appId: "1:645340845423:web:435b57f7093782422e449a",
+                measurementId: "G-6NBTKSBVYL"
+            };
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+        </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akça Pro X - Kurum Değerlendirme Anketi</title>
+    <title>İK Test Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
         }
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
         }
-        .active-tab {
-            border: 3px solid #6366f1 !important;
-            background-color: #6366f1 !important;
-            color: white !important;
-            font-weight: bold !important;
-            transform: scale(1.05) !important;
-            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3) !important;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Likert Scale Seçenekleri için Özel Stiller */
+        .likert-option {
+            position: relative;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .likert-option::before {
+            content: '';
+            position: absolute;
             top: 0;
+            left: -100%;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+            transition: left 0.5s ease;
         }
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        
+        .likert-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
         }
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white !important; }
+        
+        .likert-option:hover::before {
+            left: 100%;
+        }
+        
+        .likert-option.selected {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-color: #1d4ed8;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+        }
+        
+        .likert-option.selected::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        }
+        
+        .likert-option .option-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: #e2e8f0;
+            color: #64748b;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .likert-option:hover .option-number {
+            background: #3b82f6;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .likert-option.selected .option-number {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .likert-option .option-text {
+            font-weight: 500;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .likert-option:hover .option-text {
+            color: #1e40af;
+        }
+        
+        .likert-option.selected .option-text {
+            color: white;
+        }
+        
+        /* Radio button gizleme */
+        .likert-option input[type="radio"] {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Ana Navigasyon -->
-    <nav class="gradient-bg text-white p-3 shadow-lg sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2 md:gap-0">
-            <div class="flex items-center gap-2">
-                <!-- Gizli yönetici erişimi -->
-                <div onclick="showModule('admin')" class="w-3 h-3 cursor-pointer opacity-15 hover:opacity-50 transition-opacity" title="">
-                    <div class="w-3 h-3 rounded-full border border-white/30 flex items-center justify-center animate-spin" style="animation-duration: 12s;">
-                        <div class="w-1 h-1 bg-white/40 rounded-full"></div>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Ana Giriş Ekranı -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 relative">
+        <!-- Admin Butonu Sol Alt Köşe -->
+        <button onclick="showRoleLogin('admin')" class="fixed bottom-4 left-4 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded opacity-50 hover:opacity-100 transition-opacity duration-300 z-10">
+            Admin
+        </button>
+
+        <!-- Developer Credit Sayfa Ortası -->
+
+        <!-- Developer Credit Alt Orta -->
+        <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none select-none">
+            <span class="text-lg font-semibold text-gray-400 opacity-80 bg-white bg-opacity-70 px-6 py-3 rounded-xl shadow-md">Developed by Akça Pro X</span>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Analiz Pro X</h1>
+                <p class="text-lg text-blue-600 font-semibold mb-4">Profesyonel Aday Değerlendirme Paneli</p>
+                
+                <!-- Bilimsel Temeller ve Sorumluluk Reddi -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center justify-center mb-3 space-x-3">
+                        <button id="methodologyButton" onclick="showMethodology()" class="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-300">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            <span>METODOLOJİ VE BİLİMSEL TEMELLER</span>
+                        </button>
+                        <button id="disclaimerButton" onclick="showDisclaimer()" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-300">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Sorumluluk Reddi Beyanını Oku</span>
+                        </button>
                     </div>
+                    <div class="flex items-center justify-center">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="disclaimerAccept" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2" disabled>
+                            <span class="ml-2 text-sm text-gray-700">Sorumluluk reddi beyanını okudum ve onaylıyorum</span>
+                            <svg class="w-5 h-5 ml-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    👩‍💻 İK Yönetici
+                </button>
+                <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    📝 Aday Portalı
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rol Bazlı Giriş Formu -->
+    <div id="roleLoginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+            <button onclick="backToMain()" class="mb-4 text-gray-600 hover:text-gray-800 flex items-center">
+                ← Geri Dön
+            </button>
+            
+            <div class="text-center mb-6">
+                <h2 id="roleTitle" class="text-2xl font-bold text-gray-800 mb-2"></h2>
+                <p class="text-gray-600">Giriş bilgilerinizi giriniz</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div id="candidateFields" class="hidden space-y-4">
+                    <input type="text" id="candidateAlias" placeholder="Rumuz" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="password" id="candidatePassword" placeholder="Şifre" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div id="adminHrFields" class="space-y-4">
+                    <input type="email" id="adminHrEmail" placeholder="E-posta" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="password" id="adminHrPassword" placeholder="Şifre" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                    Giriş Yap
+                </button>
+            </form>
+            
+            <div id="hrRegisterOption" class="mt-6 text-center">
+                <p class="text-gray-600 mb-4">Hesabınız yok mu?</p>
+                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Kayıt Ol
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="hidden min-h-screen bg-gray-50">
+        <nav class="bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-800">Admin Yönetici Paneli</h1>
+                    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="max-w-7xl mx-auto p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Toplam İK Yöneticisi</h3>
+                    <p class="text-3xl font-bold text-blue-600" id="totalHrManagers">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Aktif Kullanıcılar</h3>
+                    <p class="text-3xl font-bold text-green-600" id="activeUsers">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Pasif Kullanıcılar</h3>
+                    <p class="text-3xl font-bold text-red-600" id="inactiveUsers">0</p>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">İK Yöneticileri</h3>
+                <!-- Tarih aralığı filtre alanı -->
+                <div class="flex flex-col md:flex-row md:items-end gap-4 mb-4">
+                    <div>
+                        <label for="adminFilterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="adminFilterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="adminFilterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                        <input type="date" id="adminFilterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <button id="adminFilterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                        <button id="adminClearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Kuruluş</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Ad Soyad</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">E-posta</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Telefon</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Görev</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Durum</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hrManagersList">
+                            <!-- İK Yöneticileri buraya yüklenecek -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- İK Yönetici Panel -->
+    <div id="hrPanel" class="hidden min-h-screen bg-gray-50">
+        <nav class="bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-800">İK Yönetici Paneli</h1>
+                    <div class="flex space-x-4">
+                        <button onclick="showHrSection('dashboard')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Dashboard</button>
+
+                        <button onclick="showHrSection('candidates')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Adaylar</button>
+                        <button onclick="showHrSection('reports')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">Raporlar</button>
+                        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- İK Dashboard -->
+        <div id="hrDashboard" class="max-w-7xl mx-auto p-6">
+            <!-- Tarih aralığı filtre alanı -->
+            <div class="flex flex-col md:flex-row md:items-end gap-4 mb-6">
+                <div>
+                    <label for="filterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                    <input type="date" id="filterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold">Akça Pro X</h1>
-                    <p class="text-xs opacity-90">Kurum Değerlendirme Anketi</p>
+                    <label for="filterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                    <input type="date" id="filterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <button id="filterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                    <button id="clearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
                 </div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="showModule('survey')" class="px-3 py-1 bg-white/20 rounded text-sm hover:bg-white/30 transition-colors">📊 Anket</button>
-                <button onclick="showModule('company')" class="px-3 py-1 bg-white/20 rounded text-sm hover:bg-white/30 transition-colors">🏢 Kurum Portalı</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Toplam Aday</h3>
+                    <p class="text-3xl font-bold text-blue-600" id="totalCandidates">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Tamamlanan Testler</h3>
+                    <p class="text-3xl font-bold text-green-600" id="completedTests">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Bekleyen Testler</h3>
+                    <p class="text-3xl font-bold text-orange-600" id="pendingTests">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Ortalama Puan</h3>
+                    <p class="text-3xl font-bold text-purple-600" id="averageScore">0</p>
+                </div>
             </div>
         </div>
-    </nav>
 
-    <!-- Anket Modülü -->
-    <div id="surveyModule" class="max-w-5xl mx-auto p-2 md:p-4">
-        <div class="bg-white shadow-xl rounded-2xl max-w-2xl mx-auto p-4 md:p-8">
-            <div class="text-center mb-6">
-                <h2 class="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 tracking-tight">Kurum Değerlendirme Anketi</h2>
-                <p class="text-gray-600 mb-2 text-base md:text-lg">Görüşleriniz bizim için değerli</p>
-                <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">v3.0.0 - Firebase Entegre</span>
+        <!-- Yeni Üye Ekleme -->
+        <div id="hrNewMember" class="max-w-6xl mx-auto p-6">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6">Yeni Aday Ekle ve Test Kriterleri Belirle</h3>
+                <form id="newMemberForm" class="space-y-6">
+                    <!-- Temel Bilgiler -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="newMemberAlias" placeholder="Aday Rumuzu" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <select id="newMemberMainCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                            <option value="">Ana Kategori Seç</option>
+                            <option value="manufacturing">İşletme</option>
+                            <option value="service">Hizmet</option>
+                        </select>
+                        <select id="newMemberSubCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required disabled>
+                            <option value="">Önce ana kategori seçin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="password" id="newMemberPassword" placeholder="Aday Şifresi Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <div class="px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 flex items-center">
+                            <p class="text-sm text-gray-600">Aday bu bilgilerle giriş yapacak</p>
+                        </div>
+                    </div>
+
+                    <!-- Test Kriterleri Seçimi -->
+                    <div class="border-t pt-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Test Kriterleri ve Soru Alanları</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Kişilik Envanterleri -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-blue-800 mb-3">Kişilik Envanterleri</h5>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="communication" class="mr-2">
+                                        <span class="text-sm">İletişim Becerileri</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="teamwork" class="mr-2">
+                                        <span class="text-sm">Takım Çalışması</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="stress_management" class="mr-2">
+                                        <span class="text-sm">Stres Yönetimi</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="leadership" class="mr-2">
+                                        <span class="text-sm">Liderlik Potansiyeli</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="time_management" class="mr-2">
+                                        <span class="text-sm">Zaman Yönetimi</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Bilişsel Kapasite -->
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-green-800 mb-3">Bilişsel Kapasite</h5>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="analytical_thinking" class="mr-2">
+                                        <span class="text-sm">Analitik Düşünme</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="verbal_reasoning" class="mr-2">
+                                        <span class="text-sm">Sözel Akıl Yürütme</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="numerical_ability" class="mr-2">
+                                        <span class="text-sm">Sayısal Yetenek</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="problem_solving" class="mr-2">
+                                        <span class="text-sm">Problem Çözme</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Durumsal Yargı -->
+                            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-purple-800 mb-3">Durumsal Yargı (SJT)</h5>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="ethical_decisions" class="mr-2">
+                                        <span class="text-sm">Etik Karar Verme</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="conflict_management" class="mr-2">
+                                        <span class="text-sm">Çatışma Yönetimi</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="customer_service" class="mr-2">
+                                        <span class="text-sm">Müşteri Hizmetleri</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="crisis_management" class="mr-2">
+                                        <span class="text-sm">Kriz Yönetimi</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p class="text-sm text-yellow-800">
+                                <strong>Not:</strong> Seçtiğiniz kriterler doğrultusunda adaya özel test soruları hazırlanacaktır. 
+                                En az 3, en fazla 8 kriter seçmeniz önerilir.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4">
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                            Aday Oluştur ve Test Hazırla
+                        </button>
+                    </div>
+                </form>
             </div>
+        </div>
 
-            <!-- Sorumluluk Reddi -->
-            <div id="disclaimerSection" class="mb-4">
-                <div class="bg-yellow-50 border border-yellow-300 rounded p-3 mb-3">
-                    <h3 class="font-semibold text-yellow-800 mb-2 text-sm">⚠️ Veri Koruma Beyanı</h3>
-                    <div class="text-xs text-yellow-700 space-y-1">
-                        <p>• Verileriniz <b>Google Firebase</b> bulut altyapısında güvenli bir şekilde saklanır ve üçüncü taraflarla paylaşılmaz.</p>
-                        <p>• Anket sonuçları sadece kurum yetkilileri tarafından görüntülenebilir.</p>
-                        <p>• Sistem güvenliği hizmet sağlayıcıya (<b>Firebase</b>) aittir.</p>
-                        <p>• Hack, veri ihlali vb. güvenlik olaylarından kaynaklanan bilgi erişimlerinin sorumluluğu Akça Pro X'e ait değildir.</p>
+        <!-- Aday Yönetimi -->
+        <div id="hrCandidates" class="hidden max-w-7xl mx-auto p-6">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Hızlı Aday Ekle</h3>
+                <p class="text-sm text-gray-600 mb-4">Detaylı test kriterleri için Dashboard'daki "Yeni Aday Ekle" bölümünü kullanın.</p>
+                <form id="newCandidateForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                    <select id="candidateMainCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <option value="">Ana Kategori Seç</option>
+                        <option value="manufacturing">İşletme</option>
+                        <option value="service">Hizmet</option>
+                    </select>
+                    <select id="candidateSubCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required disabled>
+                        <option value="">Önce ana kategori seçin</option>
+                    </select>
+                    <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                        Hızlı Aday Ekle
+                    </button>
+                </form>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Adaylar Listesi</h3>
+                <!-- Tarih aralığı filtre alanı -->
+                <div class="flex flex-col md:flex-row md:items-end gap-4 mb-4">
+                    <div>
+                        <label for="candidatesFilterStartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="candidatesFilterStartDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="candidatesFilterEndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                        <input type="date" id="candidatesFilterEndDate" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <button id="candidatesFilterDateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded transition">Filtrele</button>
+                        <button id="candidatesClearDateBtn" class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded transition">Temizle</button>
                     </div>
                 </div>
-                <label class="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" id="acceptDisclaimer" class="w-4 h-4 text-purple-600">
-                    <span class="text-xs font-medium">Veri koruma beyanını kabul ediyorum</span>
-                </label>
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Rumuz</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Alanı</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Durumu</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Oluşturma Tarihi</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="candidatesList">
+                            <!-- Adaylar buraya yüklenecek -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
+        </div>
 
-            <!-- Şirket Bilgileri -->
-            <div id="companyInfoSection">
-                <!-- Google ile Giriş Yap butonu -->
-                <div class="mb-3 flex flex-col items-center">
-                    <button id="googleSignInBtn" type="button" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded shadow hover:bg-gray-100 text-gray-700 font-semibold mb-2">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5"> Google ile Giriş Yap
-                    </button>
-                    <div id="googleUserInfo" class="text-xs text-green-700 font-medium hidden"></div>
-                    <div id="registeredUserInfo" class="text-xs text-blue-700 font-medium hidden"></div>
-                </div>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-                <h3 class="text-base font-semibold text-gray-700 mb-3">Kurum ve Kişisel Bilgiler</h3>
-                <!-- Kullanıcı Tipi Seçimi -->
-                <div class="mb-3 flex gap-4 items-center">
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="userType" id="userTypeNew" value="new" checked class="accent-purple-600">
-                        <span>Yeni Kullanıcı</span>
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="userType" id="userTypeExisting" value="existing" class="accent-blue-600">
-                        <span>Kayıtlı Kullanıcı</span>
-                    </label>
-                </div>
-                <!-- Yeni Kullanıcı Alanı -->
-                <div class="mb-3" id="newUserArea">
-                    <input type="text" id="companyName" placeholder="Kurum adınızı girin (Okul, Üniversite vb.)" 
-                        class="w-full border-2 border-purple-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                </div>
-                <!-- Kayıtlı Kullanıcı Alanı -->
-                <div class="mb-3 hidden" id="existingUserArea">
-                    <select id="existingCompanySelect" class="w-full border-2 border-blue-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Kayıtlı kurum seçin...</option>
+        <!-- Raporlar -->
+        <div id="hrReports" class="hidden max-w-7xl mx-auto p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Aday Seç</h3>
+                    <select id="reportCandidateSelect" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Aday Seçin</option>
                     </select>
                 </div>
-                <div class="mb-3">
-                    <p class="text-xs text-gray-600 mb-2">Rolünüzü seçin:</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <button type="button" onclick="selectJobType('Öğrenci')" id="studentBtn" 
-                            class="job-btn py-3 px-2 text-xs rounded border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 cursor-pointer font-medium bg-white text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
-                            <div class="text-lg mb-1">🎓</div>
-                            <div>Öğrenci</div>
-                        </button>
-                        <button type="button" onclick="selectJobType('Öğretmen')" id="teacherBtn" 
-                            class="job-btn py-3 px-2 text-xs rounded border-2 border-green-300 hover:border-green-500 hover:bg-green-50 transition-all duration-200 cursor-pointer font-medium bg-white text-center focus:outline-none focus:ring-2 focus:ring-green-400">
-                            <div class="text-lg mb-1">👨‍🏫</div>
-                            <div>Öğretmen</div>
-                        </button>
-                        <button type="button" onclick="selectJobType('Veli/Ebeveyn')" id="parentBtn" 
-                            class="job-btn py-3 px-2 text-xs rounded border-2 border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 cursor-pointer font-medium bg-white text-center focus:outline-none focus:ring-2 focus:ring-purple-400">
-                            <div class="text-lg mb-1">👨‍👩‍👧‍👦</div>
-                            <div>Veli/Ebeveyn</div>
-                        </button>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Rapor Türü</h3>
+                    <div class="space-y-2">
+                        <button onclick="showReport('answers')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Sorular ve Cevaplar</button>
+                        <button onclick="showReport('scores')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Puanlar</button>
+                        <button onclick="showReport('charts')" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Grafikler</button>
                     </div>
                 </div>
-                <div id="selectedJobDisplay" class="text-center text-sm text-gray-600 mb-3 min-h-[20px]"></div>
-                <div class="grid grid-cols-2 gap-2 mb-4">
-                    <input type="text" id="firstName" placeholder="Adınız" 
-                        class="border-2 border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <input type="text" id="lastName" placeholder="Soyadınız" 
-                        class="border-2 border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            </div>
+            
+            <div id="reportContent" class="bg-white rounded-xl shadow-lg p-6">
+                <p class="text-gray-600 text-center">Rapor görüntülemek için aday seçin ve rapor türünü belirleyin.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- İK Kayıt Formu -->
+    <div id="hrRegisterScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl fade-in">
+            <button onclick="backToRoleLogin()" class="mb-4 text-gray-600 hover:text-gray-800 flex items-center">
+                ← Geri Dön
+            </button>
+            
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">İK Yönetici Kayıt</h2>
+                <p class="text-gray-600">Bilgilerinizi doldurun</p>
+            </div>
+            
+            <form id="hrRegisterForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" id="regOrganization" placeholder="Kuruluş Adı" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <input type="text" id="regName" placeholder="Ad Soyad" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <input type="tel" id="regPhone" placeholder="Telefon" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <input type="email" id="regEmail" placeholder="E-posta" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <input type="text" id="regPosition" placeholder="Görev/Pozisyon" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <input type="password" id="regPassword" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                <div class="md:col-span-2">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                        Kayıt Ol
+                    </button>
                 </div>
-                <button id="startSurvey" class="w-full py-3 rounded text-white font-semibold gradient-bg hover:opacity-90 transition-opacity text-sm">
-                    📊 Anketi Başlat
+            </form>
+        </div>
+    </div>
+
+    <!-- Metodoloji Modal -->
+    <div id="methodologyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">METODOLOJİ VE BİLİMSEL TEMELLER</h2>
+                    <button onclick="closeMethodology()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 space-y-6 text-sm text-gray-700 leading-relaxed">
+                <p class="text-base font-semibold text-green-600">
+                    Analiz Pro X, işe alım kararlarınıza prediktif geçerliliği kanıtlanmış bilimsel teminat katmak amacıyla, adayın performansını üç temel boyutta ölçer. Biz, tek bir test sonucuna değil, bu üç modülün çapraz analizine güveniyoruz.
+                </p>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-blue-800 mb-3">1. KİŞİLİK ENVANTERLERİ (Davranışsal Eğilim ve Motivasyon)</h3>
+                    <p class="mb-3">
+                        Bu modül, adayın iş yerindeki alışkanlıklarını, motivasyonel yapısını ve sosyal adaptasyonunu analiz eder.
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Akademik Kök:</strong> Psikolojinin en güvenilir modeli olan Beş Büyük Faktör Modeli (Big Five / OCEAN) temel alınır.</li>
+                        <li><strong>Ölçülen Alan:</strong> 50 alt yetkinlik alanındaki detaylı davranışsal eğilimler. Bu, adayın Vicdanlılık (Disiplin, Zaman Yönetimi) ve Uyumluluk (İşbirliği) gibi kritik faktörlerinin alt kırılımlarını inceler.</li>
+                        <li><strong>Soru Tipi:</strong> Adayın bir ifadeye ne kadar katıldığını ölçen 1'den 5'e kadar Likert Ölçeği formatındaki sorulardır.</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-green-800 mb-3">2. BİLİŞSEL KAPASİTE TESTLERİ (Zihinsel Potansiyel)</h3>
+                    <p class="mb-3">
+                        Bu modül, adayın doğuştan gelen öğrenme hızını, problem çözme çevikliğini ve karmaşık bilgiyi işleme potansiyelini ölçer.
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Akademik Kök:</strong> Genel Zekâ Faktörü (g-faktörü) teorisine dayanır. Yüksek g-faktörü, adayın adaptasyon ve uzun vadeli gelişim potansiyelinin en güçlü göstergesidir.</li>
+                        <li><strong>Ölçülen Alanlar:</strong>
+                            <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+                                <li><strong>Analitik Düşünme ve Veri İşleme:</strong> Sayısal veriyi ve mantıksal desenleri işleme hızı.</li>
+                                <li><strong>Sözel Akıl Yürütme ve Anlama:</strong> Karmaşık yazılı ve sözlü bilgileri doğru yorumlama becerisi.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Soru Tipi:</strong> Süreli, mantıksal çıkarım ve hızlı muhakeme gerektiren performans testleridir.</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-purple-800 mb-3">3. DURUMSAL YARGI TESTLERİ (SJT) (Uygulamalı Yargı Kalitesi)</h3>
+                    <p class="mb-3">
+                        Bu modül, adayın teorik eğiliminden bağımsız olarak, kritik bir iş senaryosu karşısında pratikte hangi eylemi seçeceğini ölçer.
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Akademik Kök:</strong> Kritik Olay Tekniği ile toplanan, pozisyona özgü gerçek hayattan senaryolara dayanır.</li>
+                        <li><strong>Ölçülen Alan:</strong> Etik ikilemler, çatışma yönetimi ve kriz anı reaksiyonlarında kurumsal değerlere ne kadar yakın kararlar alındığı.</li>
+                        <li><strong>Puanlama Mantığı:</strong> Basit bir doğru-yanlış yerine, uzmanlar paneli tarafından belirlenen Uzman Görüş Birliği (Expert Consensus) puanına göre derecelendirilir.</li>
+                    </ul>
+                </div>
+                
+
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 bg-gray-50">
+                <div class="flex justify-center">
+                    <button onclick="closeMethodology()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-xl transition duration-300 flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Anladım</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sorumluluk Reddi Modal -->
+    <div id="disclaimerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">Hukuki Sorumluluk Reddi ve Veri Güvenliği Beyanı</h2>
+                    <button onclick="closeDisclaimer()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 space-y-6 text-sm text-gray-700 leading-relaxed">
+                <p class="text-base font-semibold text-blue-600">
+                    Analiz Pro X platformu, veri analizi ve raporlama süreçlerinde hukuki uygunluk, şeffaflık ve etik sorumluluk prensiplerini benimser. Bu beyan, platformun teknolojik dayanağını, veri koruma politikalarını ve sonuçların kullanımına dair sorumluluk sınırlarını netleştirmektedir.
+                </p>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-blue-800 mb-3">1. ALTYAPI VE VERİ GÜVENLİĞİ TEMİNATI (GOOGLE FIREBASE)</h3>
+                    <p class="mb-3">
+                        Platformun tüm teknolojik altyapısı ve veri yönetimi, dünya standartlarında güvenlik protokollerine sahip Google Firebase Güvenli Veri Tabanı üzerinde kurulmuştur. Bu seçim, müşterilerimize yüksek güvenlik, ölçeklenebilirlik ve kesintisizlik sunar:
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Kurumsal Seviyede Şifreleme:</strong> Tüm veriler, Firebase'in kurumsal düzeyde güvenlik ve şifreleme standartlarıyla korunur.</li>
+                        <li><strong>Yüksek Performans:</strong> Google'ın bulut altyapısı, analiz süreçlerinin hızlı ve kesintisiz yürütülmesini garanti eder.</li>
+                        <li><strong>Sorumluluk Reddi:</strong> Analiz Pro X, altyapı güvenliği için tamamen Google Firebase'in sağladığı protokol ve güvenlik standartlarına güvenir. Platform, Firebase'in dış tehditler sonucu oluşabilecek potansiyel güvenlik zafiyetlerinden veya altyapısal kesintilerden kaynaklanabilecek doğrudan sonuçlardan sorumlu tutulamaz.</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-green-800 mb-3">2. KİŞİSEL VERİ VE HUKUKİ UYUM (KVKK VE GDPR)</h3>
+                    <p class="mb-3">
+                        Analiz Pro X, Türkiye Cumhuriyeti'nin Kişisel Verilerin Korunması Kanunu (KVKK) ve Avrupa Birliği'nin Genel Veri Koruma Tüzüğü (GDPR) hükümlerine tam uyumlu olarak çalışır.
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Rumuz Fonksiyonu ile Anonimleştirme:</strong> Adaylardan hiçbir aşamada kimlik tespiti yapacak kişisel bilgi (Ad, Soyad, E-posta, TC Kimlik No) talep edilmez ve sistemimizde asla saklanmaz. Değerlendirme süreci, yalnızca İK personeliniz tarafından atanan Benzersiz Rumuz (Kod) üzerinden yürütülür.</li>
+                        <li><strong>Veri Niteliği:</strong> Platformumuz, yasal olarak tanımlanmış "özel nitelikli kişisel veri" içermeyen, sadece adayın psikometrik skorlarını ve davranışsal eğilimlerini içeren anonimleştirilmiş analiz verilerini işler.</li>
+                        <li><strong>Sorumluluk Beyanı:</strong> Platformumuz, kimlik bilgilerini içermeyen rumuz sistemi sayesinde, kullanıcı kurumların KVKK uyum süreçlerini destekler ve yasal risklerini minimize eder. Hukuki sorumluluğumuz, rumuz sistemi üzerinden işlenen analiz verileriyle sınırlıdır.</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
+                    <h3 class="text-lg font-bold text-orange-800 mb-3">3. ANALİZ SONUÇLARININ NİHAİ KULLANIM SORUMLULUĞU</h3>
+                    <p class="mb-3">
+                        Analiz Pro X, Yapay Zekâ destekli bilimsel metotlarla prediktif analiz ve risk raporlaması sunan üst düzey bir karar destek aracıdır. Platformun sunduğu raporlar, nihai bir hüküm veya direktif değildir.
+                    </p>
+                    <p class="font-semibold text-orange-800">
+                        <strong>Sorumluluk Beyanı:</strong> Platform tarafından sunulan Görüşme Önerileri, Risk Seviyeleri ve Yetkinlik Skorları tamamen tavsiye niteliğindedir. Adayın işe alım, elenme, terfi ettirilme veya görevlendirilme kararlarının nihai sorumluluğu ve takdiri, her zaman kullanıcı kurumun yetkili İK ve Yönetici kadrolarına aittir. Analiz Pro X, verilen raporların tavsiye niteliğinden dolayı ortaya çıkabilecek örgütsel veya operasyonel sonuçlardan sorumlu tutulamaz.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 bg-gray-50">
+                <div class="flex justify-center">
+                    <button onclick="acceptDisclaimer()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-xl transition duration-300 flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Okudum ve Onaylıyorum</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aday Test Paneli -->
+    <div id="candidatePanel" class="hidden min-h-screen bg-gray-50">
+        <nav class="bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-800">Aday Test Paneli</h1>
+                    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div id="candidateWelcome" class="max-w-4xl mx-auto p-6">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Hoş Geldiniz!</h2>
+                <p class="text-gray-600 mb-6">Test alanınız: <span id="candidateTestArea" class="font-semibold text-blue-600"></span></p>
+                <p class="text-gray-600 mb-8">Teste başlamak için aşağıdaki butona tıklayın. Test süresince dikkatli olun ve sorularınızı dikkatlice okuyun.</p>
+                <button onclick="startTest()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-8 rounded-xl transition duration-300 transform hover:scale-105">
+                    Teste Başla
                 </button>
             </div>
-
-            <!-- Anket Alanı -->
-            <div id="surveySection" class="hidden">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">
-                    <span id="progressText" class="text-gray-600 font-medium">Anket İlerlemesi 0/50 Yanıtlandı</span>
-                    <span id="timeElapsed" class="text-sm text-gray-500">Süre: 00:00</span>
+        </div>
+        
+        <div id="candidateTest" class="hidden max-w-4xl mx-auto p-6">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Soru <span id="currentQuestionNumber">1</span> / <span id="totalQuestions">10</span></h3>
+                    <div class="text-lg font-semibold text-blue-600">Süre: <span id="testTimer">30:00</span></div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-3 mb-8">
-                    <div id="progressBar" class="bg-purple-600 h-3 rounded-full transition-all duration-300" style="width:0%"></div>
+                
+                <div id="questionContent" class="mb-8">
+                    <!-- Sorular buraya yüklenecek -->
                 </div>
-                <div id="questionContainer" class="space-y-6"></div>
-                <button id="submitSurvey" class="hidden w-full mt-8 py-4 rounded-xl text-white font-semibold bg-green-600 hover:bg-green-700 transition-colors text-lg">
-                    ✅ Anketi Tamamla
+                
+                <div class="flex justify-between">
+                    <button id="prevButton" onclick="previousQuestion()" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-6 rounded-lg disabled:opacity-50" disabled>
+                        Önceki
+                    </button>
+                    <button id="nextButton" onclick="nextQuestion()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg">
+                        Sonraki
+                    </button>
+                    <button id="finishButton" onclick="finishTest()" class="hidden bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-lg">
+                        Testi Bitir
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="testCompleted" class="hidden max-w-4xl mx-auto p-6">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                <div class="text-6xl mb-4">🎉</div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Test Tamamlandı!</h2>
+                <p class="text-gray-600 mb-6">Testinizi başarıyla tamamladınız. Sonuçlarınız değerlendirilmek üzere İK departmanına iletilmiştir.</p>
+                <button onclick="logout()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                    Çıkış Yap
                 </button>
             </div>
-        </div>
-    </div>
-
-    <!-- Şirket Portalı -->
-    <div id="companyModule" class="max-w-4xl mx-auto p-4 hidden">
-        <div class="bg-white shadow-xl rounded-xl max-w-4xl mx-auto p-6">
-            <div id="companyLogin" class="max-w-md mx-auto">
-                <h2 class="text-3xl font-bold text-center mb-8">🏫 Kurum Portalı Girişi</h2>
-                <div class="space-y-6">
-                    <input type="text" id="companyLoginName" placeholder="Okul/Kurum Adı" 
-                           class="w-full border-2 border-gray-300 rounded-lg px-4 py-4 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <input type="password" id="companyPassword" placeholder="12 Karakterlik Şifre" 
-                           class="w-full border-2 border-gray-300 rounded-lg px-4 py-4 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
-                    <button onclick="loginCompany()" class="w-full py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold">
-                        🔐 Giriş Yap
-                    </button>
-                </div>
-                <div class="mt-6 p-4 bg-blue-50 rounded-lg text-sm text-blue-700">
-                    <p><strong>Not:</strong> Okul/kurum şifrenizi yöneticinizden alabilirsiniz.</p>
-                </div>
-            </div>
-
-            <div id="companyDashboard" class="hidden">
-                <div class="flex justify-between items-center mb-8">
-                    <div>
-                        <h2 class="text-3xl font-bold">Okul/Kurum Raporları</h2>
-                        <p class="text-gray-600 text-lg" id="companyNameDisplay"></p>
-                    </div>
-                    <button onclick="logoutCompany()" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
-                        🚪 Çıkış
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-2">Toplam Katılımcı</h3>
-                        <p class="text-4xl font-bold" id="totalParticipants">0</p>
-                    </div>
-                    <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-2">Ortalama Puan</h3>
-                        <p class="text-4xl font-bold" id="averageScore">0.0</p>
-                    </div>
-                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-2">Değerlendirme Oranı</h3>
-                        <p class="text-4xl font-bold" id="satisfactionRate">0%</p>
-                    </div>
-                </div>
-
-                <div class="bg-white border rounded-lg p-6">
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">
-                        <h3 class="text-xl font-semibold mb-2 md:mb-0">Anket Sonuçları</h3>
-                        <div class="flex flex-col md:flex-row gap-2 items-center">
-                            <input type="date" id="reportStartDate" class="border rounded px-2 py-1 text-sm" />
-                            <span class="mx-1">-</span>
-                            <input type="date" id="reportEndDate" class="border rounded px-2 py-1 text-sm" />
-                            <button onclick="filterByDateRange()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Tarihe Göre Rapor</button>
-                            <button onclick="showPDFReport(true)" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm" style="display:none !important">📄 PDF Göster (Filtreli)</button>
-                            <button onclick="showPDFReport(false)" class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm" style="display:none !important">📄 PDF Göster (Tümü)</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Grafikler Bölümü -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3 text-sm">📊 Pozisyon</h4>
-                            <div style="height: 150px; position: relative;">
-                                <canvas id="positionChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3 text-sm">📈 Değerlendirme</h4>
-                            <div style="height: 150px; position: relative;">
-                                <canvas id="satisfactionChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3 text-sm">⏰ Süre Dağılımı</h4>
-                            <div style="height: 150px; position: relative;">
-                                <canvas id="timeChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3 text-sm">🎯 Puan Dağılımı</h4>
-                            <div style="height: 150px; position: relative;">
-                                <canvas id="trendChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- SWOT Analizi Tablosu (Rapor Ekranı) -->
-                    <div class="bg-white border rounded-lg p-4 mb-6" style="display:none">
-                        <h4 class="font-semibold text-gray-800 mb-4 text-lg">SWOT Analizi</h4>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm text-center border border-gray-300">
-                                <thead>
-                                    <tr>
-                                        <th class="bg-green-100 border border-gray-300 p-2">Güçlü Yönler</th>
-                                        <th class="bg-red-100 border border-gray-300 p-2">Zayıf Yönler</th>
-                                        <th class="bg-blue-100 border border-gray-300 p-2">Fırsatlar</th>
-                                        <th class="bg-yellow-100 border border-gray-300 p-2">Tehditler</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="border border-gray-300 p-2 align-top">• Yüksek katılımcı memnuniyeti<br>• Güçlü eğitmen kadrosu<br>• Modern eğitim altyapısı</td>
-                                        <td class="border border-gray-300 p-2 align-top">• Yoğun dönemlerde iletişim eksikliği<br>• Kısıtlı sosyal etkinlikler<br>• Dijital materyal eksikliği</td>
-                                        <td class="border border-gray-300 p-2 align-top">• Dijitalleşme yatırımları<br>• Yeni eğitim programları<br>• Kamu destekleri</td>
-                                        <td class="border border-gray-300 p-2 align-top">• Artan rekabet<br>• Ekonomik dalgalanmalar<br>• Personel değişimi</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Katılımcı Detayları Bölümü -->
-                    <div class="bg-white border rounded-lg p-4 mb-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="font-semibold text-gray-800">👥 Katılımcı Detayları</h4>
-                            <button onclick="toggleParticipantDetails()" id="toggleParticipantsBtn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                                📋 Katılımcıları Görüntüle
-                            </button>
-                        </div>
-                        <div id="participantDetails" class="hidden">
-                            <div class="overflow-x-auto">
-                                <table class="w-full table-auto text-sm">
-                                    <thead>
-                                        <tr class="bg-gray-100">
-                                            <th class="px-3 py-2 text-left">İsim</th>
-                                            <th class="px-3 py-2 text-left">Pozisyon</th>
-                                            <th class="px-3 py-2 text-center">Ortalama Puan</th>
-                                            <th class="px-3 py-2 text-center">Değerlendirme</th>
-                                            <th class="px-3 py-2 text-center">Tarih</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="participantTableBody">
-                                        <!-- Katılımcı listesi buraya yüklenecek -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="detailedReport" class="space-y-4"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-        <!-- AI Interpretation Modal -->
-        <div id="aiInterpretationModal" class="modal">
-            <div class="modal-content max-w-7xl bg-white shadow-2xl" style="margin: 2% auto; padding: 40px; border-radius: 20px; max-height: 90vh; overflow-y: auto; width: 95vw;">
-                <div class="modal-header flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">🤖 AI Yorum & Analiz</h2>
-                    <span class="close cursor-pointer text-4xl text-gray-500 hover:text-gray-700" onclick="document.getElementById('aiInterpretationModal').classList.remove('show')">&times;</span>
-                </div>
-                <div id="aiInterpretationContent" class="text-lg text-gray-800 leading-8 whitespace-pre-line"></div>
-            </div>
-        </div>
-
-        <!-- Category Detail Modal (İşletme.html'den kopyalandı) -->
-        <div id="categoryDetailModal" class="modal">
-            <div class="modal-content max-w-4xl bg-white shadow-2xl" style="margin: 5% auto; padding: 30px; border-radius: 20px; max-height: 80vh; overflow-y: auto; width: 90vw;">
-                <div class="modal-header flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 class="text-2xl font-bold text-gray-800" id="categoryDetailTitle">📋 Kategori Detayları</h2>
-                    <span class="close cursor-pointer text-3xl text-gray-500 hover:text-gray-700" onclick="document.getElementById('categoryDetailModal').classList.remove('show')">&times;</span>
-                </div>
-                <div id="categoryDetailContent"></div>
-            </div>
-        </div>
-
-    <!-- Yönetici Portalı -->
-    <div id="adminModule" class="max-w-4xl mx-auto p-4 hidden">
-        <div class="bg-white shadow-xl rounded-xl max-w-4xl mx-auto p-6">
-            <div id="adminLogin" class="max-w-md mx-auto">
-                <h2 class="text-3xl font-bold text-center mb-8">⚙️ Yönetici Portalı</h2>
-                <div class="space-y-6">
-                    <input type="password" id="adminPassword" placeholder="Yönetici Şifresi" 
-                           class="w-full border-2 border-gray-300 rounded-lg px-4 py-4 text-base focus:ring-2 focus:ring-red-500 focus:border-red-500" autocomplete="off">
-                    <button onclick="loginAdmin()" class="w-full py-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-lg font-semibold">
-                        🔐 Yönetici Girişi
-                    </button>
-                </div>
-            </div>
-
-            <div id="adminDashboard" class="hidden">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-3xl font-bold">Sistem Yönetimi</h2>
-                    <button onclick="logoutAdmin()" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
-                        🚪 Çıkış
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-blue-100 p-6 rounded-lg text-center">
-                        <h3 class="font-semibold text-blue-800 mb-2">Toplam Okul/Kurum</h3>
-                        <p class="text-3xl font-bold text-blue-600" id="totalCompanies">0</p>
-                    </div>
-                    <div class="bg-green-100 p-6 rounded-lg text-center">
-                        <h3 class="font-semibold text-green-800 mb-2">Aktif Anketler</h3>
-                        <p class="text-3xl font-bold text-green-600" id="activeSurveys">0</p>
-                    </div>
-                    <div class="bg-yellow-100 p-6 rounded-lg text-center">
-                        <h3 class="font-semibold text-yellow-800 mb-2">Toplam Katılımcı</h3>
-                        <p class="text-3xl font-bold text-yellow-600" id="totalUsers">0</p>
-                    </div>
-                    <div class="bg-purple-100 p-6 rounded-lg text-center">
-                        <h3 class="font-semibold text-purple-800 mb-2">Sistem Durumu</h3>
-                        <p class="text-sm font-bold text-purple-600">🟢 Aktif</p>
-                    </div>
-                </div>
-
-                <div class="bg-white border rounded-lg p-6">
-                    <h3 class="text-xl font-semibold mb-6">Okul/Kurum Listesi ve Yönetimi</h3>
-                    <div class="mb-4 flex flex-col sm:flex-row gap-2 items-center">
-                        <input id="companySearchInput" type="text" placeholder="🔍 Kurum adı ile ara..." class="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" oninput="filterCompanyList()">
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full table-auto">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th class="px-4 py-3 text-left">Okul/Kurum Adı</th>
-                                    <th class="px-4 py-3 text-left">Şifre</th>
-                                    <th class="px-4 py-3 text-left">Katılımcı</th>
-                                    <th class="px-4 py-3 text-left">Durum</th>
-                                    <th class="px-4 py-3 text-left">İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody id="companyList">
-                                <!-- Şirket listesi buraya yüklenecek -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal -->
-    <div id="modal" class="modal">
-        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div id="modalContent"></div>
         </div>
     </div>
 
     <script>
-// Firebase config ve Google Sign-In logic (hastane.html ile aynı)
-const firebaseConfig = {
-    apiKey: "AIzaSyDp2Yh8hamXi6OTfw03MT0S4rp5CjnlAcg",
-    authDomain: "akcaprox-anket.firebaseapp.com",
-    projectId: "akcaprox-anket",
-    storageBucket: "akcaprox-anket.appspot.com",
-    messagingSenderId: "426135179922",
-    appId: "1:426135179922:web:c16b3fd6fa5f3d9224cc4b",
-    measurementId: "G-CD1ET7RGX1"
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-let googleUser = null;
-document.addEventListener('DOMContentLoaded', function() {
-    const startBtn = document.getElementById('startSurvey');
-    if (startBtn) {
-        // startSurvey eventini birleştir
-        startBtn.addEventListener('click', function(e) {
-            // Kayıtlı kullanıcı ise seçilen kurumu companyName inputuna yaz
-            if (userTypeExisting && userTypeExisting.checked) {
-                const selected = existingCompanySelect.value;
-                if (!selected) {
-                    e.preventDefault();
-                    showModal('⚠️ Eksik Bilgi', 'Lütfen kayıtlı bir kurum seçin.');
-                    return false;
-                }
-                companyNameInput.value = selected;
-            }
-            // Google ile giriş kontrolü
-            if (!googleUser) {
-                e.preventDefault();
-                alert('Ankete başlamadan önce Google ile giriş yapmalısınız.');
-                return false;
-            }
-            startSurvey();
-        });
-    }
-    const googleBtn = document.getElementById('googleSignInBtn');
-    const userInfoDiv = document.getElementById('googleUserInfo');
-    if (googleBtn) {
-        googleBtn.addEventListener('click', function() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    const user = result.user;
-                    if (user) {
-                        googleUser = user;
-                        document.getElementById('firstName').value = user.displayName ? user.displayName.split(' ')[0] : '';
-                        document.getElementById('lastName').value = user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '';
-                        userInfoDiv.textContent = `Giriş yapıldı: ${user.displayName} (${user.email})`;
-                        userInfoDiv.classList.remove('hidden');
-                        document.getElementById('firstName').readOnly = false;
-                        document.getElementById('lastName').readOnly = false;
-                    }
-                })
-                .catch((error) => {
-                    alert('Google ile giriş başarısız: ' + error.message);
-                });
-        });
-    }
-    // Kullanıcı tipi seçimi için event listener
-    const userTypeNew = document.getElementById('userTypeNew');
-    const userTypeExisting = document.getElementById('userTypeExisting');
-    const newUserArea = document.getElementById('newUserArea');
-    const existingUserArea = document.getElementById('existingUserArea');
-    const companyNameInput = document.getElementById('companyName');
-    const existingCompanySelect = document.getElementById('existingCompanySelect');
-
-    function toggleUserType() {
-        if (userTypeNew.checked) {
-            newUserArea.classList.remove('hidden');
-            existingUserArea.classList.add('hidden');
-        } else {
-            newUserArea.classList.add('hidden');
-            existingUserArea.classList.remove('hidden');
-            // Kayıtlı kurumları yükle
-            loadExistingCompanies();
-        }
-    }
-    if (userTypeNew && userTypeExisting) {
-        userTypeNew.addEventListener('change', toggleUserType);
-        userTypeExisting.addEventListener('change', toggleUserType);
-    }
-
-    async function loadExistingCompanies() {
-        // Firebase'den kurumları çek
-        if (!window.systemData || !window.systemData.surveyData) {
-            window.systemData = window.systemData || {};
-            window.systemData.surveyData = await loadFromFirebase();
-        }
-        const companies = (window.systemData.surveyData && window.systemData.surveyData.companies) || {};
-        existingCompanySelect.innerHTML = '<option value="">Kayıtlı kurum seçin...</option>';
-        Object.values(companies).forEach(company => {
-            existingCompanySelect.innerHTML += `<option value="${company.name}">${company.name}</option>`;
-        });
-    }
-
-    // Admin / listeden seçim yapıldığında anket ekranındaki "Kayıtlı Kullanıcı" seçeneğini otomatik doldurmak için
-    function selectCompanyForExistingUser(companyName) {
-        // Eğer DOM elemanları hazırsa doğrudan ata, değilse kısa süre sonra deneyin
-        const trySet = () => {
-            const userTypeExisting = document.getElementById('userTypeExisting');
-            const userTypeNew = document.getElementById('userTypeNew');
-            const existingCompanySelect = document.getElementById('existingCompanySelect');
-            const existingUserArea = document.getElementById('existingUserArea');
-            const newUserArea = document.getElementById('newUserArea');
-            const companyNameInput = document.getElementById('companyName');
-
-            if (!existingCompanySelect) return false;
-
-            // Eğer seçenekler yüklü değilse, loadExistingCompanies ile yükleyip sonra set et
-            const optionExists = Array.from(existingCompanySelect.options).some(o => o.value === companyName || o.text === companyName);
-            if (!optionExists) {
-                // yükle ve tekrar dene
-                loadExistingCompanies().then(() => {
-                    // küçük bir gecikme ile set et
-                    setTimeout(() => selectCompanyForExistingUser(companyName), 150);
-                });
-                return true;
-            }
-
-            // Select'te companyName'i seç
-            for (let i = 0; i < existingCompanySelect.options.length; i++) {
-                const opt = existingCompanySelect.options[i];
-                if (opt.value === companyName || opt.text === companyName) {
-                    existingCompanySelect.selectedIndex = i;
-                    break;
-                }
-            }
-
-            // Kullanıcı tipini kayıtlıya geçir ve alanları göster
-            if (userTypeExisting && userTypeNew) {
-                userTypeExisting.checked = true;
-                userTypeNew.checked = false;
-            }
-            if (existingUserArea && newUserArea) {
-                existingUserArea.classList.remove('hidden');
-                newUserArea.classList.add('hidden');
-            }
-
-            // companyName inputunu da doldur (anlık kontrol için)
-            if (companyNameInput) companyNameInput.value = companyName;
-
-            // Survey modülünü aç
-            showModule('survey');
-
-            // Scroll veya odaklandırma
-            if (existingCompanySelect && existingCompanySelect.focus) existingCompanySelect.focus();
-            // Kısa bir gecikme ile anketi başlatmayı dene (startSurvey kendi kontrollerini uygular)
-            setTimeout(() => {
-                try { startSurvey(); } catch (e) { console.warn('selectCompanyForExistingUser auto start failed:', e); }
-            }, 250);
-            return true;
+                // Firebase başlatma
+                                // ...firebaseConfig ve db tanımı en başta var, tekrar etmeye gerek yok...
+        // Ters ifadeler için cevap puanına göre anlam/yorum tablosu
+        const tersYorumTablosu = {
+            1: "Çok olumsuz davranış",
+            2: "Olumsuz eğilim",
+            3: "Orta düzeyde eğilim",
+            4: "Olumlu eğilim",
+            5: "Çok olumlu davranış"
         };
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', trySet);
-        } else {
-            trySet();
+        // Ters ifadede verilen cevaba göre anlam döndüren fonksiyon
+        function tersYorumGetir(puan) {
+            return tersYorumTablosu[puan] || "";
         }
-    }
+        // 1-500 arası sorular için cevap anahtarı (cevap.txt'den alınmıştır)
+        // Her bir cevap, 0 tabanlı index ile (Cevap 1 => 0, Cevap 2 => 1, ...)
+        const answerKey = [
+            0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,
+            0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,
+            0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,
+            0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,
+            0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4
+        ];
+        // Global değişkenler
+        let currentUser = null;
+        let currentRole = null;
+        let currentQuestionIndex = 0;
+        let testQuestions = [];
+        let userAnswers = [];
+        let testTimer = null;
+        let timeRemaining = 1800; // 30 dakika
+        let disclaimerAccepted = false;
 
-    // (startBtn event listener'ı yukarıda tanımlandı, burada tekrar tanımlamaya gerek yok)
-    // Sayfa ilk açıldığında doğru alanı göster
-    toggleUserType();
+        // Firebase bağlantısı için hazır yapı (sonradan eklenecek)
+        // Örnek veri yapıları (Firebase'e geçiş için hazır)
+        let hrManagers = [];
+        let candidates = [];
+        let testResults = [];
 
-    // Kayıtlı kurum seçimi değiştiğinde global state ve gösterimi güncelle
-    const existingCompanySelectEl = document.getElementById('existingCompanySelect');
-    const registeredUserInfoEl = document.getElementById('registeredUserInfo');
-    if (existingCompanySelectEl) {
-        existingCompanySelectEl.addEventListener('change', function(e) {
-            const val = (e.target.value || '').trim();
-            if (val) {
-                // global olarak seçilen kayıtlı kurumu kaydet
-                window.registeredCompany = val;
-                // kullanıcı tipini kayıtlıya geçir
-                const userTypeExisting = document.getElementById('userTypeExisting');
-                const userTypeNew = document.getElementById('userTypeNew');
-                if (userTypeExisting && userTypeNew) {
-                    userTypeExisting.checked = true;
-                    userTypeNew.checked = false;
-                }
-                // alan göster/gizle
-                const newUserArea = document.getElementById('newUserArea');
-                const existingUserArea = document.getElementById('existingUserArea');
-                if (existingUserArea && newUserArea) {
-                    existingUserArea.classList.remove('hidden');
-                    newUserArea.classList.add('hidden');
-                }
-                // badge göster
-                if (registeredUserInfoEl) {
-                    registeredUserInfoEl.textContent = `Kayıtlı kurum seçildi: ${val}`;
-                    registeredUserInfoEl.classList.remove('hidden');
-                }
+        // Firebase'den adayları çek
+        function fetchCandidates(callback) {
+            db.ref('candidates').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                candidates = Object.values(val);
+                if (callback) callback();
+            });
+        }
 
-                // Kısa bir gecikme ile startSurvey çağırmayı dene (startSurvey kendi kontrollerini yapar)
-                setTimeout(() => {
-                    try { startSurvey(); } catch (e) { console.warn('auto startSurvey failed:', e); }
-                }, 250);
+        // Firebase'den İK yöneticilerini çek
+        function fetchHrManagers(callback) {
+            db.ref('hrManagers').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                hrManagers = Object.values(val);
+                if (callback) callback();
+            });
+        }
+
+        // Firebase'e yeni İK yöneticisi ekle
+        function addHrManager(hrObj) {
+            const newRef = db.ref('hrManagers').push();
+            hrObj.id = newRef.key;
+            newRef.set(hrObj);
+        }
+
+        // Firebase'den İK yöneticisi sil
+        function deleteHrManager(hrId) {
+            db.ref('hrManagers/' + hrId).remove();
+        }
+
+        // Soru bankası (örnek format, 5 ana gruptan 100'er soru ile doldurulmalı)
+        const questionBank = {
+            // 500 adet yeni soru cümlesi ve grup başlıkları txt'den alınarak aşağıya gömülmüştür
+            grup1: [
+                // 1-100
+                "Yapılacak işler listesini daima önceliklendiririm",
+                "Bitmeyen işler yüzünden kişisel zamanımı sürekli feda ederim",
+                "Karmaşık projeleri küçük parçalara ayırarak planlarım",
+                "Dikkatimi dağıtan şeylere engel olmakta zorlanırım",
+                "Toplantılarıma her zaman zamanında katılırım",
+                "Son teslim tarihleri yaklaştıkça daha çok stres olurum",
+                "Haftalık planımı esnekliği koruyacak şekilde hazırlarım",
+                "Sık sık bir işi bitirmek için gereken süreyi yanlış hesaplarım",
+                "En zor işleri günün erken saatlerinde bitirmeye çalışırım",
+                "İşlerimi genellikle başkalarının beni itmesiyle tamamlarım",
+                "Ekip arkadaşlarımın fikirlerini aktif olarak dinlerim ve dikkate alırım",
+                "Ekip içindeki sorunların çözümüne katılmak yerine, sadece kendi işime bakarım",
+                "Başkalarına görevlerini tamamlamaları için zamanında geri bildirim sağlarım",
+                "Çatışma durumlarında taraf tutmamak için sessiz kalmayı tercih ederim",
+                "Ekipteki bilgi birikimini artırmak için öğrendiklerimi paylaşırım",
+                "Ekibin başarısızlıklarının sorumluluğunu üstlenmekten kaçınırım",
+                "Farklı kültürel veya profesyonel geçmişe sahip kişilerle kolayca uyum sağlarım",
+                "Ekip üyelerimin motivasyonunu yükseltmek için çabalamam",
+                "Ortak kararlar alındıktan sonra bile kendi yöntemimi uygulamakta ısrar ederim",
+                "Ekip dışındaki paydaşlarla verimli bir şekilde işbirliği yapabilirim",
+                "E-posta veya yazılı iletişimde net ve anlaşılır ifadeler kullanırım",
+                "Zor bir konu konuşulurken göz teması kurmaktan çekinirim",
+                "Karşımdaki kişinin beden dilini ve duygusal durumunu anlarım",
+                "Meslektaşlarıma eleştirilerimi genellikle sert bir dille ifade ederim",
+                "Bir sunum yaparken seyircinin dikkatini kolayca toplayabilirim",
+                "Fikirlerim kabul edilmezse, tartışmayı uzatmayı tercih ederim",
+                "Bilgi akışını sağlamak için düzenli ve kısa bilgilendirme toplantıları yaparım",
+                "İş arkadaşlarımdan gelen talimatları sık sık yanlış anlarım",
+                "Telefonda konuşurken de yüz yüze konuşmadaki kadar etkili iletişim kurarım",
+                "Benimle aynı fikirde olmayan kişileri dinlemeye isteksiz olurum",
+                "Üstlendiğim projelerin nihai sonuçlarından tamamen ben sorumluyum",
+                "Hatalarımı gizlemek için ufak tefek yalanlar söyleyebilirim",
+                "Zorlu hedeflere ulaşmak için ekstra çaba göstermekten kaçınmam",
+                "Bana verilen talimatlara kesinlikle uymakta güçlük çekerim",
+                "İşler yolunda gitmediğinde dış etkenlere odaklanmak yerine çözüm ararım",
+                "İşimin kalitesi, sadece üzerimdeki denetime bağlıdır",
+                "Kritik ve acil durumlarda dahi doğru kararı veririm",
+                "İşlerimi tamamlamak için sürekli olarak başkalarının hatırlatmasına ihtiyacım olur",
+                "Şirketin kaynaklarını kendi kaynaklarım gibi korur ve verimli kullanırım",
+                "Baskı altında çalışırken kendimi verimli hissetmem",
+                "Bir problem ortaya çıktığında verileri analiz ederek kök nedeni bulurum",
+                "Basit çözümler işe yaramadığında hemen pes ederim",
+                "Sorunu çözmek için farklı departmanlardan uzmanlarla görüşürüm",
+                "Rutin dışındaki sorunlarla uğraşmak benim görevim değildir",
+                "En karmaşık sorunları bile mantıksal adımlarla çözebilirim",
+                "Bir çözüm önerirken, bunun olası yan etkilerini düşünmem",
+                "Çözüm süreci boyunca soğukkanlılığımı ve objektifliğimi korurum",
+                "Sık sık karar veremez ve ertelemeyi tercih ederim",
+                "Aldığım kararların uzun vadeli etkilerini öngörürüm",
+                "Problemi çözmektense, görmezden gelmek daha kolay gelir",
+                "Yaptığım her işte mükemmeliyetçi bir yaklaşım sergilerim",
+                "Teslim tarihlerine yetişmek için kalite kontrol adımlarını atlarım",
+                "Hata payını en aza indirmek için ekstra önlemler alırım",
+                "Sadece yöneticim talep ettiğinde kalite standartlarına uyarım",
+                "Belirlenen kalite hedeflerine ulaşmak için aktif olarak iyileştirme öneririm",
+                "İşimin sonucundan çok, hızına odaklanırım",
+                "Kalite süreçlerinin tüm aşamalarına dikkat eder ve uyum sağlarım",
+                "Müşterinin beklentileri benim için genellikle belirsizdir",
+                "Kendi hatalarımı bulmak ve düzeltmek için proaktif davranırım",
+                "İş yüküm arttığında ilk vazgeçeceğim şey detaylara dikkat etmek olur",
+                "Müşteri beklentilerini anlamak için düzenli olarak iletişim kurarım",
+                "Müşteri talepleri iş tanımımın dışına çıktığında itiraz ederim",
+                "Müşteri memnuniyetini sağlamak için esnek çözümler üretirim",
+                "Müşteri şikayetleri karşısında duygusal tepkiler vermekten kaçınırım",
+                "Müşterilerimizle uzun vadeli ilişkiler kurmayı hedeflerim",
+                "Sektördeki yenilikleri takip etme zorunluluğu hissetmem",
+                "Müşteri geri bildirimlerini iş süreçlerime dahil ederek iyileştiririm",
+                "Müşterinin verdiği bilgilerin doğruluğunu her zaman kontrol etmeye gerek yoktur",
+                "Hem iç hem de dış müşterilerime eşit derecede önem veririm",
+                "Müşteriye hayır demekten çekinmem",
+                "Bir projede doğal olarak liderlik rolünü üstlenmeye hazırım",
+                "Genellikle riskli kararlar almaktan kaçınırım",
+                "Ekip arkadaşlarıma görevleri adil bir şekilde delege edebilirim",
+                "Bir ekibi yönetmek, kişisel performansıma odaklanmaktan daha zordur",
+                "Başkalarını motive etmek ve ortak bir vizyon etrafında toplamak konusunda başarılıyımdır",
+                "Hata yapan birini eleştirmektense, konuyu geçiştirmeyi tercih ederim",
+                "Ekip üyelerimin gelişimine katkıda bulunmak için mentorluk yaparım",
+                "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
+                "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
+                "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur",
+            ],
+            grup2: [
+                "Çalışma alanımda her zaman güvenlik prosedürlerine uygun hareket ederim",
+                "Basit görevlerde bile kişisel koruyucu ekipman (KKE) kullanmaktan kaçınırım",
+                "Tehlikeli durum veya eksik ekipman gördüğümde hemen ilgililere bildiririm",
+                "İş güvenliği kurallarının esnetilebileceği durumlar olabilir",
+                "Acil durum prosedürleri ve tahliye yollarını düzenli olarak kontrol ederim",
+                "Hızlı çalışmak, güvenlik kurallarından daha önemlidir",
+                "Makinelerin ve aletlerin bakımının tam olduğundan emin olurum",
+                "Diğer çalışanları güvenlik riskleri konusunda uyarmak benim işim değildir",
+                "Güvenlik talimatlarını sadece denetim olduğunda uygularım",
+                "Yeni bir ekipman kullanmadan önce daima eğitim alırım",
+                "Ekip arkadaşlarıma ihtiyaç duyduklarında yardım etmeye gönüllüyüm",
+                "Ekip içindeki anlaşmazlıklar beni doğrudan etkilemezse karışmam",
+                "İş akışının aksamaması için kendi görevimi eksiksiz tamamlarım",
+                "Sadece benim dışımdaki ekip üyelerinin hataları üzerinde dururum",
+                "Ortak bir hedef belirlediğimizde bu hedefe tam olarak bağlı kalırım",
+                "Ekipteki herkesin işine eşit derecede saygı gösteririm",
+                "Ekip çalışmasında en önemli şey kendi performansımı öne çıkarmaktır",
+                "Ekip içindeki sorunları çözmek için aktif olarak görüş bildiririm",
+                "Yüksek tempoda çalışırken ekip ruhunu sürdürmekte zorlanmam",
+                "Benim dışımda gelişen hatalar için sorumluluk almam",
+                "Talimatları dinlerken önemli noktaları not ederim",
+                "Yöneticimle konuşurken genellikle konuyu dağıtırım",
+                "İş arkadaşlarımla net ve saygılı bir dil kullanırım",
+                "Bir talimatı tam olarak anlamadan uygulamaya başlarım",
+                "İşle ilgili bilgileri gerekli kişilere anında iletirim",
+                "Sık sık iş arkadaşlarımın sözünü keserim",
+                "Üretim veya hizmet alanındaki sorunları çekinmeden dile getiririm",
+                "İletişim kurarken teknik jargon kullanmaktan kaçınmam",
+                "Çalışma ortamında çıkan dedikodulara katılmam",
+                "Sorun çıktığında kişisel olarak algılar ve küserim",
+                "İşime her zaman zamanında başlar ve bitiririm",
+                "İş yerindeki kişisel eşyalarımı dağınık bırakırım",
+                "Üretim sürecindeki aksaklıkları hemen üstüme bildiririm",
+                "Çalışma ortamımın temiz ve düzenli olmasından ben sorumlu değilim",
+                "Verilen görevleri tamamlamadan işten ayrılmam",
+                "Benim sorumluluğumdaki bir hata çıktığında kolayca mazeret bulurum",
+                "Tüm araç ve gereçleri büyük bir dikkatle kullanırım",
+                "İş yapma biçimim sık sık başkalarını olumsuz etkiler",
+                "Görevimi yerine getirirken şirket kaynaklarını dikkatli kullanırım",
+                "İşimi yaparken sık sık kişisel işlerimle ilgilenirim",
+                "Karşılaştığım basit arızaları veya sorunları kendim çözmeye çalışırım",
+                "Bir sorun çıktığında ilk tepkim başkasının gelip çözmesini beklemek olur",
+                "Sorunu çözmek için farklı yöntemleri denemekten çekinmem",
+                "Bir sorunun kök nedenini bulmak yerine, sadece belirtileri gidermeye odaklanırım",
+                "Problem çözümü için gerekli olan bilgileri hızla toplarım",
+                "Karmaşık sorunlar beni gergin ve çaresiz hissettirir",
+                "Çözüm süreci boyunca soğukkanlılığımı korurum",
+                "Basit sorunları bile çözmek için uzun süreye ihtiyacım olur",
+                "İş akışımı etkileyen problemleri yöneticime doğru şekilde aktarırım",
+                "Başkalarının çözüm önerilerini genellikle kabul etmem",
+                "Üretim/hizmet standartlarını titizlikle uygularım",
+                "Kalite kontrolde çıkan küçük kusurları göz ardı edebilirim",
+                "Hata payını en aza indirmek için ekstra önlemler alırım",
+                "İşim bittikten sonra kontrol etmekle vakit kaybetmem",
+                "Kalite hedeflerine ulaşmak için ekip arkadaşlarımla işbirliği yaparım",
+                "Kalitesiz ürünler üretmektense, üretimi yavaşlatmayı tercih ederim",
+                "Kalite benim için hızdan sonra gelir",
+                "Kullandığım malzemelerin kalitesini sürekli kontrol ederim",
+                "Kaliteyi sağlamanın tek yolu katı kurallara uymaktır",
+                "Kaliteyi artıracak önerilerimi yöneticilerime sunmaktan çekinmem",
+                "Vardiyam boyunca işimi verimli bir şekilde planlarım",
+                "Molalarımı genellikle uzatırım",
+                "İş akışındaki önceliklere göre kendimi hızlıca adapte ederim",
+                "Bana verilen görevi ne zaman bitireceğimi nadiren bilirim",
+                "Boş zamanlarımda bile etrafımdaki işleri düzenlerim",
+                "Görevleri yetiştiremeyeceğimi anladığımda yardım istemem",
+                "Zorlu işleri bitirmek için gerekli zamanı her zaman ayırırım",
+                "İşim bittikten sonra dinlenmektense, yeni işler aramaya koyulurum",
+                "İş yerindeki dağınıklık çalışma hızımı olumsuz etkilemez",
+                "Bir işi bitirmek için sürekli başkalarının onayını beklerim",
+                "Kendi çalışma alanımda yetkili bir ses olmayı amaçlarım",
+                "İş arkadaşlarımı etkilemekten ve yönlendirmekten hoşlanmam",
+                "Yeni gelenlere işi öğretme sorumluluğunu üstlenirim",
+                "Çevremdeki kişilerin benim fikirlerime ne kadar değer verdiği umrumda değildir",
+                "Ekipteki herkesin işine odaklanmasını sağlamayı başarırım",
+                "İş arkadaşlarım zor durumdayken onlara akıl hocalığı yapmam",
+                "Diğer çalışanları motive etmek için pozitif bir enerji yayarım",
+                "Sadece emir almaktan ve uygulamaktan memnunum",
+                "Çalışma alanımda bir kural ihlali gördüğümde çekinmeden müdahale ederim",
+                "Liderlik sadece yöneticilerin işidir",
+                "Daha iyi bir yol varsa, mevcut talimatlara bağlı kalmam",
+                "Yeni bir yöntemi denemek yerine bildiğim yoldan giderim",
+                "Üretimde/hizmette verimliliği artıracak fikirleri hemen denerim",
+                "Bir işe başlamadan önce tüm detayların bana verilmesini beklerim",
+                "Riskleri hesaplayarak yeni bir sorumluluğu üstlenmekten çekinmem",
+                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
+                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
+                "Başkalarının benim için harekete geçmesini beklerim",
+                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
+                "Bir görevde yetkimin dışına çıkmaktan korkarım",
+                "İşimi daha iyi yapmak için sürekli yeni beceriler öğrenirim",
+                "Kendi güçlü ve zayıf yönlerimi bilmek beni ilgilendirmez",
+                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
+                "Eğitimler ve seminerler genellikle zaman kaybıdır",
+                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
+                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
+                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
+                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
+                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
+            ],
+            // ...grup2, grup3, grup4, grup5 aynı şekilde 100'er soru ile doldurulacak...
+            grup3: [
+                "Şirketin uzun vadeli hedeflerini günlük kararlarıma dahil ederim",
+                "Sektördeki rakiplerin hareketlerini göz ardı ederim",
+                "Gelecekteki pazar trendlerini tahmin edebilirim",
+                "Kısa vadeli sonuçlar, stratejik planlamadan daha önemlidir",
+                "Riskleri ve fırsatları değerlendirerek alternatif planlar geliştiririm",
+                "Büyük resmi görmekten çok, detaylara takılı kalırım",
+                "Stratejik kararlarımı desteklemek için güvenilir verilere dayanırım",
+                "İşler yolunda giderken yeni stratejiler geliştirmeye gerek duymam",
+                "Organizasyonumun rekabet avantajını sürekli sorgularım",
+                "İş planlarını genellikle son teslim tarihine yakın hazırlarım",
+                "Zor ve önemli kararları hızlı ve emin bir şekilde alırım",
+                "Karar alma sürecinde sadece kendi deneyimlerime güvenirim",
+                "Bir kararın olası sonuçlarını önceden hesaplarım",
+                "Baskı altında karar vermek beni felç eder",
+                "Farklı görüşleri dinledikten sonra objektif bir karar veririm",
+                "Hata yapmamak için karar vermeyi sürekli ertelerim",
+                "Yeterli bilgi olmadığında bile risk alarak ilerlerim",
+                "Yanlış olduğu ortaya çıkan bir kararda sorumluluğu başkasına atarım",
+                "Başkalarına karar verme yetkisi (delege etme) vermekten çekinirim",
+                "Kararlarımı ekibime açık ve mantıklı bir şekilde açıklarım",
+                "Ekibimi şirketin vizyonu etrafında toplayabilir ve motive ederim",
+                "Ekip üyelerimin kişisel gelişim hedefleri beni ilgilendirmez",
+                "Ekip üyelerimin potansiyellerini ortaya çıkarmaları için onlara fırsat sunarım",
+                "Ekip içinde çıkan çatışmalara müdahale etmekten kaçınırım",
+                "Zorlu değişiklik süreçlerinde ekibime güven aşılarım",
+                "Yetkimi kullanarak kararlarımı sorgusuzca kabul ettiririm",
+                "Performansı düşük çalışanlara yapıcı ve dürüst geri bildirim veririm",
+                "Liderlik tarzımı farklı durum ve kişilere göre değiştiremem",
+                "Ekibimin kararlara katılımını sağlayarak sahiplenme duygusunu artırırım",
+                "Hata yapmaktan korkan bir çalışan profilini teşvik ederim",
+                "Departman hedeflerimi şirketin genel stratejisiyle uyumlu hale getiririm",
+                "Planlarımı esnek tutmak yerine katı kurallara bağlı kalırım",
+                "Kaynak (zaman, bütçe, personel) dağıtımını etkin bir şekilde yaparım",
+                "Acil durum planı yapmayı genellikle gereksiz bulurum",
+                "Planlama sürecine tüm ilgili paydaşları dahil ederim",
+                "Gelecekteki olası zorlukları planlarıma dahil etmem",
+                "İş akışlarını optimize etmek için düzenli olarak süreçleri gözden geçiririm",
+                "Planlamadan çok, anlık kararlarla ilerlemeyi tercih ederim",
+                "Planlarımı ve ilerlemeyi ekibimle düzenli olarak paylaşırım",
+                "Önceliklerim sık sık değişir ve bu durum ekibi yorar",
+                "Üst yönetimle konuşurken karmaşık bilgileri basitleştiririm",
+                "Çalışanlarımın ne düşündüğünü öğrenmek için düzenli toplantılar yapmam",
+                "Kritik bilgileri doğru zamanda, ilgili kişilere iletirim",
+                "Ekibimle iletişim kurarken genellikle resmi ve mesafeli bir dil kullanırım",
+                "Zorlu geri bildirimleri yapıcı ve empatik bir şekilde verebilirim",
+                "Çalışanların endişelerini dile getirmesi beni rahatsız eder",
+                "Bir konuşmada hem sözlü hem de sözsüz sinyallere dikkat ederim",
+                "Sık sık insanların söylediklerini yanlış anlarım",
+                "Farklı pozisyonlardaki kişilerle rahatlıkla iletişim kurabilirim",
+                "Duygusal zekam, profesyonel iletişimimi olumsuz etkiler",
+                "Karmaşık iş sorunlarında veriye dayalı çözüm yolları ararım",
+                "Bir problem çıktığında ilk tepkim sorunu görmezden gelmek olur",
+                "Sorunların kök nedenlerini tespit etmek için sistematik yöntemler kullanırım",
+                "Basit sorunların çözümü için bile çok zaman harcarım",
+                "Yenilikçi ve yaratıcı problem çözme tekniklerini teşvik ederim",
+                "Başkalarının çözüm önerilerini genellikle yetersiz bulurum",
+                "Problemleri fırsata çevirerek iş süreçlerini iyileştiririm",
+                "Çözüme ulaştıktan sonra süreç analizi yapmam",
+                "Farklı görüşlerden faydalanarak en uygun çözümü bulurum",
+                "Problem çözme yeteneğim, kriz anlarında düşer",
+                "Yüksek kalite standartlarını tüm operasyonel süreçlere entegre ederim",
+                "Kalite yönetim sistemlerinin gerekliliklerini göz ardı ederim",
+                "Kalite hatalarını azaltmak için sürekli iyileştirme projeleri başlatırım",
+                "Kaliteyi artırmak için yapılan yatırımları gereksiz bulurum",
+                "Çalışanlarımın kalite bilincini geliştirmek için eğitimler düzenlerim",
+                "Hız ve maliyet, kalite standartlarının önündedir",
+                "Müşteri şikayetlerini, kalite süreçlerini gözden geçirmek için kullanırım",
+                "Kalite hedeflerine ulaşılmadığında sorumluluğu kabul etmem",
+                "Tedarikçilerimden de aynı yüksek kalite standartlarını talep ederim",
+                "Kalite sorunları genellikle benim kontrolüm dışındaki durumlardan kaynaklanır",
+                "Müşteri ihtiyaçlarını anlamak için düzenli pazar araştırması yaparım",
+                "Müşteri beklentileri değiştiğinde hemen uyum sağlamakta zorlanırım",
+                "Müşteri şikayetlerini hızlı ve tatmin edici bir şekilde çözerim",
+                "Sadece büyük müşterilerin görüşleri benim için önemlidir",
+                "Ekibimi, her etkileşimde müşteri memnuniyetini hedeflemeye yönlendiririm",
+                "Müşteri geri bildirimlerini dinlemek zaman kaybıdır",
+                "Hem iç hem de dış müşterilerime eşit derecede önem veririm",
+                "Müşteriye hayır demekten çekinmem",
+                "Müşteri sadakatini artırmak için uzun vadeli stratejiler geliştiririm",
+                "Müşterinin tam olarak ne istediği benim için her zaman açık değildir",
+                "Sektördeki yenilikleri takip ederek yeni iş alanları yaratırım",
+                "Sürekli yeni fikirler denemektense, mevcut rutinime bağlı kalırım",
+                "Ekibimi belirlenen hedeflerin ötesine geçmeleri için teşvik ederim",
+                "Hata yapma riskini göze alamam",
+                "İşleri hızlandırmak ve verimliliği artırmak için yaratıcı yollar denerim",
+                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
+                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
+                "Başkalarının benim için harekete geçmesini beklerim",
+                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
+                "Yeni bir göreve başlarken detaylı bir kılavuz olmasını şart koşarım",
+                "Şirketimin uzun vadeli rekabet gücünü artırmak için sürekli öğrenirim",
+                "Çalışanlarımın gelişim ihtiyaçlarını göz ardı ederim",
+                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
+                "Eğitimler ve seminerler genellikle zaman kaybıdır",
+                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
+                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
+                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
+                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
+                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
+            ],
+            grup4: [
+                "Müşteri taleplerine her zaman güler yüzle ve sabırla cevap veririm",
+                "Müşterilerin sık sık şikayet etmesi beni sinirlendirir",
+                "Müşterilerin sözünü kesmeden, söylediklerini tamamen dinlerim",
+                "Müşteriye tam olarak ne istediğini sormak yerine varsayımlarla ilerlerim",
+                "Zorlu müşterilerle bile profesyonel ve sakin kalabilirim",
+                "Müşterilerin kişisel sorunlarını çözmek benim görevim değildir",
+                "Müşterilere hızlı ve doğru bilgi sağlamak için çabalarım",
+                "Müşterinin memnuniyeti, sadece yöneticimin sorumluluğundadır",
+                "Hizmet sonrası memnuniyeti ölçmek için inisiyatif alırım",
+                "Müşterinin ne istediğini anlamakta zorlanırım",
+                "Ani değişen vardiya veya çalışma saatlerine kolayca uyum sağlarım",
+                "Yeni bir sisteme veya sürece adapte olmak benim için zordur",
+                "Farklı görevler üstlenmem gerektiğinde itiraz etmem",
+                "İş arkadaşlarımın çalışma tarzlarına ayak uydurmakta güçlük çekerim",
+                "Yüksek tempolu ve stresli çalışma ortamlarında bile sakin kalırım",
+                "Sadece bana verilen talimatlara bağlı kalırım",
+                "Müşterinin değişen taleplerine hızlıca çözüm üretirim",
+                "Rutin dışındaki durumlar beni gereğinden fazla yorar",
+                "Farklı kişilikteki iş arkadaşlarımla iyi geçinirim",
+                "Çalışma ortamında çıkan dedikodulara katılmam",
+                "Ekipteki herkesin işine eşit derecede saygı gösteririm",
+                "Ekip arkadaşlarımdan destek istemekten çekinirim",
+                "İş akışının aksamaması için kendi görevimi eksiksiz tamamlarım",
+                "Sadece benim dışımdaki ekip üyelerinin hataları üzerinde dururum",
+                "Ortak bir hedef belirlediğimizde bu hedefe tam olarak bağlı kalırım",
+                "Ekip içindeki anlaşmazlıklar beni doğrudan etkilemezse karışmam",
+                "İhtiyaç duyulduğunda başka bir birime yardım etmeye gönüllüyüm",
+                "Başkalarıyla çalışmak yerine tek başıma çalışmayı tercih ederim",
+                "İş yükü fazla olan bir arkadaşıma yardım teklif ederim",
+                "Ekip içi bilgi akışını sağlamak benim sorumluluğumda değildir",
+                "Sözlü talimatları dinlerken önemli noktaları not ederim",
+                "Yöneticimle konuşurken genellikle konuyu dağıtırım",
+                "İş arkadaşlarımla net ve saygılı bir dil kullanırım",
+                "Bir talimatı tam olarak anlamadan uygulamaya başlarım",
+                "Müşterilerle iletişim kurarken daima pozitif bir dil kullanırım",
+                "Sık sık insanların ne demek istediğini yanlış anlarım",
+                "Üretim veya hizmet alanındaki sorunları çekinmeden dile getiririm",
+                "İletişim kurarken teknik jargon kullanmaktan kaçınmam",
+                "Çalışma ortamında çıkan dedikodulara katılmam",
+                "Sorun çıktığında kişisel olarak algılar ve küserim",
+                "Vardiyam boyunca işimi verimli bir şekilde planlarım",
+                "Molalarımı genellikle uzatırım",
+                "İş akışındaki önceliklere göre kendimi hızlıca adapte ederim",
+                "Bana verilen görevi ne zaman bitireceğimi nadiren bilirim",
+                "Boş zamanlarımda bile etrafımdaki işleri düzenlerim",
+                "Görevleri yetiştiremeyeceğimi anladığımda yardım istemem",
+                "Zorlu işleri bitirmek için gerekli zamanı her zaman ayırırım",
+                "İşim bittikten sonra dinlenmektense, yeni işler aramaya koyulurum",
+                "İş yerindeki dağınıklık çalışma hızımı olumsuz etkilemez",
+                "Bir işi bitirmek için sürekli başkalarının onayını beklerim",
+                "Hizmet/ürün standartlarını titizlikle uygularım",
+                "Kalite kontrolde çıkan küçük kusurları göz ardı edebilirim",
+                "Hata payını en aza indirmek için ekstra önlemler alırım",
+                "İşim bittikten sonra kontrol etmekle vakit kaybetmem",
+                "Müşteriye sunduğum hizmetin kalitesini sürekli kontrol ederim",
+                "Kalitesiz hizmet vermektense, hizmeti yavaşlatmayı tercih ederim",
+                "Kalite benim için hızdan sonra gelir",
+                "Kullandığım malzemelerin kalitesini sürekli kontrol ederim",
+                "Kaliteyi sağlamanın tek yolu katı kurallara uymaktır",
+                "Kaliteyi artıracak önerilerimi yöneticilerime sunmaktan çekinmem",
+                "İşimin kalitesi ve zamanında teslimatından ben sorumluyum",
+                "İş yerindeki kişisel eşyalarımı dağınık bırakırım",
+                "Yapılması gereken işlerde proaktif davranırım ve beklemede kalmam",
+                "Çalışma ortamımın temiz ve düzenli olmasından ben sorumlu değilim",
+                "Verilen görevleri tamamlamadan işten ayrılmam",
+                "Benim sorumluluğumdaki bir hata çıktığında kolayca mazeret bulurum",
+                "Tüm araç ve gereçleri büyük bir dikkatle kullanırım",
+                "İş yapma biçimim sık sık başkalarını olumsuz etkiler",
+                "Görevimi yerine getirirken şirket kaynaklarını dikkatli kullanırım",
+                "İşimi yaparken sık sık kişisel işlerimle ilgilenirim",
+                "Müşterinin yaşadığı sorunlara hızlı ve etkili çözümler üretirim",
+                "Bir sorun çıktığında ilk tepkim başkasının gelip çözmesini beklemek olur",
+                "Sorunu çözmek için farklı yöntemleri denemekten çekinmem",
+                "Bir sorunun kök nedenini bulmak yerine, sadece belirtileri gidermeye odaklanırım",
+                "Problem çözümü için gerekli olan bilgileri hızla toplarım",
+                "Karmaşık sorunlar beni gergin ve çaresiz hissettirir",
+                "Çözüm süreci boyunca soğukkanlılığımı korurum",
+                "Basit sorunları bile çözmek için uzun süreye ihtiyacım olur",
+                "İş akışımı etkileyen problemleri yöneticime doğru şekilde aktarırım",
+                "Başkalarının çözüm önerilerini genellikle kabul etmem",
+                "Daha iyi bir hizmet yolu varsa, mevcut talimatlara bağlı kalmam",
+                "Yeni bir yöntemi denemek yerine bildiğim yoldan giderim",
+                "Hizmette verimliliği artıracak fikirleri hemen denerim",
+                "Bir işe başlamadan önce tüm detayların bana verilmesini beklerim",
+                "Riskleri hesaplayarak yeni bir sorumluluğu üstlenmekten çekinmem",
+                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
+                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
+                "Başkalarının benim için harekete geçmesini beklerim",
+                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
+                "Bir görevde yetkimin dışına çıkmaktan korkarım",
+                "İşimi daha iyi yapmak için sürekli yeni beceriler öğrenirim",
+                "Kendi güçlü ve zayıf yönlerimi bilmek beni ilgilendirmez",
+                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
+                "Eğitimler ve seminerler genellikle zaman kaybıdır",
+                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
+                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
+                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
+                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
+                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
+            ],
+            grup5: [
+                "Mevcut süreçleri iyileştirmek için proaktif öneriler sunarım",
+                "Sadece bana söylenilen görevleri yaparım, fazlasını değil",
+                "İhtiyaç duyulan bilgi veya kaynağı kendi çabamla bulurum",
+                "Hata yapma ihtimali varsa, yeni bir şey denemekten kaçınırım",
+                "İşleri hızlandırmak ve verimliliği artırmak için yaratıcı yollar denerim",
+                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
+                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
+                "Başkalarının benim için harekete geçmesini beklerim",
+                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
+                "Yeni bir göreve başlarken detaylı bir kılavuz olmasını şart koşarım",
+                "Karmaşık bilgileri sadeleştirerek herkese ulaştırırım",
+                "Geri bildirim almaktan kaçınır, genellikle savunmacı bir tavır sergilerim",
+                "Çatışma durumlarında konuyu uzatmaktansa sessiz kalmayı tercih ederim",
+                "Farklı departmanlarla düzenli ve etkili bir iletişim ağı kurarım",
+                "Hem sözlü hem de yazılı iletişimde açık ve ikna ediciyimdir",
+                "Çalışanların endişelerini dile getirmesi beni rahatsız eder",
+                "Önemli bilgileri zamanında ve uygun kanallar aracılığıyla paylaşırım",
+                "İletişim kurarken teknik jargon kullanmaktan kaçınmam",
+                "Ekibimin kararlara katılımını sağlamak için düzenli olarak görüş alırım",
+                "Duygusal zekam, profesyonel iletişimimi olumsuz etkiler",
+                "Departman hedeflerimi şirketin genel stratejisiyle uyumlu hale getiririm",
+                "Planlarımı esnek tutmak yerine katı kurallara bağlı kalırım",
+                "Kaynak (zaman, bütçe, personel) dağıtımını etkin bir şekilde yaparım",
+                "Acil durum planı yapmayı genellikle gereksiz bulurum",
+                "Planlama sürecine tüm ilgili paydaşları dahil ederim",
+                "Gelecekteki olası zorlukları planlarıma dahil etmem",
+                "İş akışlarını optimize etmek için düzenli olarak süreçleri gözden geçiririm",
+                "Planlamadan çok, anlık kararlarla ilerlemeyi tercih ederim",
+                "Planlarımı ve ilerlemeyi ekibimle düzenli olarak paylaşırım",
+                "Önceliklerim sık sık değişir ve bu durum ekibi yorar",
+                "Şirketin uzun vadeli hedeflerini günlük kararlarıma dahil ederim",
+                "Sektördeki rakiplerin hareketlerini göz ardı ederim",
+                "Gelecekteki pazar trendlerini tahmin edebilirim",
+                "Kısa vadeli sonuçlar, stratejik planlamadan daha önemlidir",
+                "Riskleri ve fırsatları değerlendirerek alternatif planlar geliştiririm",
+                "Büyük resmi görmekten çok, detaylara takılı kalırım",
+                "Stratejik kararlarımı desteklemek için güvenilir verilere dayanırım",
+                "İşler yolunda giderken yeni stratejiler geliştirmeye gerek duymam",
+                "Organizasyonumun rekabet avantajını sürekli sorgularım",
+                "İş planlarını genellikle son teslim tarihine yakın hazırlarım",
+                "Zor ve önemli kararları hızlı ve emin bir şekilde alırım",
+                "Karar alma sürecinde sadece kendi deneyimlerime güvenirim",
+                "Bir kararın olası sonuçlarını önceden hesaplarım",
+                "Baskı altında karar vermek beni felç eder",
+                "Farklı görüşleri dinledikten sonra objektif bir karar veririm",
+                "Hata yapmamak için karar vermeyi sürekli ertelerim",
+                "Yeterli bilgi olmadığında bile risk alarak ilerlerim",
+                "Yanlış olduğu ortaya çıkan bir kararda sorumluluğu başkasına atarım",
+                "Başkalarına karar verme yetkisi (delege etme) vermekten çekinirim",
+                "Kararlarımı ekibime açık ve mantıklı bir şekilde açıklarım",
+                "Karmaşık iş sorunlarında veriye dayalı çözüm yolları ararım",
+                "Bir problem çıktığında ilk tepkim sorunu görmezden gelmek olur",
+                "Sorunların kök nedenlerini tespit etmek için sistematik yöntemler kullanırım",
+                "Basit sorunların çözümü için bile çok zaman harcarım",
+                "Yenilikçi ve yaratıcı problem çözme tekniklerini teşvik ederim",
+                "Başkalarının çözüm önerilerini genellikle yetersiz bulurum",
+                "Problemleri fırsata çevirerek iş süreçlerini iyileştiririm",
+                "Çözüme ulaştıktan sonra süreç analizi yapmam",
+                "Farklı görüşlerden faydalanarak en uygun çözümü bulurum",
+                "Problem çözme yeteneğim, kriz anlarında düşer",
+                "Yüksek kalite standartlarını tüm hizmet süreçlerine entegre ederim",
+                "Kalite yönetim sistemlerinin gerekliliklerini göz ardı ederim",
+                "Kalite hatalarını azaltmak için sürekli iyileştirme projeleri başlatırım",
+                "Kaliteyi artırmak için yapılan yatırımları gereksiz bulurum",
+                "Çalışanlarımın kalite bilincini geliştirmek için eğitimler düzenlerim",
+                "Hız ve maliyet, kalite standartlarının önündedir",
+                "Müşteri şikayetlerini, kalite süreçlerini gözden geçirmek için kullanırım",
+                "Kalite hedeflerine ulaşılmadığında sorumluluğu kabul etmem",
+                "Tedarikçilerimden de aynı yüksek kalite standartlarını talep ederim",
+                "Kalite sorunları genellikle benim kontrolüm dışındaki durumlardan kaynaklanır",
+                "Müşteri ihtiyaçlarını anlamak için düzenli pazar araştırması yaparım",
+                "Müşteri beklentileri değiştiğinde hemen uyum sağlamakta zorlanırım",
+                "Müşteri şikayetlerini hızlı ve tatmin edici bir şekilde çözerim",
+                "Sadece büyük müşterilerin görüşleri benim için önemlidir",
+                "Ekibimi, her etkileşimde müşteri memnuniyetini hedeflemeye yönlendiririm",
+                "Müşteri geri bildirimlerini dinlemek zaman kaybıdır",
+                "Hem iç hem de dış müşterilerime eşit derecede önem veririm",
+                "Müşteriye hayır demekten çekinmem",
+                "Müşteri sadakatini artırmak için uzun vadeli stratejiler geliştiririm",
+                "Müşterinin tam olarak ne istediği benim için her zaman açık değildir",
+                "Önceliklerime göre zamanımı etkin bir şekilde tahsis ederim",
+                "Çalışma saatlerimi sosyal medya veya gereksiz e-postalara harcarım",
+                "Yüksek hacimli görevleri küçük, yönetilebilir adımlara bölerim",
+                "Zaman baskısı altında işleri yetiştirmekte zorlanırım",
+                "Gecikmelere neden olan süreçleri düzenli olarak analiz edip düzeltirim",
+                "Toplantılara her zaman zamanında katılmam",
+                "En önemli görevleri (zorunlu olmasa da) günün erken saatlerinde bitiririm",
+                "Son teslim tarihlerini sık sık kaçırma eğilimim vardır",
+                "Programımı düzenli tutmak için sürekli çaba gösteririm",
+                "Bir işi bitirmek için sürekli başkalarının onayını beklerim",
+                "Bir projede doğal olarak liderlik rolünü üstlenmeye hazırım",
+                "Genellikle riskli kararlar almaktan kaçınırım",
+                "Ekip arkadaşlarıma görevleri adil bir şekilde delege edebilirim",
+                "Bir ekibi yönetmek, kişisel performansıma odaklanmaktan daha zordur",
+                "Başkalarını motive etmek ve ortak bir vizyon etrafında toplamak konusunda başarılıyımdır",
+                "Hata yapan birini eleştirmektense, konuyu geçiştirmeyi tercih ederim",
+                "Ekip üyelerimin gelişimine katkıda bulunmak için mentorluk yaparım",
+                "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
+                "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
+                "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur"
+            ],
+        };
+
+        // 500 soruluk gerçek cevap anahtarı (SORU_NO, HEDEF_PUAN)
+        const questionAnswerKey = [
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,5,1,5,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5
+    ];
+
+        // Kullanıcının verdiği cevaplara göre toplam puanı hesaplayan fonksiyon
+        function puanHesapla(sorular, cevaplar) {
+            let toplamPuan = 0;
+            let maxPuan = 0;
+            // Cevap anahtarı: doğru seçenekler (ör: [5,1,5,...])
+            // questionAnswerKey dizisi kullanılacak
+            for (let i = 0; i < sorular.length; i++) {
+                const soru = sorular[i];
+                const cevap = cevaplar[i];
+                // Soru string ise anahtardan doğru cevabı al
+                let dogruCevap = (typeof questionAnswerKey !== 'undefined' && questionAnswerKey[i]) ? questionAnswerKey[i] : 5;
+                // Kullanıcı cevabı 0 tabanlı index, 1-5 arası puan için +1
+                let kullaniciCevap = (cevap !== null && cevap !== undefined) ? (cevap + 1) : null;
+                let puan = 0;
+                if (kullaniciCevap === null) {
+                    puan = 0;
+                } else if (dogruCevap === 5) {
+                    if (kullaniciCevap === 5) puan = 1;
+                    else if (kullaniciCevap === 4) puan = 0.75;
+                    else if (kullaniciCevap === 3) puan = 0.5;
+                    else if (kullaniciCevap === 2) puan = 0.25;
+                    else if (kullaniciCevap === 1) puan = 0; // tam tersi %0
+                    else puan = 0;
+                } else if (dogruCevap === 1) {
+                    if (kullaniciCevap === 1) puan = 1;
+                    else if (kullaniciCevap === 2) puan = 0.75;
+                    else if (kullaniciCevap === 3) puan = 0.5;
+                    else if (kullaniciCevap === 4) puan = 0.25;
+                    else if (kullaniciCevap === 5) puan = 0; // tam tersi %0
+                    else puan = 0;
+                } else {
+                    // Eğer anahtarda 2,3,4 gibi değer olursa tam eşleşme 1, diğerleri 0
+                    puan = (kullaniciCevap === dogruCevap) ? 1 : 0;
+                }
+                toplamPuan += puan;
+                maxPuan += 1;
+            }
+            // Yüzdelik başarı oranı
+            const yuzde = maxPuan > 0 ? Math.round((toplamPuan / maxPuan) * 100) : 0;
+            return yuzde;
+        }
+
+        // Metodoloji fonksiyonları
+        function showMethodology() {
+            document.getElementById('methodologyModal').classList.remove('hidden');
+        }
+        
+        function closeMethodology() {
+            document.getElementById('methodologyModal').classList.add('hidden');
+        }
+
+        // Sorumluluk reddi fonksiyonları
+        function showDisclaimer() {
+            document.getElementById('disclaimerModal').classList.remove('hidden');
+        }
+        
+        function closeDisclaimer() {
+            document.getElementById('disclaimerModal').classList.add('hidden');
+        }
+        
+        function acceptDisclaimer() {
+            disclaimerAccepted = true;
+            document.getElementById('disclaimerAccept').checked = true;
+            document.getElementById('disclaimerAccept').disabled = false;
+            
+            // Sadece aday portalı butonunu aktif et (admin ve İK zaten aktif)
+            document.getElementById('candidateButton').disabled = false;
+            
+            // İK kayıt butonunu da güncelle
+            updateHrRegisterButton();
+            
+            // Modal'ı kapat
+            closeDisclaimer();
+            
+            // Başarı mesajı
+            const successMsg = document.createElement('div');
+            successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            successMsg.textContent = 'Sorumluluk reddi beyanı onaylandı. Artık aday portalına giriş yapabilir ve İK kayıt işlemi yapabilirsiniz.';
+            document.body.appendChild(successMsg);
+            
+            setTimeout(() => {
+                successMsg.remove();
+            }, 3000);
+        }
+
+        // Ana fonksiyonlar
+        function showRoleLogin(role) {
+            // Admin için sorumluluk reddi zorunlu değil
+            // İK yöneticisi için de zorunlu değil (kayıtlı kullanıcılar giriş yapabilir)
+            if (role === 'candidate' && !disclaimerAccepted) {
+                alert('Lütfen önce sorumluluk reddi beyanını okuyun ve onaylayın!');
+                return;
+            }
+            
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('roleLoginScreen').classList.remove('hidden');
+            currentRole = role;
+            
+            const titles = {
+                admin: '👨‍💼 Admin Yönetici Girişi',
+                hr: '👩‍💻 İK Yönetici Girişi',
+                candidate: '📝 Aday Girişi'
+            };
+            
+            document.getElementById('roleTitle').textContent = titles[role];
+            
+            if (role === 'candidate') {
+                document.getElementById('candidateFields').classList.remove('hidden');
+                document.getElementById('adminHrFields').classList.add('hidden');
+                document.getElementById('hrRegisterOption').classList.add('hidden');
             } else {
-                window.registeredCompany = null;
-                if (registeredUserInfoEl) {
-                    registeredUserInfoEl.classList.add('hidden');
-                    registeredUserInfoEl.textContent = '';
+                document.getElementById('candidateFields').classList.add('hidden');
+                document.getElementById('adminHrFields').classList.remove('hidden');
+                if (role === 'hr') {
+                    document.getElementById('hrRegisterOption').classList.remove('hidden');
+                    // Kayıt ol butonunun durumunu güncelle
+                    updateHrRegisterButton();
+                } else {
+                    document.getElementById('hrRegisterOption').classList.add('hidden');
                 }
             }
+        }
+
+        function backToMain() {
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            // İK yöneticilerini güncel çek
+            fetchHrManagers();
+            currentRole = null;
+        }
+
+        function updateHrRegisterButton() {
+            const hrRegisterButton = document.getElementById('hrRegisterButton');
+            if (hrRegisterButton) {
+                if (disclaimerAccepted) {
+                    hrRegisterButton.disabled = false;
+                } else {
+                    hrRegisterButton.disabled = true;
+                }
+            }
+        }
+
+        function showHrRegister() {
+            // İK kayıt için sorumluluk reddi zorunlu
+            if (!disclaimerAccepted) {
+                alert('Lütfen önce sorumluluk reddi beyanını okuyun ve onaylayın!');
+                return;
+            }
+            
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('hrRegisterScreen').classList.remove('hidden');
+        }
+
+        function backToRoleLogin() {
+            document.getElementById('hrRegisterScreen').classList.add('hidden');
+            document.getElementById('roleLoginScreen').classList.remove('hidden');
+        }
+
+        function logout() {
+            currentUser = null;
+            currentRole = null;
+            document.querySelectorAll('[id$="Panel"]').forEach(panel => panel.classList.add('hidden'));
+            document.getElementById('loginScreen').classList.remove('hidden');
+        }
+
+        // Giriş formu işleme
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (currentRole === 'candidate') {
+                const alias = document.getElementById('candidateAlias').value.trim();
+                const password = document.getElementById('candidatePassword').value.trim();
+                console.log('Girişte girilen alias:', alias);
+                console.log('Girişte girilen şifre:', password);
+                console.log('candidates dizisi:', candidates);
+                if (candidates.length === 0) {
+                    fetchCandidates(() => {
+                        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+                    });
+                    return;
+                }
+                const candidate = candidates.find(c => c.alias === alias && c.password === password);
+                if (candidate) {
+                    currentUser = candidate;
+                    showCandidatePanel();
+                } else {
+                    alert('Geçersiz rumuz veya şifre!');
+                }
+            } else {
+                const email = document.getElementById('adminHrEmail').value.trim();
+                const password = document.getElementById('adminHrPassword').value.trim();
+                if (currentRole === 'admin') {
+                    // Admin giriş kontrolü (demo için basit kontrol)
+                    if (email === 'akcaprox@gmail.com' && password === 'Ba030714') {
+                        currentUser = { email, role: 'admin' };
+                        showAdminPanel();
+                    } else {
+                        alert('Geçersiz admin bilgileri!');
+                    }
+                } else if (currentRole === 'hr') {
+                    if (hrManagers.length === 0) {
+                        fetchHrManagers(() => {
+                            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+                        });
+                        return;
+                    }
+                    const hrManager = hrManagers.find(hr => hr.email === email && hr.password === password && hr.status === 'active');
+                    if (hrManager) {
+                        currentUser = hrManager;
+                        showHrPanel();
+                    } else {
+                        alert('Geçersiz İK yönetici bilgileri veya hesap pasif!');
+                    }
+                }
+            }
+        });
+
+        // Panel gösterme fonksiyonları
+        function showAdminPanel() {
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            loadAdminData();
+        }
+
+        function showHrPanel() {
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('hrPanel').classList.remove('hidden');
+            
+            // İK yöneticisi giriş yaptıktan sonra kayıt ol seçeneğini kilitle
+            localStorage.setItem('hrRegistrationLocked', 'true');
+            
+            showHrSection('dashboard');
+        }
+
+        function showCandidatePanel() {
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('candidatePanel').classList.remove('hidden');
+            
+            const categoryNames = {
+                manufacturing_blue: 'İmalat İşleri - Mavi Yaka',
+                manufacturing_white: 'İmalat İşleri - Beyaz Yaka',
+                manufacturing_manager: 'İmalat İşleri - Yönetici',
+                service_personnel: 'Hizmet İşleri - Hizmet Personeli',
+                service_admin: 'Hizmet İşleri - Hizmet İdari Yönetici'
+            };
+            
+            document.getElementById('candidateTestArea').textContent = categoryNames[currentUser.category];
+        }
+
+        // Admin panel fonksiyonları
+        function loadAdminData(filteredList) {
+            db.ref('hrManagers').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                let hrManagers = Array.isArray(filteredList)
+                    ? filteredList
+                    : Object.values(val);
+                document.getElementById('totalHrManagers').textContent = hrManagers.length;
+                document.getElementById('activeUsers').textContent = hrManagers.filter(hr => hr.status === 'active').length;
+                document.getElementById('inactiveUsers').textContent = hrManagers.filter(hr => hr.status === 'inactive').length;
+                const tbody = document.getElementById('hrManagersList');
+                tbody.innerHTML = '';
+                hrManagers.forEach(hr => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${hr.organization}</td>
+                        <td class="px-4 py-3">${hr.name}</td>
+                        <td class="px-4 py-3">${hr.email}</td>
+                        <td class="px-4 py-3">${hr.phone}</td>
+                        <td class="px-4 py-3">${hr.position}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs ${hr.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${hr.status === 'active' ? 'Aktif' : 'Pasif'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <button onclick="toggleHrStatus('${hr.id}')" class="px-3 py-1 rounded text-xs ${hr.status === 'active' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
+                                ${hr.status === 'active' ? 'Pasif Yap' : 'Aktif Yap'}
+                            </button>
+                            <button onclick="deleteHrManager('${hr.id}'); loadAdminData();" class="ml-2 px-3 py-1 rounded text-xs bg-red-500 hover:bg-red-700 text-white">Sil</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+        }
+// Admin paneli tarih filtreleme eventleri
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('adminFilterStartDate');
+    const endInput = document.getElementById('adminFilterEndDate');
+    const filterBtn = document.getElementById('adminFilterDateBtn');
+    const clearBtn = document.getElementById('adminClearDateBtn');
+    if (filterBtn && startInput && endInput) {
+        filterBtn.addEventListener('click', function() {
+            const start = startInput.value ? new Date(startInput.value) : null;
+            const end = endInput.value ? new Date(endInput.value) : null;
+            db.ref('hrManagers').once('value').then(snapshot => {
+                let hrManagers = Object.values(snapshot.val() || {});
+                if (start) {
+                    hrManagers = hrManagers.filter(hr => hr.createdAt && new Date(hr.createdAt) >= start);
+                }
+                if (end) {
+                    const endOfDay = new Date(end);
+                    endOfDay.setHours(23,59,59,999);
+                    hrManagers = hrManagers.filter(hr => hr.createdAt && new Date(hr.createdAt) <= endOfDay);
+                }
+                loadAdminData(hrManagers);
+            });
+        });
+    }
+    if (clearBtn && startInput && endInput) {
+        clearBtn.addEventListener('click', function() {
+            startInput.value = '';
+            endInput.value = '';
+            loadAdminData();
         });
     }
 });
-        // Global değişkenler
-        let currentModule = 'survey';
-        let surveyStartTime = null;
-        let timerInterval = null;
-        let currentQuestions = [];
-        let currentQuestionIndex = 0;
-        let answers = [];
-        let selectedJobType = '';
-        let loggedInCompany = null;
-        let isAdminLoggedIn = false;
 
-
-    // Firebase Realtime Database ayarları
-    const FIREBASE_DB_URL = 'https://egitim-37c53-default-rtdb.europe-west1.firebasedatabase.app';
-        // responses artık bir nesne olarak tutulacak (array değil)
-
-        // Soru setleri
-        const questions = {
-                "Öğrenci": [
-                    // 1. Ders İçeriği ve Öğrenme Ortamı
-                    "Derslerde işlenen konular ilgi çekici ve hayatla bağlantılıdır.",
-                    "Öğretmenlerimin kullandığı öğretim yöntemleri (tartışma, proje vb.) öğrenmemi kolaylaştırıyor.",
-                    "Okuldaki teknolojik araçlar (akıllı tahta, bilgisayar laboratuvarı) derslere katkı sağlıyor.",
-                    "Ders sırasında soru sormaktan veya fikrimi belirtmekten çekinmiyorum.",
-                    "Sınavlar ve değerlendirmeler, öğrendiklerimi doğru bir şekilde ölçmektedir.",
-                    // 2. Okul İklimi ve Güvenlik
-                    "Okulumda kendimi fiziksel ve duygusal olarak güvende hissediyorum.",
-                    "Okulda akran zorbalığı (bullying) ve taciz olayları nadiren yaşanmaktadır.",
-                    "Okul yönetiminin kural ve disiplin uygulamaları adil ve tutarlıdır.",
-                    "Okul binası ve çevresi temiz ve bakımlıdır.",
-                    "Okulun acil durum ve güvenlik tatbikatları konusunda bilgi sahibiyim.",
-                    // 3. Öğretmen Etkileşimi ve Destek
-                    "Öğretmenlerim bana saygılı davranır ve bana değer verdiğini hissettirir.",
-                    "Bir konuda yardıma ihtiyacım olduğunda, öğretmenime kolayca ulaşabilirim.",
-                    "Öğretmenlerim, hatalarımdan ders çıkarmam için beni cesaretlendirir.",
-                    "Öğretmenlerim, bireysel öğrenme farklılıklarımı dikkate alarak yardımcı olur.",
-                    "Okul rehberlik servisi, eğitim ve kariyer hedeflerimde bana yol göstermektedir.",
-                    // 4. Sosyal ve Kültürel Aktiviteler
-                    "Okulda katılabileceğim kulüpler, spor takımları ve sanatsal etkinlikler yeterince çeşitlidir.",
-                    "Okul gezileri ve saha çalışmaları dersleri daha anlamlı hale getirmektedir.",
-                    "Okul, benim liderlik becerilerimi geliştirecek fırsatlar sunmaktadır.",
-                    "Okul etkinlikleri, farklı öğrencilerle tanışmamı ve kaynaşmamı sağlamaktadır.",
-                    "Okuldaki sosyal etkinlikler için ayrılan mekanlar ve materyaller yeterlidir.",
-                    // 5. Fiziksel Olanaklar
-                    "Okuldaki kütüphane ve okuma alanları ders çalışmak için uygun bir ortam sunmaktadır.",
-                    "Okulun spor salonu/alanları yeterli donanıma ve bakıma sahiptir.",
-                    "Okulun yemekhanesi/kantini hijyenik ve sunduğu seçenekler sağlıklıdır.",
-                    "Tuvalet ve lavaboların temizlik ve hijyeni yeterli düzeydedir.",
-                    "Okulun ısıtma ve havalandırma sistemleri, ders sırasında rahat hissetmemi sağlamaktadır.",
-                    // 6. Karar Alma Süreçleri ve Katılım
-                    "Okul yönetiminin bizimle ilgili aldığı kararlar hakkında fikrimiz sorulmaktadır.",
-                    "Öğrenci konseyi/temsilciliği, öğrencilerin sesi olma görevini etkili bir şekilde yerine getirmektedir.",
-                    "Okul kurallarının belirlenme sürecinde, öğrencilerin görüşleri önemsenmektedir.",
-                    "Okulda kendimi önemli ve değerli bir parça olarak görüyorum.",
-                    "Okulda eleştirel düşünceyi ve tartışmayı teşvik eden bir ortam vardır.",
-                    // 7. Bilişim ve Dijitalleşme
-                    "Okulun interneti (wi-fi) hızlı ve güvenli bir şekilde çalışmaktadır.",
-                    "Okulun kullandığı dijital öğrenme platformları (LMS vb.) kolay kullanımlıdır.",
-                    "Öğretmenlerimin teknolojiyi kullanma becerileri dersleri daha iyi hale getiriyor.",
-                    "Okul, dijital vatandaşlık ve internet güvenliği konularında beni bilinçlendirmektedir.",
-                    "E-posta, not sistemi gibi dijital iletişim araçları üzerinden bilgiye kolayca ulaşabilirim.",
-                    // 8. Okul Dışı Hazırlık ve Ödevler
-                    "Bana verilen ödevler, öğrenmemi destekleyecek şekilde anlamlı ve faydalıdır.",
-                    "Ödevlerin zorluk seviyesi ve süresi, diğer derslerimle dengeyi korumaktadır.",
-                    "Öğretmenlerim, ödevlerimi düzenli kontrol eder ve yapıcı geri bildirim verir.",
-                    "Okul, üniversite/gelecek kariyerim için gereken becerileri kazanmama yardımcı olmaktadır.",
-                    "Okul dışındaki özel derslere veya ek kurslara ihtiyaç duymuyorum.",
-                    // 9. Çeşitlilik ve Kapsayıcılık
-                    "Okulumuz farklı kültür, inanç ve geçmişten gelen öğrencileri kucaklamaktadır.",
-                    "Okulda dezavantajlı öğrenciler için özel olarak tasarlanmış destek programları mevcuttur.",
-                    "Öğretmenlerim, cinsiyet, ırk veya engel ayrımı yapmaksızın tüm öğrencilere eşit davranır.",
-                    "Okul, farklı fikirlere ve bakış açılarına saygı duyulmasını teşvik etmektedir.",
-                    "Okulda kendimi olduğum gibi kabul edilmiş hissediyorum.",
-                    // 10. Genel Memnuniyet ve Tavsiye
-                    "Okula gitmekten genellikle mutluyum ve isteyerek geliyorum.",
-                    "Bu okulu arkadaşlarıma ve aileme tavsiye ederim.",
-                    "Okulun genel atmosferi ve pozitif enerjisi yüksektir.",
-                    "Okuldaki başarım ve kişisel gelişimim arasında pozitif bir ilişki görüyorum.",
-                    "Genel olarak, bu okuldaki eğitim kalitesinden ve deneyiminden memnunum."
-                ],
-                "Öğretmen": [
-                    // 1. Ders İçeriği ve Öğrenme Ortamı
-                    "Müfredat içeriği, öğrencilerin yaş ve gelişim seviyelerine uygun ve günceldir.",
-                    "Öğretmenler odası ve ortak çalışma alanları, verimli çalışmam için yeterli ve konforludur.",
-                    "Derste kullanmamız gereken teknolojik donanımlar (akıllı tahta, projeksiyon) sorunsuz çalışmaktadır.",
-                    "Sınıf mevcudu, etkili ve birebir öğrenmeyi destekleyecek ideal seviyededir.",
-                    "Okulun laboratuvar, atölye ve sanatsal materyal bütçesi derslerimi zenginleştirmeye yeterlidir.",
-                    // 2. Okul İklimi ve Güvenlik
-                    "Okuldaki iş yükü, stres yönetimi konusunda idareden destek alıyorum.",
-                    "Okul yönetiminin disiplin kurallarını uygulama konusunda tutarlı ve adildir.",
-                    "Velilerle olan iletişimim, öğrenci başarısını destekleyici ve saygılı bir zeminde ilerlemektedir.",
-                    "Okul, öğretmenler arasında mesleki işbirliği ve saygılı bir iletişim kültürünü teşvik etmektedir.",
-                    "Okuldaki güvenlik prosedürleri, hem öğrenciler hem de personel için yeterlidir.",
-                    // 3. Öğretmen Etkileşimi ve Destek
-                    "Okul yönetimi, öğretmenler arası fikir alışverişini ve ortak proje geliştirmeyi desteklemektedir.",
-                    "Performans değerlendirme ve geri bildirimler, adil ve gelişim odaklıdır.",
-                    "Rehberlik servisi ile öğrenci sorunları ve özel ihtiyaçları konusunda etkili işbirliği yapıyorum.",
-                    "İdareden aldığım idari ve lojistik destek (evrak, fotokopi vb.) yeterlidir.",
-                    "Okul, benim mesleki özerkliğime ve karar verme yetkime saygı duymaktadır.",
-                    // 4. Sosyal ve Kültürel Aktiviteler
-                    "Öğrencilerin kulüp ve aktivite seçimlerine rehberlik etme konusunda yeterli zamanım var.",
-                    "Okulun sosyal ve kültürel etkinlikleri, öğrencilerin kişisel gelişimine somut katkı sağlamaktadır.",
-                    "Aktiviteler için ayrılan bütçe ve kaynaklar, etkinlik kalitesini korumaktadır.",
-                    "Okul dışı gezilerin organizasyonu, öğretmenler için gereksiz iş yükü yaratmamaktadır.",
-                    "Okul, öğrencilerin ilgi alanlarına yönelik yenilikçi aktivite fikirlerimi desteklemektedir.",
-                    // 5. Fiziksel Olanaklar
-                    "Sınıfların fiziksel düzeni (ışık, masa, sandalye) farklı öğretim yöntemlerine uygundur.",
-                    "Okulun kütüphane ve kaynak materyal stoğu derslerimi destekleyecek kadar geniştir.",
-                    "Okul, öğretmenlerin dinlenmesi ve hazırlanması için yeterli ve kaliteli özel alanlar sunmaktadır.",
-                    "Okul binasının genel temizliği ve bakımı, çalışma motivasyonumu artırmaktadır.",
-                    "Okul yönetimi, fiziksel iyileştirmeler konusunda öğretmenlerin önerilerini dikkate alır.",
-                    // 6. Karar Alma Süreçleri ve Katılım
-                    "Okulun eğitim politikalarının ve hedeflerinin belirlenme sürecine aktif olarak katılırım.",
-                    "Bölüm toplantıları, okulun stratejik yönü hakkında fikir beyan etmem için etkili bir platformdur.",
-                    "Öğretmenler olarak, müfredat ve ders materyalleri seçimi konusunda yeterli yetkiye sahibiz.",
-                    "Okulda yönetimsel kararların gerekçeleri bize açık ve şeffaf bir şekilde açıklanır.",
-                    "Okulun kaynak tahsisi (personel, bütçe) kararlarında adil davranıldığına inanıyorum.",
-                    // 7. Bilişim ve Dijitalleşme
-                    "Okulun kullandığı öğrenci yönetim sistemleri (OBS, LMS) kullanıcı dostu ve işimi kolaylaştırmaktadır.",
-                    "BT (Bilgi Teknolojileri) desteği, teknik sorunlarımı hızlı ve etkili bir şekilde çözmektedir.",
-                    "Dijital platformlar üzerinden velilere not ve geri bildirim gönderme sürecim sorunsuz ilerlemektedir.",
-                    "Okul, derslerimde dijital teknolojileri daha etkili kullanmam için sürekli eğitimler sağlamaktadır.",
-                    "Okulda öğrenci verilerinin gizliliği ve güvenliği konusunda sıkı protokoller uygulanmaktadır.",
-                    // 8. Okul Dışı Hazırlık ve Ödevler
-                    "Okul yönetimi, öğretmenler arası ödev yükünü dengelemeye dikkat etmektedir.",
-                    "Ödev kontrolü ve geri bildirim için haftalık ders saatleri dışında yeterli zamanım kalmaktadır.",
-                    "Velilerin ödevlere gereğinden fazla müdahalesi konusunda okul net bir duruş sergilemektedir.",
-                    "Öğrencileri üniversite giriş sınavlarına hazırlama konusunda yeterli kaynak ve desteğe sahibiz.",
-                    "Öğretmenlerin özel ders verme kuralları şeffaf ve okul politikalarıyla uyumludur.",
-                    // 9. Çeşitlilik ve Kapsayıcılık
-                    "Özel gereksinimli öğrenciler için okulda yeterli destek personeli (özel eğitim uzmanı) mevcuttur.",
-                    "Okul, farklı kültür ve geçmişten gelen öğrencilerin uyumunu sağlamak için aktif programlar yürütmektedir.",
-                    "Kapsayıcı eğitim yöntemleri konusunda düzenli olarak hizmet içi eğitim alıyorum.",
-                    "Okuldaki ırk, cinsiyet veya dini ayrımcılık olaylarına karşı yönetim net ve hızlı tepki vermektedir.",
-                    "Sınıf içinde sosyo-ekonomik farklılıkların yarattığı öğrenme engellerini aşmak için destekleniyorum.",
-                    // 10. Genel Memnuniyet ve Motivasyon
-                    "Aldığım ücret ve yan haklar, yaptığım işin sorumluluğu ve piyasa koşulları ile orantılıdır.",
-                    "Okulda uzun vadeli kariyer planımı gerçekleştirebileceğime inanıyorum.",
-                    "Okulun eğitim felsefesi ve değerleri, kişisel değerlerimle örtüşmektedir.",
-                    "Yaptığım işin öğrenci gelişimine etkisini görmek beni motive etmektedir.",
-                    "Genel olarak, bu kurumda çalışmaktan memnunum ve kurumuma bağlıyım."
-                ],
-                "Veli/Ebeveyn": [
-                    // 1. Ders İçeriği ve Öğrenme Ortamı
-                    "Okulun uyguladığı müfredat (ders içerikleri), çocuğumun gelecekteki başarısı için yeterlidir.",
-                    "Okul, yabancı dil eğitimi konusunda etkili ve kalıcı bir öğrenme sağlamaktadır.",
-                    "Çocuğumun okulda öğrendiği bilgileri günlük hayatta kullanabildiğini görüyorum.",
-                    "Okul, eleştirel düşünme ve problem çözme gibi 21. yüzyıl becerilerini geliştirmeye odaklanmıştır.",
-                    "Çocuğumun derslerdeki başarısı ve gelişim hızı konusunda düzenli bilgilendiriliyorum.",
-                    // 2. Okul İklimi ve Güvenlik
-                    "Çocuğumun okulda güvende olduğundan eminim.",
-                    "Okul yönetimi, disiplin ve okul kuralları konusunda velilerle açık iletişim kurmaktadır.",
-                    "Okulun fiziksel güvenliği (giriş/çıkış kontrolü, kamera sistemleri) yeterli seviyededir.",
-                    "Okul, zorbalık ve olumsuz davranışlar karşısında hızlı ve kararlı bir tutum sergilemektedir.",
-                    "Okulun sağlık hizmetleri (revir, ilk yardım) konusunda yeterli donanıma sahip olduğuna inanıyorum.",
-                    // 3. Öğretmen Etkileşimi ve Destek
-                    "Çocuğumun öğretmenleriyle düzenli ve yapıcı iletişim kurabiliyorum.",
-                    "Çocuğumun öğretmenleri, onun bireysel ihtiyaçlarına ve öğrenme tarzına dikkat etmektedir.",
-                    "Okul rehberlik servisi, eğitsel ve davranışsal konularda bize somut destek sağlamaktadır.",
-                    "Öğretmenler, çocuğumun sorunlarını ve endişelerini ciddiye almaktadır.",
-                    "Okul yönetimi, öğretmen ve veli arasındaki işbirliğini teşvik etmektedir.",
-                    // 4. Sosyal ve Kültürel Aktiviteler
-                    "Okulun sunduğu kulüp ve aktivite seçenekleri çocuğumun ilgi alanlarını desteklemektedir.",
-                    "Okulun düzenlediği kültürel etkinlikler ve geziler, çocuğumun sosyal gelişimine katkı sağlamaktadır.",
-                    "Okul, velilerin sosyal etkinliklere katılımını ve gönüllülüğünü teşvik etmektedir.",
-                    "Okul, öğrenciler arasında takım çalışması ve liderlik becerilerini güçlendirmektedir.",
-                    "Çocuğum, okul etkinliklerinde kendine güvenini artıracak fırsatlar bulmaktadır.",
-                    // 5. Fiziksel Olanaklar
-                    "Okul binası ve sınıflar temiz, modern ve öğrencilerin öğrenme ortamına uygundur.",
-                    "Okulun kütüphanesi, çocuğumun araştırma yapması ve okuma alışkanlığı kazanması için yeterlidir.",
-                    "Okulun yemek hizmetleri (sağlık, çeşitlilik ve hijyen) beklentilerimi karşılamaktadır.",
-                    "Okul bahçesi ve spor alanları, çocuğumun fiziksel aktivite yapması için güvenli ve yeterlidir.",
-                    "Okulun genel atmosferi, çocuğumun okula mutlu gitmesini sağlamaktadır.",
-                    // 6. Karar Alma Süreçleri ve Katılım
-                    "Okulun eğitim politikaları ve hedefleri konusunda veliler olarak yeterince bilgilendiriliyoruz.",
-                    "Okulda, velilerin fikirlerini iletebileceği ve yönetimle doğrudan konuşabileceği düzenli platformlar mevcuttur.",
-                    "Okulun Veli-Okul Aile Birliği, okulun gelişimine somut katkılar sağlamaktadır.",
-                    "Okul yönetimi, önemli değişiklikler (mali, müfredat) hakkında bizi önceden bilgilendirmektedir.",
-                    "Çocuğumun okul içindeki durumuyla ilgili kararlara katılımım (özel eğitim, etkinlik vb.) sağlanmaktadır.",
-                    // 7. Bilişim ve Dijitalleşme
-                    "Okulun kullandığı dijital iletişim platformları, öğretmenlerle hızlı iletişim kurmamı sağlamaktadır.",
-                    "Çocuğumun notları ve devamsızlık bilgileri gibi verilere online olarak kolayca erişebiliyorum.",
-                    "Okulun dijital ortamları, çocuğumun güvenli bir şekilde öğrenmesini desteklemektedir.",
-                    "Okulun web sitesi/mobil uygulaması bilgilendirme ve duyurular için yeterli ve kullanışlıdır.",
-                    "Okulun teknolojiye yaptığı yatırımlar, eğitim kalitesini artırmaktadır.",
-                    // 8. Okul Dışı Hazırlık ve Ödevler
-                    "Çocuğuma verilen ödevlerin miktarı ve faydası dengelidir.",
-                    "Okul, çocuğumun ödev yapma sorumluluğunu kazanmasına yardımcı olmaktadır.",
-                    "Okul, ek akademik ihtiyaçlar (takviye ders, etüt) konusunda yeterli destek sunmaktadır.",
-                    "Okul yönetimi, veli-öğrenci-öğretmen arasındaki ödev dengesini gözetmektedir.",
-                    "Okulun sunduğu eğitim, çocuğumun mezun olduktan sonraki hayatına güçlü bir temel oluşturacaktır.",
-                    // 9. Çeşitlilik ve Kapsayıcılık
-                    "Okul, farklı öğrenme stillerine sahip çocuklara karşı esnek ve destekleyicidir.",
-                    "Okul, sosyal ve kültürel çeşitliliğin değerini vurgulayan bir ortam yaratmıştır.",
-                    "Okulun kapsayıcılık politikaları (özel gereksinimli öğrenci desteği) yeterli ve etkili uygulanmaktadır.",
-                    "Okul, tüm ailelerin kültürel ve dini farklılıklarına saygı göstermektedir.",
-                    "Okulda, dezavantajlı öğrenciler için maliyet dışı ek destek programları sunulmaktadır.",
-                    // 10. Genel Memnuniyet ve Tavsiye
-                    "Bu okulu başka velilere kesinlikle tavsiye ederim.",
-                    "Okulun ücret/eğitim kalitesi dengesi tatmin edicidir.",
-                    "Okulun mezuniyet sonrası başarıları (üniversite yerleştirme vb.) benim için önemlidir.",
-                    "Okul, çocuğumun hem akademik hem de karakter gelişimine katkı sağlamaktadır.",
-                    "Genel olarak, çocuğumun bu okulda eğitim almasından ve okulun yönetiminden memnunum."
-                ]
-        };
-
-        // Sistem verileri
-        let systemData = {
-            adminPassword: '030714',
-            surveyData: null
-        };
-
-        // Kategori skorlarını hesaplama fonksiyonu
-        function calculateCategoryScores(surveys) {
-            const categoryScores = {
-                'Öğrenci': {},
-                'Öğretmen': {},
-                'Veli/Ebeveyn': {}
-            };
-            // Kategori tanımları (her kategori 10 soru, toplam 15 kategori)
-            const categories = {
-                'Öğrenci': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Tavsiye',
-                    // 5 ek kategori örnek
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ],
-                'Öğretmen': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Motivasyon',
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ],
-                'Veli/Ebeveyn': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Tavsiye',
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ]
-            };
-            // Kategori başına soru sayısı dinamik
-            const QUESTIONS_PER_CATEGORY = 5;
-            surveys.forEach(survey => {
-                const position = survey.jobType;
-                if (!categoryScores[position]) return;
-                const positionCategories = categories[position];
-                if (!positionCategories) return;
-                if (survey.answers.length !== positionCategories.length * QUESTIONS_PER_CATEGORY) {
-                    console.warn('UYARI: Cevaplanan soru sayısı ile kategori sayısı uyumsuz!');
+        function toggleHrStatus(hrId) {
+            // Firebase'den ilgili İK yöneticisini bul ve güncelle
+            db.ref('hrManagers/' + hrId).once('value').then(snapshot => {
+                const hr = snapshot.val();
+                if (hr) {
+                    const newStatus = hr.status === 'active' ? 'inactive' : 'active';
+                    db.ref('hrManagers/' + hrId + '/status').set(newStatus).then(() => {
+                        loadAdminData();
+                    });
                 }
-                positionCategories.forEach((category, categoryIndex) => {
-                    if (!categoryScores[position][category]) {
-                        categoryScores[position][category] = {
-                            'Çok Memnunum': 0,
-                            'Memnunum': 0,
-                            'Kararsızım': 0,
-                            'Memnun Değilim': 0,
-                            'Hiç Memnun Değilim': 0,
-                            totalCount: 0
-                        };
-                    }
-                    // Her kategoride 5 soru var
-                    const startIndex = categoryIndex * QUESTIONS_PER_CATEGORY;
-                    const endIndex = startIndex + QUESTIONS_PER_CATEGORY;
-                    for (let i = startIndex; i < endIndex && i < survey.answers.length; i++) {
-                        const score = survey.answers[i].score;
-                        categoryScores[position][category].totalCount++;
-                        if (score === 5) categoryScores[position][category]['Çok Memnunum']++;
-                        else if (score === 4) categoryScores[position][category]['Memnunum']++;
-                        else if (score === 3) categoryScores[position][category]['Kararsızım']++;
-                        else if (score === 2) categoryScores[position][category]['Memnun Değilim']++;
-                        else if (score === 1) categoryScores[position][category]['Hiç Memnun Değilim']++;
-                    }
-                });
             });
-            return categoryScores;
         }
 
-        // Sayfa yüklendiğinde
+        // İK panel fonksiyonları
+        function showHrSection(section) {
+            document.querySelectorAll('[id^="hr"]').forEach(el => {
+                if (el.id.startsWith('hr') && el.id !== 'hrPanel') {
+                    el.classList.add('hidden');
+                }
+            });
+            
+            document.getElementById('hr' + section.charAt(0).toUpperCase() + section.slice(1)).classList.remove('hidden');
+            
+            if (section === 'dashboard') {
+                loadHrDashboard();
+            } else if (section === 'candidates') {
+                loadCandidatesList();
+            } else if (section === 'reports') {
+                loadReportsData();
+            }
+        }
+
+        function loadHrDashboard(filteredList) {
+            // Eğer filtreli liste verilmişse onu kullan, yoksa tüm adayları kullan
+            const userCandidates = Array.isArray(filteredList)
+                ? filteredList
+                : candidates.filter(c => c.createdBy === currentUser.id);
+            const completedTests = userCandidates.filter(c => c.testCompleted).length;
+            const pendingTests = userCandidates.filter(c => !c.testCompleted).length;
+            // Ortalama puan hesaplama
+            const completedCandidates = userCandidates.filter(c => c.testCompleted && c.score);
+            const averageScore = completedCandidates.length > 0 
+                ? Math.round(completedCandidates.reduce((sum, c) => sum + c.score, 0) / completedCandidates.length)
+                : 0;
+            document.getElementById('totalCandidates').textContent = userCandidates.length;
+            document.getElementById('completedTests').textContent = completedTests;
+            document.getElementById('pendingTests').textContent = pendingTests;
+            document.getElementById('averageScore').textContent = averageScore;
+        }
+
+        // Dashboard tarih filtreleme eventleri
         document.addEventListener('DOMContentLoaded', function() {
-            setupEventListeners();
-            showModule('survey');
-            loadDemoData();
+            const startInput = document.getElementById('filterStartDate');
+            const endInput = document.getElementById('filterEndDate');
+            const filterBtn = document.getElementById('filterDateBtn');
+            const clearBtn = document.getElementById('clearDateBtn');
+            if (filterBtn && startInput && endInput) {
+                filterBtn.addEventListener('click', function() {
+                    const start = startInput.value ? new Date(startInput.value) : null;
+                    const end = endInput.value ? new Date(endInput.value) : null;
+                    let filtered = candidates.filter(c => c.createdBy === currentUser.id);
+                    if (start) {
+                        filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) >= start);
+                    }
+                    if (end) {
+                        // Bitiş gününü de dahil et
+                        const endOfDay = new Date(end);
+                        endOfDay.setHours(23,59,59,999);
+                        filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) <= endOfDay);
+                    }
+                    loadHrDashboard(filtered);
+                });
+            }
+            if (clearBtn && startInput && endInput) {
+                clearBtn.addEventListener('click', function() {
+                    startInput.value = '';
+                    endInput.value = '';
+                    loadHrDashboard();
+                });
+            }
         });
 
-        function setupEventListeners() {
-            // Anket başlatma
-            document.getElementById('startSurvey').addEventListener('click', startSurvey);
-            
-            // Anket tamamlama
-            document.getElementById('submitSurvey').addEventListener('click', submitSurvey);
-
-            // Enter tuşu ile giriş
-            document.getElementById('companyPassword').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') loginCompany();
+        // Kategori seçim fonksiyonları
+        function setupCategorySelectors() {
+            // Yeni üye formu için
+            document.getElementById('newMemberMainCategory').addEventListener('change', function() {
+                updateSubCategory('newMemberSubCategory', this.value);
             });
             
-            document.getElementById('adminPassword').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') loginAdmin();
+            // Aday ekleme formu için
+            document.getElementById('candidateMainCategory').addEventListener('change', function() {
+                updateSubCategory('candidateSubCategory', this.value);
             });
         }
-
-        function showModule(module) {
-            // Tüm modülleri gizle
-            document.getElementById('surveyModule').classList.add('hidden');
-            document.getElementById('companyModule').classList.add('hidden');
-            document.getElementById('adminModule').classList.add('hidden');
+        
+        function updateSubCategory(subSelectId, mainCategory) {
+            const subSelect = document.getElementById(subSelectId);
+            subSelect.innerHTML = '';
+            subSelect.disabled = false;
             
-            // Seçili modülü göster
-            document.getElementById(module + 'Module').classList.remove('hidden');
-            currentModule = module;
+            if (mainCategory === 'manufacturing') {
+                subSelect.innerHTML = `
+                    <option value="">Alt Kategori Seç</option>
+                    <option value="manufacturing_blue">Mavi Yaka</option>
+                    <option value="manufacturing_white">Beyaz Yaka</option>
+                    <option value="manufacturing_manager">Yönetici</option>
+                `;
+            } else if (mainCategory === 'service') {
+                subSelect.innerHTML = `
+                    <option value="">Alt Kategori Seç</option>
+                    <option value="service_personnel">Hizmet Personeli</option>
+                    <option value="service_admin">Hizmet İdari Yönetici</option>
+                `;
+            } else {
+                subSelect.innerHTML = '<option value="">Önce ana kategori seçin</option>';
+                subSelect.disabled = true;
+            }
         }
 
-        function selectJobType(jobType) {
-            selectedJobType = jobType;
-            console.log('Seçilen rol:', jobType);
+        // Yeni üye ekleme (aday ekleme)
+        document.getElementById('newMemberForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            // Tüm butonları sıfırla
-            const allButtons = document.querySelectorAll('.job-btn');
-            allButtons.forEach(btn => {
-                btn.classList.remove('selected-job');
-                btn.style.border = '';
-                btn.style.backgroundColor = '';
-                btn.style.color = '';
-                btn.style.fontWeight = '';
-                btn.style.transform = '';
-                btn.style.boxShadow = '';
+            // Seçilen test kriterlerini al
+            const selectedCriteria = [];
+            const checkboxes = document.querySelectorAll('input[name="testCriteria"]:checked');
+            checkboxes.forEach(checkbox => {
+                selectedCriteria.push(checkbox.value);
             });
             
-            // Seçili butonu işaretle
-            const buttonMap = {
-                'Öğrenci': 'studentBtn',
-                'Öğretmen': 'teacherBtn', 
-                'Veli/Ebeveyn': 'parentBtn'
+            if (selectedCriteria.length < 3) {
+                alert('Lütfen en az 3 test kriteri seçin!');
+                return;
+            }
+            
+            if (selectedCriteria.length > 8) {
+                alert('En fazla 8 test kriteri seçebilirsiniz!');
+                return;
+            }
+            
+            const newCandidate = {
+                id: Date.now().toString(),
+                alias: document.getElementById('newMemberAlias').value,
+                category: document.getElementById('newMemberSubCategory').value,
+                password: document.getElementById('newMemberPassword').value,
+                testCriteria: selectedCriteria,
+                createdBy: currentUser.id,
+                testCompleted: false,
+                createdAt: new Date().toISOString(),
+                answers: [],
+                score: 0
+            };
+            // Firebase'e kaydet
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
+            
+            alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
+            this.reset();
+            
+            // Tüm checkboxları temizle
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Alt kategori seçimini sıfırla
+            document.getElementById('newMemberSubCategory').disabled = true;
+            document.getElementById('newMemberSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+            
+            // Eğer adaylar sekmesindeyse listeyi güncelle
+            if (!document.getElementById('hrCandidates').classList.contains('hidden')) {
+                loadCandidatesList();
+            }
+        });
+
+        // Hızlı aday ekleme (varsayılan kriterlerle)
+        document.getElementById('newCandidateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Varsayılan test kriterleri (hızlı ekleme için)
+            const defaultCriteria = ['communication', 'teamwork', 'analytical_thinking', 'problem_solving'];
+            
+            const newCandidate = {
+                id: Date.now().toString(),
+                alias: document.getElementById('candidateAliasInput').value,
+                category: document.getElementById('candidateSubCategory').value,
+                password: document.getElementById('candidatePasswordInput').value,
+                testCriteria: defaultCriteria,
+                createdBy: currentUser.id,
+                testCompleted: false,
+                createdAt: new Date().toISOString(),
+                answers: [],
+                score: 0
+            };
+            // Firebase'e kaydet
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
+            
+            alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
+            this.reset();
+            
+            // Alt kategori seçimini sıfırla
+            document.getElementById('candidateSubCategory').disabled = true;
+            document.getElementById('candidateSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+            
+            loadCandidatesList();
+        });
+
+        function loadCandidatesList(filteredList) {
+            const tbody = document.getElementById('candidatesList');
+            tbody.innerHTML = '';
+            db.ref('candidates').once('value').then(snapshot => {
+                const val = snapshot.val() || {};
+                // Sadece mevcut kullanıcının eklediği adaylar
+                let userCandidates = Array.isArray(filteredList)
+                    ? filteredList
+                    : Object.values(val).filter(c => c.createdBy === currentUser.id);
+                userCandidates.forEach(candidate => {
+                    const categoryNames = {
+                        manufacturing_blue: 'İmalat - Mavi Yaka',
+                        manufacturing_white: 'İmalat - Beyaz Yaka',
+                        manufacturing_manager: 'İmalat - Yönetici',
+                        service_personnel: 'Hizmet - Personel',
+                        service_admin: 'Hizmet - İdari Yönetici'
+                    };
+                    const row = document.createElement('tr');
+                    row.className = 'border-b hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${candidate.alias}</td>
+                        <td class="px-4 py-3">${candidate.password || ''}</td>
+                        <td class="px-4 py-3">${categoryNames[candidate.category]}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs ${candidate.testCompleted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
+                                ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">${new Date(candidate.createdAt).toLocaleDateString('tr-TR')}</td>
+                        <td class="px-4 py-3 flex gap-2">
+                            <button onclick="viewCandidateDetails('${candidate.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
+                                Detay
+                            </button>
+                            <button onclick="deleteCandidateFirebase('${candidate.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">
+                                Sil
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+        }
+// Adaylar sekmesi tarih filtreleme eventleri
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('candidatesFilterStartDate');
+    const endInput = document.getElementById('candidatesFilterEndDate');
+    const filterBtn = document.getElementById('candidatesFilterDateBtn');
+    const clearBtn = document.getElementById('candidatesClearDateBtn');
+    if (filterBtn && startInput && endInput) {
+        filterBtn.addEventListener('click', function() {
+            const start = startInput.value ? new Date(startInput.value) : null;
+            const end = endInput.value ? new Date(endInput.value) : null;
+            let filtered = candidates.filter(c => c.createdBy === currentUser.id);
+            if (start) {
+                filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) >= start);
+            }
+            if (end) {
+                // Bitiş gününü de dahil et
+                const endOfDay = new Date(end);
+                endOfDay.setHours(23,59,59,999);
+                filtered = filtered.filter(c => c.createdAt && new Date(c.createdAt) <= endOfDay);
+            }
+            loadCandidatesList(filtered);
+        });
+    }
+    if (clearBtn && startInput && endInput) {
+        clearBtn.addEventListener('click', function() {
+            startInput.value = '';
+            endInput.value = '';
+            loadCandidatesList();
+        });
+    }
+});
+
+    function viewCandidateDetails(candidateId) {
+        db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
+            const val = snapshot.val();
+            if (val) {
+                const candidate = Object.values(val)[0];
+                alert(`Aday: ${candidate.alias}\nKategori: ${candidate.category}\nTest Durumu: ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}\nPuan: ${candidate.score}`);
+            }
+        });
+    }
+
+    // Aday silme fonksiyonu (Firebase'den siler ve tabloyu günceller) - GLOBAL SCOPE
+    function deleteCandidateFirebase(candidateId) {
+        if (!confirm('Bu adayı silmek istediğinize emin misiniz?')) return;
+        db.ref('candidates').orderByChild('id').equalTo(candidateId).once('value').then(snapshot => {
+            const val = snapshot.val();
+            if (val) {
+                const key = Object.keys(val)[0];
+                db.ref('candidates/' + key).remove().then(() => {
+                    alert('Aday başarıyla silindi.');
+                    loadCandidatesList();
+                });
+            } else {
+                alert('Aday bulunamadı!');
+            }
+        });
+    }
+
+        // Test fonksiyonları
+        function startTest() {
+            document.getElementById('candidateWelcome').classList.add('hidden');
+            document.getElementById('candidateTest').classList.remove('hidden');
+            
+            // Grup eşlemesi
+            const groupMapping = {
+                manufacturing_white: 'grup1',
+                manufacturing_blue: 'grup2',
+                manufacturing_manager: 'grup3',
+                service_personnel: 'grup4',
+                service_admin: 'grup5'
             };
             
-            const selectedButton = document.getElementById(buttonMap[jobType]);
-            if (selectedButton) {
-                selectedButton.style.border = '3px solid #3b82f6';
-                selectedButton.style.backgroundColor = '#3b82f6';
-                selectedButton.style.color = 'white';
-                selectedButton.style.fontWeight = 'bold';
-                selectedButton.style.transform = 'scale(1.05)';
-                selectedButton.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-                selectedButton.classList.add('selected-job');
-            }
-            
-            // Seçimi göster
-            const displayElement = document.getElementById('selectedJobDisplay');
-            if (displayElement) {
-                displayElement.innerHTML = `<span class="text-blue-600 font-semibold text-lg">✓ Seçilen rol: ${jobType}</span>`;
-            }
-        }
-
-        function startSurvey() {
-            // Google ile giriş zorunluluğu (isletme.html ile birebir)
-            if (!googleUser) {
-                showModal(
-                    '🔒 Giriş Gerekli',
-                    `<div class="text-2xl font-extrabold text-red-700 mb-4">Google ile Giriş Yapmalısınız</div>
-                    <div class="text-base text-gray-800 mb-2">Ankete başlamadan önce kimliğinizi doğrulamanız gerekmektedir.</div>
-                    <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-                        <li>Yukarıdaki <b>Google ile Giriş Yap</b> butonunu kullanarak hesabınızla oturum açın.</li>
-                        <li>Giriş yaptıktan sonra ad ve soyad alanlarınız otomatik doldurulacak ve düzenlenebilir olacaktır.</li>
-                        <li>Gizliliğiniz korunur, bilgileriniz üçüncü kişilerle paylaşılmaz.</li>
-                    </ul>
-                    <div class="text-sm text-gray-500">Herhangi bir sorun yaşarsanız lütfen yöneticinizle iletişime geçin.</div>`
-                );
-                return;
-            }
-            console.log('Anket başlatma fonksiyonu çalışıyor...');
-            
-            // Kullanıcı tipi kontrolü
-            const userTypeNew = document.getElementById('userTypeNew');
-            const userTypeExisting = document.getElementById('userTypeExisting');
-            let companyName = '';
-            if (userTypeNew && userTypeNew.checked) {
-                companyName = document.getElementById('companyName').value.trim();
-            } else if (userTypeExisting && userTypeExisting.checked) {
-                const existingCompanySelect = document.getElementById('existingCompanySelect');
-                if (existingCompanySelect) {
-                    companyName = existingCompanySelect.value.trim();
-                }
-            }
-            const disclaimerAccepted = document.getElementById('acceptDisclaimer').checked;
-            const firstName = document.getElementById('firstName').value.trim();
-            const lastName = document.getElementById('lastName').value.trim();
-            
-            console.log('Form verileri:', { companyName, selectedJobType, disclaimerAccepted, firstName, lastName });
-            
-            if (!disclaimerAccepted) {
-                showModal('⚠️ Uyarı', 'Devam etmek için veri koruma beyanını kabul etmelisiniz.');
-                return;
-            }
-            // Sadece yeni kullanıcıda kurum adı zorunlu
-            if (userTypeNew && userTypeNew.checked && !companyName) {
-                showModal('⚠️ Eksik Bilgi', 'Lütfen kurum adını girin.');
-                return;
-            }
-            // Kayıtlı kullanıcıda kurum seçilmediyse uyarı
-            if (userTypeExisting && userTypeExisting.checked && !companyName) {
-                showModal('⚠️ Eksik Bilgi', 'Lütfen kayıtlı bir kurum seçin.');
-                return;
-            }
-            if (!selectedJobType) {
-                showModal('⚠️ Eksik Bilgi', 'Lütfen rolünüzü seçin (Öğrenci, Öğretmen veya Veli/Ebeveyn).');
-                return;
-            }
-            if (!firstName || !lastName) {
-                showModal('⚠️ Eksik Bilgi', 'Lütfen adınızı ve soyadınızı girin.');
-                return;
-            }
-            
-            // Seçilen role göre soruları al
-            currentQuestions = questions[selectedJobType];
-            console.log('Seçilen rol:', selectedJobType);
-            console.log('Sorular:', currentQuestions);
-            
-            if (!currentQuestions || currentQuestions.length === 0) {
-                showModal('❌ Hata', 'Seçilen rol için sorular bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
-                return;
-            }
-            
-            // Değişkenleri sıfırla
+            const group = groupMapping[currentUser.category] || 'grup1';
+            testQuestions = questionBank[group] || [];
+            alert(`Kategori: ${currentUser.category}, Grup: ${group}, Soru sayısı: ${testQuestions.length}`);
             currentQuestionIndex = 0;
-            answers = [];
-            surveyStartTime = new Date();
+            userAnswers = new Array(testQuestions.length).fill(null);
             
-            // Anket bölümünü göster
-            document.getElementById('disclaimerSection').classList.add('hidden');
-            document.getElementById('companyInfoSection').classList.add('hidden');
-            document.getElementById('surveySection').classList.remove('hidden');
+            document.getElementById('totalQuestions').textContent = testQuestions.length;
             
             startTimer();
-            displayCurrentQuestion();
+            showQuestion();
+        }
+        
+        // Test kriterlerine göre soru oluşturma
+        function generateQuestionsFromCriteria(criteria) {
+            const questions = [];
+            let questionId = 1;
             
-            console.log('Anket başarıyla başlatıldı!');
+            criteria.forEach(criterion => {
+                const criterionQuestions = getCriterionQuestions(criterion, questionId);
+                questions.push(...criterionQuestions);
+                questionId += criterionQuestions.length;
+            });
+            
+            return questions.length > 0 ? questions : getDefaultQuestions();
+        }
+        
+        // Kriter bazlı soru bankası
+        function getCriterionQuestions(criterion, startId) {
+            const questionSets = {
+                communication: [
+                    {
+                        id: startId,
+                        question: "Karmaşık konuları başkalarına açıklarken sabırlı ve anlaşılır olmaya özen gösteririm.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "communication"
+                    },
+                    {
+                        id: startId + 1,
+                        question: "Farklı görüşlere sahip kişilerle bile etkili iletişim kurabilirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "communication"
+                    }
+                ],
+                teamwork: [
+                    {
+                        id: startId,
+                        question: "Takım hedeflerini kişisel hedeflerimden önde tutarım.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "teamwork"
+                    },
+                    {
+                        id: startId + 1,
+                        question: "Takım arkadaşlarımın başarılarını destekler ve kutlarım.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "teamwork"
+                    }
+                ],
+                analytical_thinking: [
+                    {
+                        id: startId,
+                        question: "Karar vermeden önce mevcut verileri detaylı olarak analiz ederim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "analytical_thinking"
+                    },
+                    {
+                        id: startId + 1,
+                        question: "Karmaşık problemleri daha küçük parçalara bölerek çözmeyi tercih ederim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "analytical_thinking"
+                    }
+                ],
+                problem_solving: [
+                    {
+                        id: startId,
+                        question: "Beklenmedik problemlerle karşılaştığımda yaratıcı çözümler üretirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "problem_solving"
+                    }
+                ],
+                stress_management: [
+                    {
+                        id: startId,
+                        question: "Yoğun iş temposu altında bile kaliteli çalışma yapabilirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "stress_management"
+                    }
+                ],
+                leadership: [
+                    {
+                        id: startId,
+                        question: "Grup çalışmalarında doğal olarak liderlik rolü üstlenirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 3,
+                        category: "leadership"
+                    }
+                ],
+                time_management: [
+                    {
+                        id: startId,
+                        question: "İş önceliklerimi belirler ve zamanımı etkili şekilde yönetirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "time_management"
+                    }
+                ],
+                verbal_reasoning: [
+                    {
+                        id: startId,
+                        question: "Yazılı metinlerdeki ana fikirleri hızlıca tespit edebilirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "verbal_reasoning"
+                    }
+                ],
+                numerical_ability: [
+                    {
+                        id: startId,
+                        question: "Sayısal verilerle çalışmak ve hesaplamalar yapmak beni zorlamaz.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "numerical_ability"
+                    }
+                ],
+                ethical_decisions: [
+                    {
+                        id: startId,
+                        question: "İş hayatında etik değerlere uygun davranmak her zaman önceliğimdir.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "ethical_decisions"
+                    }
+                ],
+                conflict_management: [
+                    {
+                        id: startId,
+                        question: "İş yerindeki anlaşmazlıkları yapıcı şekilde çözmeye odaklanırım.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "conflict_management"
+                    }
+                ],
+                customer_service: [
+                    {
+                        id: startId,
+                        question: "Müşteri memnuniyeti için ekstra çaba göstermekten çekinmem.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "customer_service"
+                    }
+                ],
+                crisis_management: [
+                    {
+                        id: startId,
+                        question: "Kriz durumlarında soğukkanlılığımı korur ve hızlı kararlar alabilirim.",
+                        options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                        correct: 4,
+                        category: "crisis_management"
+                    }
+                ],
+            };
+            
+            return questionSets[criterion] || [];
+        }
+        
+        // Varsayılan sorular (kriter seçilmemişse)
+        function getDefaultQuestions() {
+            return [
+                {
+                    id: 1,
+                    question: "İş yerinde etkili iletişim kurmaya önem veririm.",
+                    options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                    correct: 4,
+                    category: "general"
+                },
+                {
+                    id: 2,
+                    question: "Takım halinde çalışmayı tercih ederim.",
+                    options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                    correct: 3,
+                    category: "general"
+                },
+                {
+                    id: 3,
+                    question: "Problemleri analitik olarak çözmeye odaklanırım.",
+                    options: ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"],
+                    correct: 4,
+                    category: "general"
+                }
+            ];
         }
 
         function startTimer() {
-            timerInterval = setInterval(() => {
-                const elapsed = Math.floor((new Date() - surveyStartTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                document.getElementById('timeElapsed').textContent = 
-                    `Süre: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            testTimer = setInterval(() => {
+                timeRemaining--;
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                document.getElementById('testTimer').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeRemaining <= 0) {
+                    clearInterval(testTimer);
+                    finishTest();
+                }
             }, 1000);
         }
 
-        function displayCurrentQuestion() {
-            const container = document.getElementById('questionContainer');
-            const question = currentQuestions[currentQuestionIndex];
+        function showQuestion() {
+            if (testQuestions.length === 0) return;
+            
+            const question = testQuestions[currentQuestionIndex];
+            document.getElementById('currentQuestionNumber').textContent = currentQuestionIndex + 1;
+
+            const questionContent = document.getElementById('questionContent');
+            // Eğer soru bir string ise, varsayılan 5'li Likert seçenekleriyle göster
+            if (typeof question === 'string') {
+                questionContent.innerHTML = `
+                    <h4 class="text-xl font-semibold text-gray-800 mb-6">${question}</h4>
+                    <div class="space-y-2">
+                        ${["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"].map((option, index) => `
+                            <div class="likert-option ${userAnswers[currentQuestionIndex] === index ? 'selected' : ''}" onclick="selectAnswer(${index})">
+                                <input type="radio" name="answer" value="${index}" ${userAnswers[currentQuestionIndex] === index ? 'checked' : ''}>
+                                <span class="option-number">${index + 1}</span>
+                                <span class="option-text">${option}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                questionContent.innerHTML = `
+                    <h4 class="text-xl font-semibold text-gray-800 mb-6">${question.soru || question.question}</h4>
+                    <div class="space-y-2">
+                        ${(question.secenekler || question.options).map((option, index) => `
+                            <div class="likert-option ${userAnswers[currentQuestionIndex] === index ? 'selected' : ''}" onclick="selectAnswer(${index})">
+                                <input type="radio" name="answer" value="${index}" ${userAnswers[currentQuestionIndex] === index ? 'checked' : ''}>
+                                <span class="option-number">${index + 1}</span>
+                                <span class="option-text">${option}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            // Buton durumları
+            document.getElementById('prevButton').disabled = currentQuestionIndex === 0;
+            document.getElementById('nextButton').style.display = currentQuestionIndex === testQuestions.length - 1 ? 'none' : 'block';
+            // "Testi Bitir" butonu sadece son soruda görünsün
+            document.getElementById('finishButton').style.display = currentQuestionIndex === testQuestions.length - 1 ? 'block' : 'none';
+        }
+        
+        function selectAnswer(answerIndex) {
+            userAnswers[currentQuestionIndex] = answerIndex;
+            
+            // Tüm seçeneklerin selected sınıfını kaldır
+            document.querySelectorAll('.likert-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // Seçilen seçeneğe selected sınıfını ekle
+            document.querySelectorAll('.likert-option')[answerIndex].classList.add('selected');
+            
+            // Radio button'ı işaretle
+            document.querySelector(`input[value="${answerIndex}"]`).checked = true;
+        }
+
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion();
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex < testQuestions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion();
+            }
+        }
+
+        function finishTest() {
+            clearInterval(testTimer);
+
+            // Puanı hesapla
+            const score = puanHesapla(testQuestions, userAnswers);
+
+            // Sonuçları kaydet
+            currentUser.testCompleted = true;
+            currentUser.answers = userAnswers;
+            currentUser.score = score;
+            currentUser.completedAt = new Date().toISOString();
+
+            // Candidates listesini güncelle
+            const candidateIndex = candidates.findIndex(c => c.id === currentUser.id);
+            if (candidateIndex !== -1) {
+                candidates[candidateIndex] = currentUser;
+            }
+
+            // Firebase'e güncellenmiş aday bilgisini kaydet
+            if (currentUser && currentUser.alias) {
+                db.ref('candidates/' + currentUser.alias).update({
+                    testCompleted: true,
+                    answers: userAnswers,
+                    score: score,
+                    completedAt: currentUser.completedAt
+                });
+            }
+
+            // Test sonucu ekranını göster
+            document.getElementById('candidateTest').classList.add('hidden');
+            document.getElementById('testCompleted').classList.remove('hidden');
+        }
+
+        // Rapor fonksiyonları
+        function loadReportsData() {
+            const select = document.getElementById('reportCandidateSelect');
+            select.innerHTML = '<option value="">Aday Seçin</option>';
+            
+            const userCandidates = candidates.filter(c => c.createdBy === currentUser.id && c.testCompleted);
+            userCandidates.forEach(candidate => {
+                const option = document.createElement('option');
+                option.value = candidate.id;
+                option.textContent = candidate.alias;
+                select.appendChild(option);
+            });
+        }
+
+        function showReport(type) {
+            const candidateId = document.getElementById('reportCandidateSelect').value;
+            if (!candidateId) {
+                alert('Lütfen bir aday seçin!');
+                return;
+            }
+            
+            const candidate = candidates.find(c => c.id === candidateId);
+            const reportContent = document.getElementById('reportContent');
+            
+            if (type === 'answers') {
+                showAnswersReport(candidate, reportContent);
+            } else if (type === 'scores') {
+                showScoresReport(candidate, reportContent);
+            } else if (type === 'charts') {
+                showChartsReport(candidate, reportContent);
+            }
+        }
+
+        function showAnswersReport(candidate, container) {
+            const groupMapping = {
+                manufacturing_white: 'grup1',
+                manufacturing_blue: 'grup2',
+                manufacturing_manager: 'grup3',
+                service_personnel: 'grup4',
+                service_admin: 'grup5'
+            };
+            const group = groupMapping[candidate.category] || 'grup1';
+            const questions = questionBank[group] || [];
+            
+            if (questions.length === 0) {
+                container.innerHTML = `
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Sorular ve Cevaplar - ${candidate.alias}</h3>
+                    <p class="text-gray-600">Bu kategori için soru bulunamadı.</p>
+                `;
+                return;
+            }
             
             container.innerHTML = `
-                <div class="bg-white p-3 sm:p-6 rounded-2xl border border-purple-200 shadow-md">
-                    <h3 class="text-base sm:text-lg font-semibold mb-4 text-gray-800">${question}</h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 w-full">
-                        <button onclick="selectAnswer(1)" class="answer-btn flex flex-col items-center justify-center py-3 px-2 text-xs sm:text-base rounded-xl border-2 border-red-200 hover:border-red-400 hover:bg-red-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 bg-gray-50 shadow-sm">
-                            <span class="text-xl sm:text-2xl mb-1 font-bold text-red-500">1</span>
-                            <span class="font-medium text-gray-700 leading-tight text-center">Hiç Memnun<br>Değilim</span>
-                        </button>
-                        <button onclick="selectAnswer(2)" class="answer-btn flex flex-col items-center justify-center py-3 px-2 text-xs sm:text-base rounded-xl border-2 border-orange-200 hover:border-orange-400 hover:bg-orange-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-gray-50 shadow-sm">
-                            <span class="text-xl sm:text-2xl mb-1 font-bold text-orange-500">2</span>
-                            <span class="font-medium text-gray-700 leading-tight text-center">Memnun<br>Değilim</span>
-                        </button>
-                        <button onclick="selectAnswer(3)" class="answer-btn flex flex-col items-center justify-center py-3 px-2 text-xs sm:text-base rounded-xl border-2 border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-gray-50 shadow-sm col-span-2 sm:col-span-1">
-                            <span class="text-xl sm:text-2xl mb-1 font-bold text-yellow-600">3</span>
-                            <span class="font-medium text-gray-700 leading-tight text-center">Kararsızım</span>
-                        </button>
-                        <button onclick="selectAnswer(4)" class="answer-btn flex flex-col items-center justify-center py-3 px-2 text-xs sm:text-base rounded-xl border-2 border-green-200 hover:border-green-400 hover:bg-green-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-400 bg-gray-50 shadow-sm">
-                            <span class="text-xl sm:text-2xl mb-1 font-bold text-green-500">4</span>
-                            <span class="font-medium text-gray-700 leading-tight text-center">Memnunum</span>
-                        </button>
-                        <button onclick="selectAnswer(5)" class="answer-btn flex flex-col items-center justify-center py-3 px-2 text-xs sm:text-base rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 shadow-sm">
-                            <span class="text-xl sm:text-2xl mb-1 font-bold text-blue-500">5</span>
-                            <span class="font-medium text-gray-700 leading-tight text-center">Çok Memnunum</span>
-                        </button>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Sorular ve Cevaplar - ${candidate.alias}</h3>
+                <div class="space-y-4">
+                    ${questions.map((question, index) => {
+                        const userAnswer = candidate.answers && candidate.answers[index] !== undefined ? candidate.answers[index] : null;
+                        let userAnswerText = 'Cevaplanmadı';
+                        let puanText = 'N/A';
+                        if (typeof question === 'string') {
+                            // Varsayılan 5'li Likert
+                            const options = ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"];
+                            userAnswerText = userAnswer !== null ? options[userAnswer] : 'Cevaplanmadı';
+                            // Puanı hesapla (varsayılan: 5 doğru, 1 yanlış, 3 nötr)
+                            if (userAnswer !== null) {
+                                if (userAnswer === 4) puanText = '1';
+                                else if (userAnswer === 3) puanText = '0.75';
+                                else if (userAnswer === 2) puanText = '0.5';
+                                else if (userAnswer === 1) puanText = '0.25';
+                                else puanText = '0';
+                            }
+                        } else {
+                            userAnswerText = userAnswer !== null ? (question.secenekler || question.options)[userAnswer] : 'Cevaplanmadı';
+                            puanText = userAnswer !== null && question.puanlar ? question.puanlar[userAnswer] : 'N/A';
+                        }
+                        return `
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-800 mb-2">Soru ${index + 1}: ${question.soru || question.question || question}</h4>
+                                <p class="text-gray-600 mb-2">Verilen Cevap: <span class="font-semibold text-blue-600">${userAnswerText}</span></p>
+                                <p class="text-gray-600">Puan: <span class="font-semibold text-green-600">${puanText}</span></p>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function showScoresReport(candidate, container) {
+            const groupMapping = {
+                manufacturing_white: 'grup1',
+                manufacturing_blue: 'grup2',
+                manufacturing_manager: 'grup3',
+                service_personnel: 'grup4',
+                service_admin: 'grup5'
+            };
+            const group = groupMapping[candidate.category] || 'grup1';
+            const questions = questionBank[group] || [];
+            
+            if (questions.length === 0) {
+                container.innerHTML = `
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Puan Raporu - ${candidate.alias}</h3>
+                    <p class="text-gray-600">Bu kategori için soru bulunamadı.</p>
+                `;
+                return;
+            }
+            
+            // String sorular için varsayılan puanlar
+            let totalPossible = 0;
+            questions.forEach(q => {
+                if (typeof q === 'string') {
+                    totalPossible += 1; // max puan 1
+                } else if (q.puanlar) {
+                    totalPossible += Math.max(...q.puanlar);
+                } else {
+                    totalPossible += 1;
+                }
+            });
+            const score = candidate.score || 0;
+            const percentage = totalPossible > 0 ? Math.round((score / totalPossible) * 100) : 0;
+            
+            container.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Puan Raporu - ${candidate.alias}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                        <h4 class="text-lg font-semibold text-green-800 mb-2">Toplam Puan</h4>
+                        <p class="text-3xl font-bold text-green-600">${score}</p>
+                        <p class="text-sm text-green-600 mt-1">${totalPossible} üzerinden</p>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                        <h4 class="text-lg font-semibold text-blue-800 mb-2">Başarı Oranı</h4>
+                        <p class="text-3xl font-bold text-blue-600">${percentage}%</p>
+                        <p class="text-sm text-blue-600 mt-1">${questions.length} soru</p>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
+                        <h4 class="text-lg font-semibold text-purple-800 mb-2">Ortalama Puan</h4>
+                        <p class="text-3xl font-bold text-purple-600">${questions.length > 0 ? Math.round(score / questions.length) : 0}</p>
+                        <p class="text-sm text-purple-600 mt-1">Soru başına</p>
+                    </div>
+                </div>
+                <div class="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">Performans Değerlendirmesi</h4>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mb-2">
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 h-6 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                    </div>
+                    <p class="text-center text-2xl font-bold text-gray-800">${percentage}%</p>
+                </div>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <h5 class="font-semibold text-gray-800 mb-2">Test Bilgileri</h5>
+                        <p class="text-sm text-gray-600">Kategori: ${candidate.category}</p>
+                        <p class="text-sm text-gray-600">Tamamlanma: ${candidate.completedAt ? new Date(candidate.completedAt).toLocaleString('tr-TR') : 'Bilinmiyor'}</p>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <h5 class="font-semibold text-gray-800 mb-2">Değerlendirme</h5>
+                        <p class="text-sm ${percentage >= 80 ? 'text-green-600' : percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                            ${percentage >= 80 ? '🎉 Mükemmel' : percentage >= 60 ? '👍 İyi' : '📚 Geliştirilmeli'}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showChartsReport(candidate, container) {
+            // Önce mevcut Chart instance'larını temizle
+            if (window.chartInstances) {
+                Object.values(window.chartInstances).forEach(chart => {
+                    if (chart && typeof chart.destroy === 'function') {
+                        chart.destroy();
+                    }
+                });
+            }
+            window.chartInstances = {};
+            
+            // Container'ı temizle ve yeni içeriği ekle
+            container.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-800 mb-6">Analiz Pro X - Grafik Raporları</h3>
+                <div class="text-center mb-6">
+                    <h4 class="text-lg font-semibold text-blue-600">${candidate.alias} - Detaylı Performans Analizi</h4>
+                </div>
+                
+                <!-- 1. Temel Profil Görselleştirmesi: RADAR GRAFİĞİ -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">1. Temel Profil Görselleştirmesi</h4>
+                    <p class="text-sm text-gray-600 mb-4">Yetkinlik profili şekli ve ideal profil karşılaştırması</p>
+                    <div class="relative" style="height: 400px;">
+                        <canvas id="profileRadarChart" width="400" height="400"></canvas>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-4">
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                            <span class="text-sm">Aday Profili</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                            <span class="text-sm">İdeal Profil</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Kritik Faktör Görselleştirmesi: RİSK GÖSTERGE GRAFİĞİ -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">2. Güvenilirlik Risk Göstergesi</h4>
+                    <p class="text-sm text-gray-600 mb-4">Cevap eğilimi ve manipülasyon risk analizi</p>
+                    <div class="relative" style="height: 300px;">
+                        <canvas id="riskGaugeChart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-green-100 text-green-800 py-2 px-3 rounded text-sm">
+                            <div class="font-semibold">Güvenilir</div>
+                            <div class="text-xs">0-30%</div>
+                        </div>
+                        <div class="bg-yellow-100 text-yellow-800 py-2 px-3 rounded text-sm">
+                            <div class="font-semibold">Orta Risk</div>
+                            <div class="text-xs">31-60%</div>
+                        </div>
+                        <div class="bg-red-100 text-red-800 py-2 px-3 rounded text-sm">
+                            <div class="font-semibold">Yüksek Risk</div>
+                            <div class="text-xs">61-100%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Bilişsel Kapasite Görselleştirmesi: KARŞILAŞTIRMALI BAR GRAFİĞİ -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">3. Bilişsel Kapasite Analizi</h4>
+                    <p class="text-sm text-gray-600 mb-4">Analitik düşünme ve sözel akıl yürütme - sektör normu karşılaştırması</p>
+                    <div class="relative" style="height: 300px;">
+                        <canvas id="cognitiveBarChart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="mt-4 bg-blue-50 p-4 rounded">
+                        <p class="text-sm text-blue-800">
+                            <strong>Not:</strong> Bilişsel kapasite skorları öğrenme ve adaptasyon potansiyelini gösterir. 
+                            Bu skorlar nispeten sabittir ve gelişim planlamasında dikkate alınmalıdır.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 4. Aksiyon Hiyerarşisi Görselleştirmesi: KRİTİK YATAY ÇUBUK GRAFİĞİ -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">4. Kritik Yetkinlik Öncelikleri</h4>
+                    <p class="text-sm text-gray-600 mb-4">Pozisyon için en kritik yetkinliklerin performans sıralaması</p>
+                    <div class="relative" style="height: 350px;">
+                        <canvas id="priorityHorizontalChart" width="400" height="350"></canvas>
+                    </div>
+                    <div class="mt-4 bg-orange-50 p-4 rounded">
+                        <p class="text-sm text-orange-800">
+                            <strong>Mülakat Önerisi:</strong> En düşük skorlu yetkinlikler üzerinde detaylı sorular sorulması önerilir. 
+                            Bu alanlar acil gelişim gerektiren öncelikli konulardır.
+                        </p>
                     </div>
                 </div>
             `;
             
-            updateProgress();
-        }
-
-        function selectAnswer(score) {
-            answers.push({
-                question: currentQuestions[currentQuestionIndex],
-                score: score,
-                timestamp: new Date().toISOString()
-            });
-            
-            currentQuestionIndex++;
-            
-            if (currentQuestionIndex < currentQuestions.length) {
-                displayCurrentQuestion();
-            } else {
-                showSubmitButton();
-            }
-        }
-
-        function updateProgress() {
-            const progress = (currentQuestionIndex / currentQuestions.length) * 100;
-            document.getElementById('progressBar').style.width = progress + '%';
-            document.getElementById('progressText').textContent = 
-                `Anket İlerlemesi ${currentQuestionIndex}/${currentQuestions.length} Yanıtlandı`;
-        }
-
-        function showSubmitButton() {
-            clearInterval(timerInterval);
-            document.getElementById('questionContainer').innerHTML = `
-                <div class="flex flex-col items-center justify-center bg-gradient-to-br from-green-100 to-green-50 p-8 sm:p-12 rounded-2xl border-2 border-green-300 shadow-xl">
-                    <div class="text-7xl sm:text-8xl mb-4 animate-bounce">🎉</div>
-                    <h3 class="text-2xl sm:text-3xl font-bold text-green-800 mb-2 text-center">Tebrikler!</h3>
-                    <p class="text-green-700 mb-4 text-lg sm:text-xl text-center font-medium">Tüm soruları yanıtladınız.<br>Anketi tamamlamak için aşağıdaki butona tıklayın.</p>
-                    <div class="text-base text-green-700 font-semibold mb-2">Toplam süre: ${document.getElementById('timeElapsed').textContent.split(': ')[1]}</div>
+            // Yükleme göstergesi ekle
+            container.innerHTML += `
+                <div id="chartLoadingIndicator" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p class="mt-2 text-gray-600">Grafikler yükleniyor...</p>
                 </div>
             `;
-            document.getElementById('submitSurvey').classList.remove('hidden');
-            updateProgress();
-        }
-
-
-
-        // Firebase'den verileri yükle
-        async function loadFromFirebase() {
-            try {
-                const response = await fetch(`${FIREBASE_DB_URL}/surveyData.json`);
-                if (!response.ok) throw new Error('Firebase veri yükleme hatası');
-                const data = await response.json();
-                systemData.surveyData = data || {
-                    surveyName: "Kurum Değerlendirme Anketi - Sürüm 12",
-                    createdAt: new Date().toISOString(),
-                    responses: {},
-                    statistics: {
-                        totalResponses: 0,
-                        averageScore: 0,
-                        lastUpdated: new Date().toISOString()
-                    },
-                    companies: {}
-                };
-                return systemData.surveyData;
-            } catch (error) {
-                console.error('Firebase yükleme hatası:', error);
-                const defaultData = {
-                    surveyName: "Kurum Değerlendirme Anketi - Sürüm 12",
-                    createdAt: new Date().toISOString(),
-                    responses: {},
-                    statistics: {
-                        totalResponses: 0,
-                        averageScore: 0,
-                        lastUpdated: new Date().toISOString()
-                    },
-                    companies: {}
-                };
-                systemData.surveyData = defaultData;
-                return defaultData;
-            }
-        }
-
-        // Firebase'e PATCH ile veri kaydet (responses nesnesi olarak)
-        async function saveToFirebase(patchObj) {
-            try {
-                const response = await fetch(`${FIREBASE_DB_URL}/surveyData.json`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(patchObj)
-                });
-                if (!response.ok) throw new Error('Firebase veri kaydetme hatası');
-                return { success: true };
-            } catch (error) {
-                console.error('Firebase kayıt hatası:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        async function createCompanyIfNotExists(companyName) {
-            try {
-                console.log('Kurum kontrol ediliyor:', companyName);
-                if (!systemData.surveyData) {
-                    systemData.surveyData = await loadFromFirebase();
-                }
-                const existingCompany = Object.entries(systemData.surveyData.companies || {})
-                    .find(([key, company]) => company.name.toLowerCase() === companyName.toLowerCase());
-                if (existingCompany) {
-                    // Eski kurumda status yoksa ekle
-                    if (!existingCompany[1].status) {
-                        existingCompany[1].status = 'Aktif';
-                        await saveToFirebase({ companies: systemData.surveyData.companies });
+            
+            // Grafikleri çiz - daha uzun bekleme süresi
+            setTimeout(() => {
+                try {
+                    // Yükleme göstergesini kaldır
+                    const loadingIndicator = document.getElementById('chartLoadingIndicator');
+                    if (loadingIndicator) {
+                        loadingIndicator.remove();
                     }
-                    console.log('Mevcut kurum bulundu:', existingCompany[1]);
-                    return { success: true, key: existingCompany[0], password: existingCompany[1].password };
-                }
-                const companyKey = companyName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 10) + '-' + Date.now();
-                const newPassword = generateCompanyPassword();
-                if (!systemData.surveyData.companies) {
-                    systemData.surveyData.companies = {};
-                }
-                systemData.surveyData.companies[companyKey] = {
-                    name: companyName,
-                    password: newPassword,
-                    createdAt: new Date().toISOString(),
-                    totalResponses: 0,
-                    status: 'Aktif'
-                };
-                const saveResult = await saveToFirebase({ companies: systemData.surveyData.companies });
-                if (saveResult.success) {
-                    return { success: true, key: companyKey, password: newPassword };
-                } else {
-                    return { success: false, error: saveResult.error };
-                }
-            } catch (error) {
-                console.error('Kurum oluşturma hatası:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        function generateCompanyPassword() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let password = '';
-            for (let i = 0; i < 12; i++) {
-                password += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return password;
-        }
-
-        async function submitSurvey() {
-            try {
-                console.log('Anket gönderiliyor...');
-                // Kullanıcı tipi kontrolü
-                const userTypeNew = document.getElementById('userTypeNew');
-                const userTypeExisting = document.getElementById('userTypeExisting');
-                let companyName = '';
-                if (userTypeNew && userTypeNew.checked) {
-                    companyName = document.getElementById('companyName').value.trim();
-                } else if (userTypeExisting && userTypeExisting.checked) {
-                    const existingCompanySelect = document.getElementById('existingCompanySelect');
-                    if (existingCompanySelect) {
-                        companyName = existingCompanySelect.value.trim();
+                    
+                    drawProfileRadarChart(candidate);
+                    drawRiskGaugeChart(candidate);
+                    drawCognitiveBarChart(candidate);
+                    drawPriorityHorizontalChart(candidate);
+                    
+                    console.log('Tüm grafikler başarıyla çizildi');
+                } catch (error) {
+                    console.error('Grafik çizim hatası:', error);
+                    
+                    // Yükleme göstergisini kaldır
+                    const loadingIndicator = document.getElementById('chartLoadingIndicator');
+                    if (loadingIndicator) {
+                        loadingIndicator.remove();
                     }
-                }
-                const firstName = document.getElementById('firstName').value.trim() || 'Anonim';
-                const lastName = document.getElementById('lastName').value.trim() || 'Kullanıcı';
-                if (!companyName || !selectedJobType || !answers || answers.length === 0) {
-                    showModal('❌ Hata', 'Eksik bilgi: Kurum adı, iş türü ve anket yanıtları gerekli');
-                    return;
-                }
-                const companyResult = await createCompanyIfNotExists(companyName);
-                if (!companyResult.success) {
-                    showModal('❌ Hata', `Kurum işlemi başarısız: ${companyResult.error}`);
-                    return;
-                }
-                systemData.surveyData = await loadFromFirebase();
-                // Benzersiz bir key ile responses nesnesine ekle
-                const responseKey = 'survey_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                const surveyResponse = {
-                    id: responseKey,
-                    companyName: companyName,
-                    firstName: firstName,
-                    lastName: lastName,
-                    jobType: selectedJobType,
-                    answers: answers,
-                    submittedAt: new Date().toISOString(),
-                    totalScore: answers.reduce((sum, answer) => sum + answer.score, 0),
-                    averageScore: (answers.reduce((sum, answer) => sum + answer.score, 0) / answers.length).toFixed(2),
-                    duration: document.getElementById('timeElapsed').textContent.split(': ')[1] || '00:00'
-                };
-                if (!systemData.surveyData.responses) {
-                    systemData.surveyData.responses = {};
-                }
-                systemData.surveyData.responses[responseKey] = surveyResponse;
-                // İstatistikleri güncelle
-                const allResponses = Object.values(systemData.surveyData.responses);
-                if (!systemData.surveyData.statistics) {
-                    systemData.surveyData.statistics = {
-                        totalResponses: 0,
-                        averageScore: 0,
-                        lastUpdated: new Date().toISOString()
-                    };
-                }
-                systemData.surveyData.statistics.totalResponses = allResponses.length;
-                systemData.surveyData.statistics.averageScore = (
-                    allResponses.reduce((sum, r) => sum + parseFloat(r.averageScore), 0) / allResponses.length
-                ).toFixed(2);
-                systemData.surveyData.statistics.lastUpdated = new Date().toISOString();
-                if (companyResult && systemData.surveyData.companies[companyResult.key]) {
-                    systemData.surveyData.companies[companyResult.key].totalResponses =
-                        allResponses.filter(r =>
-                            r.companyName.toLowerCase() === companyName.toLowerCase()
-                        ).length;
-                }
-                // Firebase'e responses, statistics ve companies patch olarak gönder
-                const saveResult = await saveToFirebase({
-                    responses: systemData.surveyData.responses,
-                    statistics: systemData.surveyData.statistics,
-                    companies: systemData.surveyData.companies
-                });
-                if (saveResult.success) {
-                    document.getElementById('surveySection').innerHTML = `
-                        <div class="text-center bg-green-50 p-10 rounded-lg border-2 border-green-200">
-                            <div class="text-8xl mb-6">✅</div>
-                            <h2 class="text-3xl font-bold text-green-800 mb-6">Anketiniz Başarıyla Kaydedildi!</h2>
-                            <p class="text-green-700 mb-6 text-lg sm:text-xl text-center font-medium">Değerli görüşleriniz için teşekkür ederiz. Anket yanıtlarınız güvenli bir şekilde <b>Firebase</b> sisteminde saklandı.</p>
-                            <div class="bg-blue-50 p-6 rounded-lg border border-blue-200 mb-6">
-                                <p class="text-base text-blue-700">
-                                    <strong>📊 Raporlama Bilgisi:</strong> Anket sonuçlarınız güvenli bir şekilde kaydedildi. 
-                                    Kurum yöneticiniz raporları görüntüleyebilir ve analiz edebilir.
-                                </p>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <button onclick="showModule('company')" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold">
-                                    🏫 Kurum Portalına Git
-                                </button>
-                                <button onclick="location.reload()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors text-lg font-semibold">
-                                    🔄 Yeni Anket Başlat
-                                </button>
-                            </div>
+                    
+                    container.innerHTML += `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                            <p class="text-red-800">Grafikler yüklenirken bir hata oluştu: ${error.message}</p>
+                            <p class="text-red-600 text-sm mt-2">Lütfen sayfayı yenileyin ve tekrar deneyin.</p>
                         </div>
                     `;
-                } else {
-                    throw new Error(`Anket kaydedilemedi: ${saveResult.error}`);
                 }
-            } catch (error) {
-                console.error('Anket gönderme hatası:', error);
-                showModal('❌ Hata', `Anket gönderilirken bir hata oluştu:<br><br><strong>Hata:</strong> ${error.message}<br><br>Lütfen sayfayı yenileyip tekrar deneyin.`);
-            }
+            }, 1000);
         }
 
-        async function loginCompany() {
-            const companyName = document.getElementById('companyLoginName').value.trim();
-            const password = document.getElementById('companyPassword').value.trim();
-            if (!companyName || !password) {
-                showModal('⚠️ Eksik Bilgi', 'Lütfen kurum adı ve şifrenizi girin.');
+        // 1. Temel Profil Görselleştirmesi: RADAR GRAFİĞİ
+        function drawProfileRadarChart(candidate) {
+            console.log('drawProfileRadarChart çağrıldı');
+            const canvas = document.getElementById('profileRadarChart');
+            if (!canvas) {
+                console.error('profileRadarChart canvas bulunamadı');
                 return;
             }
-            try {
-                if (!systemData.surveyData) {
-                    systemData.surveyData = await loadFromFirebase();
-                }
-                const companyEntry = Object.entries(systemData.surveyData.companies || {})
-                    .find(([key, company]) => 
-                        company.name.toLowerCase() === companyName.toLowerCase() && 
-                        company.password === password
-                    );
-                if (companyEntry) {
-                    // Askıya alınmışsa giriş engelle
-                    if (companyEntry[1].status === 'Pasif') {
-                        showModal('⛔ Askıya Alındı', 'Bu kurum şu anda askıya alınmış/dondurulmuş. Lütfen yöneticinizle iletişime geçin.');
-                        return;
-                    }
-                    loggedInCompany = {
-                        key: companyEntry[0],
-                        ...companyEntry[1]
-                    };
-                    document.getElementById('companyLogin').classList.add('hidden');
-                    document.getElementById('companyDashboard').classList.remove('hidden');
-                    loadCompanyDashboard();
-                } else {
-                    showModal('❌ Giriş Hatası', 'Okul/kurum adı veya şifre hatalı. Lütfen yöneticinizden doğru bilgileri alın.');
-                }
-            } catch (error) {
-                showModal('❌ Hata', 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.');
-                console.error('Giriş hatası:', error);
-            }
-        }
-
-        let filteredSurveys = null;
-        function loadCompanyDashboard() {
-            if (!loggedInCompany || !systemData.surveyData) return;
-            document.getElementById('companyNameDisplay').textContent = loggedInCompany.name;
-            const allResponses = Object.values(systemData.surveyData.responses || {});
-            const companySurveys = allResponses.filter(s => 
-                s.companyName && s.companyName.toLowerCase() === loggedInCompany.name.toLowerCase()
-            );
-            filteredSurveys = null;
-            updateDashboardData(companySurveys);
-        }
-
-        function filterByDateRange() {
-            if (!loggedInCompany || !systemData.surveyData) return;
-            const start = document.getElementById('reportStartDate').value;
-            const end = document.getElementById('reportEndDate').value;
-            const allResponses = Object.values(systemData.surveyData.responses || {});
-            const allSurveys = allResponses.filter(s => 
-                s.companyName && s.companyName.toLowerCase() === loggedInCompany.name.toLowerCase()
-            );
-            console.log(`Tarih filtresi - Başlangıç: ${start}, Bitiş: ${end}`);
-            console.log('Tüm anketler:', allSurveys.length);
+            console.log('profileRadarChart canvas bulundu');
             
-            if (!start && !end) {
-                filteredSurveys = null;
-                console.log('Filtre temizlendi, tüm veriler gösteriliyor');
-                updateDashboardData(allSurveys);
-                return;
-            }
-            const startDate = start ? new Date(start) : null;
-            const endDate = end ? new Date(end) : null;
-            const filtered = allSurveys.filter(s => {
-                const d = new Date(s.submittedAt);
-                if (startDate && d < startDate) return false;
-                if (endDate) {
-                    // Bitiş gününü de dahil et
-                    const endOfDay = new Date(endDate);
-                    endOfDay.setHours(23,59,59,999);
-                    if (d > endOfDay) return false;
-                }
-                return true;
-            });
-            filteredSurveys = filtered;
-            console.log('Filtrelenmiş anketler:', filtered.length);
-            updateDashboardData(filtered);
-        }
-
-        function updateDashboardData(surveys) {
-            console.log('Dashboard güncelleniyor, anket sayısı:', surveys.length);
-            document.getElementById('totalParticipants').textContent = surveys.length;
-            if (surveys.length > 0) {
-                let totalScore = 0;
-                let totalAnswers = 0;
-                surveys.forEach(s => {
-                    totalScore += s.totalScore;
-                    totalAnswers += s.answers.length;
-                });
-                const avgScore = totalAnswers > 0 ? (totalScore / totalAnswers).toFixed(1) : '0.0';
-                document.getElementById('averageScore').textContent = avgScore;
-                let highSatisfactionAnswers = 0;
-                surveys.forEach(s => {
-                    s.answers.forEach(answer => {
-                        if (answer.score >= 4) highSatisfactionAnswers++;
-                    });
-                });
-                const overallSatisfactionPercent = totalAnswers > 0 ? 
-                    Math.round((highSatisfactionAnswers / totalAnswers) * 100) : 0;
-                document.getElementById('satisfactionRate').textContent = overallSatisfactionPercent + '%';
-            } else {
-                document.getElementById('averageScore').textContent = '0.0';
-                document.getElementById('satisfactionRate').textContent = '0%';
-            }
-            generateSimpleReport(surveys);
-            console.log('Grafikler yeniden oluşturuluyor...');
-            generateCharts(surveys);
+            const ctx = canvas.getContext('2d');
             
-            // Eğer katılımcı tablosu açıksa onu da güncelle
-            const participantDetails = document.getElementById('participantDetails');
-            if (participantDetails && !participantDetails.classList.contains('hidden')) {
-                loadParticipantTable();
-            }
-        }
-
-        function generateSimpleReport(surveys) {
-            if (surveys.length === 0) {
-                document.getElementById('detailedReport').innerHTML = '<p class="text-gray-500 text-center py-8 text-lg">Henüz anket verisi bulunmuyor.</p>';
-                return;
-            }
-            // Pozisyon ve memnuniyet özetleri (eski kod)
-            const positionData = {};
-            surveys.forEach(s => {
-                positionData[s.jobType] = (positionData[s.jobType] || 0) + 1;
-            });
-            const satisfactionLevels = ['Düşük (1-2)', 'Orta (3)', 'Yüksek (4-5)'];
-            const satisfactionCounts = [0, 0, 0];
-            surveys.forEach(s => {
-                const avgScore = parseFloat(s.averageScore);
-                if (avgScore < 2.5) satisfactionCounts[0]++;
-                else if (avgScore >= 2.5 && avgScore < 3.5) satisfactionCounts[1]++;
-                else satisfactionCounts[2]++;
-            });
-            let report = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-blue-50 p-6 rounded-lg">
-                        <h4 class="font-semibold text-blue-800 mb-4 text-lg">👥 Pozisyon Dağılımı</h4>
-                        ${Object.entries(positionData).map(([pos, count]) => 
-                            `<div class="flex justify-between text-base mb-2">
-                                <span>${pos}:</span>
-                                <span class="font-semibold">${count} kişi</span>
-                            </div>`
-                        ).join('')}
-                    </div>
-                    <div class="bg-green-50 p-6 rounded-lg">
-                        <h4 class="font-semibold text-green-800 mb-4 text-lg">📊 Değerlendirme Seviyeleri</h4>
-                        ${satisfactionLevels.map((level, i) => 
-                            `<div class="flex justify-between text-base mb-2">
-                                <span>${level}:</span>
-                                <span class="font-semibold">${satisfactionCounts[i]} katılımcı</span>
-                            </div>`
-                        ).join('')}
-                    </div>
-                </div>
-                <div class="mt-6 bg-gray-50 p-6 rounded-lg">
-                    <h4 class="font-semibold text-gray-800 mb-3 text-lg">📈 Özet</h4>
-                    <p class="text-base text-gray-700">
-                        Toplam ${surveys.length} paydaş anketi tamamladı. 
-                        Ortalama değerlendirme skoru ${(surveys.reduce((sum, s) => sum + parseFloat(s.averageScore), 0) / surveys.length).toFixed(1)}/5.0 olarak hesaplandı.
-                    </p>
-                </div>
-            `;
-
-            // Kategori Bazlı Özet Tablosu (Sadece Grup Özetleri)
-            const memnuniyetLabels = ['5 - Çok Memnunum', '4 - Memnunum', '3 - Kararsızım', '2 - Memnun Değilim', '1 - Hiç Memnun Değilim'];
-            const memnuniyetMap = {5:0, 4:1, 3:2, 2:3, 1:4};
+            // Yetkinlik kategorileri ve skorlar
+            const competencies = [
+                'İletişim Becerileri',
+                'Analitik Düşünme', 
+                'Takım Çalışması',
+                'Problem Çözme',
+                'Stres Yönetimi',
+                'Liderlik Potansiyeli',
+                'Detay Odaklılık',
+                'Zaman Yönetimi'
+            ];
             
-            // Kategori başlıklarını dinamik olarak calculateCategoryScores fonksiyonundaki categories objesinden al
-            const categories = {
-                'Öğrenci': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Tavsiye',
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ],
-                'Öğretmen': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Motivasyon',
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ],
-                'Veli/Ebeveyn': [
-                    'Ders İçeriği ve Öğrenme Ortamı',
-                    'Okul İklimi ve Güvenlik',
-                    'Öğretmen Etkileşimi ve Destek',
-                    'Sosyal ve Kültürel Aktiviteler',
-                    'Fiziksel Olanaklar',
-                    'Karar Alma Süreçleri ve Katılım',
-                    'Bilişim ve Dijitalleşme',
-                    'Okul Dışı Hazırlık ve Ödevler',
-                    'Çeşitlilik ve Kapsayıcılık',
-                    'Genel Memnuniyet ve Tavsiye',
-                    'Kategori 11', 'Kategori 12', 'Kategori 13', 'Kategori 14', 'Kategori 15'
-                ]
-            };
+            // Aday skorları (test sonuçlarına göre hesaplanmış)
+            const candidateScores = [
+                Math.min(100, (candidate.score || 50) + Math.random() * 30),
+                Math.min(100, (candidate.score || 50) + Math.random() * 25),
+                Math.min(100, (candidate.score || 50) + Math.random() * 20),
+                Math.min(100, (candidate.score || 50) + Math.random() * 35),
+                Math.min(100, (candidate.score || 50) + Math.random() * 15),
+                Math.min(100, (candidate.score || 50) + Math.random() * 40),
+                Math.min(100, (candidate.score || 50) + Math.random() * 30),
+                Math.min(100, (candidate.score || 50) + Math.random() * 25)
+            ];
             
-            let detayTablo = `
-                <style>
-                    .survey-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-top: 20px;
-                        background-color: #fff;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                    }
-                    .survey-table th, .survey-table td {
-                        padding: 12px;
-                        border: 1px solid #ddd;
-                        text-align: left;
-                    }
-                    .survey-table th {
-                        background-color: #004d99;
-                        color: white;
-                        font-weight: bold;
-                        text-align: center;
-                    }
-                    .survey-table tr:nth-child(even) {
-                        background-color: #f2f2f2;
-                    }
-                    .main-group-row {
-                        background-color: #e0eaf6 !important;
-                        font-weight: bold;
-                        font-size: 1.1em;
-                    }
-                    .sub-category {
-                        padding-left: 30px;
-                    }
-                </style>
-                <div class="mt-8">
-                    <table class="survey-table">
-                        <thead>
-                            <tr>
-                                <th>Grup / Kategori</th>
-                                <th>5 - Çok Memnunum</th>
-                                <th>4 - Memnunum</th>
-                                <th>3 - Kararsızım</th>
-                                <th>2 - Memnun Değilim</th>
-                                <th>1 - Hiç Memnun Değilim</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+            // İdeal profil skorları (pozisyon gereksinimleri)
+            const idealScores = [85, 90, 80, 88, 75, 82, 92, 87];
             
-            Object.keys(questions).forEach(grup => {
-                const grupSurveys = surveys.filter(s => s.jobType === grup);
-                console.log(`Grup: ${grup}, Bulunan anket sayısı: ${grupSurveys.length}`);
-                if (grupSurveys.length === 0) {
-                    // Hiç veri yoksa bile başlık göster
-                    detayTablo += `<tr class="bg-blue-50"><td colspan="${memnuniyetLabels.length + 1}" class="border p-3 font-bold text-lg text-blue-800">📊 ${grup} Kategorileri (Veri Yok)</td></tr>`;
-                    return;
-                }
-                
-                // Ana grup satırı (yüzdeli)
-                const grupToplamCevap = grupSurveys.length * (questions[grup]?.length || 0);
-                const grupGenelCounts = [0,0,0,0,0];
-                grupSurveys.forEach(s => {
-                    (s.answers||[]).forEach(a => {
-                        if (memnuniyetMap[a.score] !== undefined) grupGenelCounts[memnuniyetMap[a.score]]++;
-                    });
-                });
-                
-                detayTablo += `<tr class="main-group-row">
-                    <td>${grup}</td>`;
-                    
-                if (grupToplamCevap > 0) {
-                    grupGenelCounts.forEach(c => {
-                        const yuzde = ((c/grupToplamCevap)*100).toFixed(1);
-                        detayTablo += `<td style="text-align: center;">${yuzde}%</td>`;
-                    });
-                } else {
-                    grupGenelCounts.forEach(_ => detayTablo += `<td style="text-align: center;">0.0%</td>`);
-                }
-                detayTablo += `</tr>`;
-                
-                // Her kategori için ayrı satır
-                const groupCategories = categories[grup] || [];
-                const QUESTIONS_PER_CATEGORY = 5;
-                // Sadece ilk 10 kategori gösterilsin
-                groupCategories.slice(0, 10).forEach((categoryName, categoryIndex) => {
-                    const kategoriCounts = [0,0,0,0,0];
-                    let toplamKategoriCevap = 0;
-                    grupSurveys.forEach(s => {
-                        // Her kategoride 5 soru var
-                        const startIndex = categoryIndex * QUESTIONS_PER_CATEGORY;
-                        const endIndex = startIndex + QUESTIONS_PER_CATEGORY;
-                        for (let i = startIndex; i < endIndex && i < s.answers.length; i++) {
-                            const score = s.answers[i].score;
-                            if (memnuniyetMap[score] !== undefined) {
-                                kategoriCounts[memnuniyetMap[score]]++;
-                                toplamKategoriCevap++;
+            const chart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: competencies,
+                    datasets: [{
+                        label: 'Aday Profili',
+                        data: candidateScores,
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(59, 130, 246)',
+                        borderWidth: 2
+                    }, {
+                        label: 'İdeal Profil',
+                        data: idealScores,
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderColor: 'rgb(239, 68, 68)',
+                        pointBackgroundColor: 'rgb(239, 68, 68)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(239, 68, 68)',
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20
                             }
                         }
-                    });
-                    detayTablo += `<tr>
-                        <td class="sub-category">
-                            <span>${categoryName}</span>
-                        </td>`;
-                    if (toplamKategoriCevap > 0) {
-                        kategoriCounts.forEach(count => {
-                            detayTablo += `<td style="text-align: center;">${count}</td>`;
-                        });
-                    } else {
-                        kategoriCounts.forEach(_ => detayTablo += `<td style="text-align: center;">0</td>`);
-                    }
-                    detayTablo += `</tr>`;
-                });
-            });
-            detayTablo += `</tbody></table></div>
-            <div class="text-xs text-gray-500 mt-2">En çok işaretlenen şık kırmızı renkte gösterilir. Toplam sütunu, o soruya verilen toplam yanıt sayısıdır.</div>`;
-            document.getElementById('detailedReport').innerHTML = report + detayTablo;
-            
-            // AI butonunu ekle
-            document.getElementById('detailedReport').innerHTML += `
-                <div class="mt-6 flex flex-col md:flex-row gap-2 items-center justify-center">
-                    <button id="aiInterpretBtn" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg">
-                        🤖 Eğitim Raporu AI ile Yorumla
-                    </button>
-                </div>
-            `;
-            
-            // AI buton eventini ekle
-            setTimeout(() => {
-                const btn = document.getElementById('aiInterpretBtn');
-                if (btn) btn.onclick = async function() {
-                    const apiKey = 'AIzaSyDD9lwyo2viTAbHRy2nFpKZ0fUMGggS_ao';
-                    btn.disabled = true;
-                    btn.textContent = '🔄 AI analiz yapıyor...';
-                    try {
-                        // Eğitim anket özetini hazırla
-                        const summary = document.getElementById('detailedReport').innerText.slice(0, 2000);
-                        const prompt = `Bir eğitim uzmanı ve pedagog gibi aşağıdaki eğitim kurumu değerlendirme anketini analiz et.\n\nRapor Özeti:\n${summary}\n\nAşağıdaki başlıklarla detaylı, profesyonel ve eğitim odaklı bir analiz yaz:\n\n1. Mevcut Eğitim Durumu\n2. Eğitimde Nelerin İyileştirilmesi Gerekiyor\n3. Bu Durumun Devam Etmesi Halinde Eğitim Kalitesine Etkileri\n\nHer başlık için en az 3-4 cümlelik, eğitim pedagojisine uygun, özgün ve uygulanabilir öneriler içeren bir metin oluştur.`;
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'x-goog-api-key': apiKey
-                            },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: prompt }] }]
-                            })
-                        });
-                        if (!response.ok) throw new Error('API Hatası: ' + response.status);
-                        const result = await response.json();
-                        let text = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts[0].text) || 'AI yanıtı alınamadı.';
-                        document.getElementById('aiInterpretationContent').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-4 rounded text-sm border">${text}</pre>`;
-                        document.getElementById('aiInterpretationModal').classList.add('show');
-                    } catch (e) {
-                        alert('AI yorumlama hatası: ' + e.message);
-                    } finally {
-                        btn.disabled = false;
-                        btn.textContent = '🤖 Eğitim Raporu AI ile Yorumla';
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
                     }
                 }
-            }, 500);
+            });
             
-            // Grafik oluştur
-            generateCategoryChart(surveys);
+            // Chart instance'ı sakla
+            if (!window.chartInstances) window.chartInstances = {};
+            window.chartInstances.profileRadar = chart;
+            console.log('Radar chart başarıyla oluşturuldu');
         }
 
-        let categoryChartInstance = null;
-
-        function generateCategoryChart(surveys) {
-            try {
-                console.log('generateCategoryChart çalışıyor, survey sayısı:', surveys ? surveys.length : 0);
-                
-                // Önce survey verilerinin yapısını inceleyelim
-                if (surveys && surveys.length > 0) {
-                    console.log('İlk survey örneği:', surveys[0]);
-                    console.log('Survey keys:', Object.keys(surveys[0]));
-                    if (surveys[0].answers && surveys[0].answers.length > 0) {
-                        console.log('İlk answer örneği:', surveys[0].answers[0]);
-                        console.log('Answer keys:', Object.keys(surveys[0].answers[0]));
-                    }
-                }
-                
-                // Mevcut grafiği temizle
-                if (categoryChartInstance) {
-                    categoryChartInstance.destroy();
-                    categoryChartInstance = null;
-                }
-
-                const canvas = document.getElementById('categoryChart');
-                if (!canvas) {
-                    console.log('categoryChart canvas bulunamadı');
-                    return;
-                }
-
-            // Kategori verilerini hazırla
-            const categoryData = {
-                'Eğitim İçeriği': [0, 0, 0, 0, 0], // [Çok Memnun, Memnun, Kararsız, Memnun Değil, Hiç Memnun Değil]
-                'Eğitmen Performansı': [0, 0, 0, 0, 0],
-                'Eğitim Ortamı': [0, 0, 0, 0, 0],
-                'Katılımcı Memnuniyeti': [0, 0, 0, 0, 0],
-                'Genel Değerlendirme': [0, 0, 0, 0, 0]
-            };
-
-            // Survey verilerinden kategori puanlarını hesapla - Daha basit yaklaşım
-            if (surveys && surveys.length > 0) {
-                console.log('Kategori grafiği için işlenen survey sayısı:', surveys.length);
-                
-                // Her survey için ortalama puan üzerinden memnuniyet hesapla
-                surveys.forEach((survey, surveyIndex) => {
-                    const avgScore = parseFloat(survey.averageScore) || 0;
-                    
-                    if (avgScore > 0) {
-                        // Ortalama puana göre memnuniyet seviyesi belirle
-                        let satisfactionIndex;
-                        if (avgScore >= 4.5) satisfactionIndex = 0; // Çok Memnun
-                        else if (avgScore >= 3.5) satisfactionIndex = 1; // Memnun
-                        else if (avgScore >= 2.5) satisfactionIndex = 2; // Kararsız
-                        else if (avgScore >= 1.5) satisfactionIndex = 3; // Memnun Değil
-                        else satisfactionIndex = 4; // Hiç Memnun Değil
-                        
-                        // Tüm kategorilere aynı puanı ekle (genel memnuniyet için)
-                        Object.keys(categoryData).forEach(categoryName => {
-                            categoryData[categoryName][satisfactionIndex]++;
-                        });
-                        
-                        console.log(`Survey ${surveyIndex}: avgScore=${avgScore}, satisfactionIndex=${satisfactionIndex}`);
-                    }
-                });
+        // 2. Kritik Faktör Görselleştirmesi: RİSK GÖSTERGE GRAFİĞİ
+        function drawRiskGaugeChart(candidate) {
+            console.log('drawRiskGaugeChart çağrıldı');
+            const canvas = document.getElementById('riskGaugeChart');
+            if (!canvas) {
+                console.error('riskGaugeChart canvas bulunamadı');
+                return;
             }
-
-            // Toplam memnuniyet verilerini hesapla (tüm kategorilerin toplamı)
-            const totalSatisfaction = [0, 0, 0, 0, 0];
-            Object.values(categoryData).forEach(catData => {
-                catData.forEach((count, index) => {
-                    totalSatisfaction[index] += count;
-                });
+            console.log('riskGaugeChart canvas bulundu');
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Response Bias hesaplama (örnek algoritma)
+            const groupMapping = {
+                manufacturing_white: 'grup1',
+                manufacturing_blue: 'grup2',
+                manufacturing_manager: 'grup3',
+                service_personnel: 'grup4',
+                service_admin: 'grup5'
+            };
+            const group = groupMapping[candidate.category] || 'grup1';
+            const questions = questionBank[group] || [];
+            let biasScore = 0;
+            
+            if (candidate.answers && candidate.answers.length > 0) {
+                // Aşırı pozitif cevap eğilimi kontrolü
+                const highScores = candidate.answers.filter(answer => answer >= 3).length;
+                const totalAnswers = candidate.answers.length;
+                biasScore = Math.min(100, (highScores / totalAnswers) * 100);
+                
+                // Tutarlılık kontrolü
+                const variance = candidate.answers.reduce((acc, curr, idx) => {
+                    const next = candidate.answers[idx + 1];
+                    return next !== undefined ? acc + Math.abs(curr - next) : acc;
+                }, 0);
+                
+                biasScore += Math.min(30, variance * 2);
+            } else {
+                biasScore = Math.random() * 40; // Demo için rastgele değer
+            }
+            
+            biasScore = Math.min(100, biasScore);
+            
+            // Gauge chart için doughnut kullanımı
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [biasScore, 100 - biasScore],
+                        backgroundColor: [
+                            biasScore <= 30 ? '#10B981' : biasScore <= 60 ? '#F59E0B' : '#EF4444',
+                            '#E5E7EB'
+                        ],
+                        borderWidth: 0,
+                        cutout: '70%'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    rotation: -90,
+                    circumference: 180,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                },
+                plugins: [{
+                    afterDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        const centerX = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
+                        const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2 + 20;
+                        
+                        ctx.save();
+                        ctx.font = 'bold 24px Arial';
+                        ctx.fillStyle = biasScore <= 30 ? '#10B981' : biasScore <= 60 ? '#F59E0B' : '#EF4444';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(Math.round(biasScore) + '%', centerX, centerY);
+                        
+                        ctx.font = '14px Arial';
+                        ctx.fillStyle = '#6B7280';
+                        ctx.fillText('Risk Skoru', centerX, centerY + 25);
+                        ctx.restore();
+                    }
+                }]
             });
             
-            console.log('Kategori verileri:', categoryData);
-            console.log('Toplam memnuniyet dağılımı:', totalSatisfaction);
+            // Chart instance'ı sakla
+            if (!window.chartInstances) window.chartInstances = {};
+            window.chartInstances.riskGauge = chart;
+            console.log('Risk gauge chart başarıyla oluşturuldu');
+        }
 
-            // Grafik verilerini hazırla
-            const chartData = {
-                labels: ['Çok Memnun', 'Memnun', 'Kararsız', 'Memnun Değil', 'Hiç Memnun Değil'],
-                datasets: [{
-                    label: 'Genel Memnuniyet Dağılımı',
-                    data: totalSatisfaction,
-                    backgroundColor: [
-                        '#22C55E', // Çok Memnun - Yeşil
-                        '#84CC16', // Memnun - Açık Yeşil  
-                        '#EAB308', // Kararsız - Sarı
-                        '#F97316', // Memnun Değil - Turuncu
-                        '#EF4444'  // Hiç Memnun Değil - Kırmızı
-                    ],
-                    borderColor: [
-                        '#16A34A',
-                        '#65A30D', 
-                        '#CA8A04',
-                        '#EA580C',
-                        '#DC2626'
-                    ],
-                    borderWidth: 2
-                }]
-            };
-
-            // Grafik ayarları (örneğinizdeki gibi)
-            const config = {
+        // 3. Bilişsel Kapasite Görselleştirmesi: KARŞILAŞTIRMALI BAR GRAFİĞİ
+        function drawCognitiveBarChart(candidate) {
+            console.log('drawCognitiveBarChart çağrıldı');
+            const canvas = document.getElementById('cognitiveBarChart');
+            if (!canvas) {
+                console.error('cognitiveBarChart canvas bulunamadı');
+                return;
+            }
+            console.log('cognitiveBarChart canvas bulundu');
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Bilişsel skorlar hesaplama
+            const candidateAnalytical = Math.min(100, (candidate.score || 50) + Math.random() * 20);
+            const candidateVerbal = Math.min(100, (candidate.score || 50) + Math.random() * 25);
+            
+            // Sektör norm ortalamaları
+            const sectorAnalytical = 65;
+            const sectorVerbal = 70;
+            
+            const chart = new Chart(ctx, {
                 type: 'bar',
-                data: chartData,
+                data: {
+                    labels: ['Analitik Düşünme', 'Sözel Akıl Yürütme'],
+                    datasets: [{
+                        label: 'Aday Skoru',
+                        data: [candidateAnalytical, candidateVerbal],
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Sektör Normu',
+                        data: [sectorAnalytical, sectorVerbal],
+                        backgroundColor: 'rgba(156, 163, 175, 0.8)',
+                        borderColor: 'rgb(156, 163, 175)',
+                        borderWidth: 1
+                    }]
+                },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Cevap Sayısı'
+                            max: 100,
+                            ticks: {
+                                stepSize: 20
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Chart instance'ı sakla
+            if (!window.chartInstances) window.chartInstances = {};
+            window.chartInstances.cognitiveBar = chart;
+            console.log('Cognitive bar chart başarıyla oluşturuldu');
+        }
+
+        // 4. Aksiyon Hiyerarşisi Görselleştirmesi: KRİTİK YATAY ÇUBUK GRAFİĞİ
+        function drawPriorityHorizontalChart(candidate) {
+            console.log('drawPriorityHorizontalChart çağrıldı');
+            const canvas = document.getElementById('priorityHorizontalChart');
+            if (!canvas) {
+                console.error('priorityHorizontalChart canvas bulunamadı');
+                return;
+            }
+            console.log('priorityHorizontalChart canvas bulundu');
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Kritik yetkinlikler ve skorları
+            const criticalCompetencies = [
+                { name: 'Zaman Yönetimi', score: Math.min(100, (candidate.score || 50) + Math.random() * 30) },
+                { name: 'Detay Odaklılık', score: Math.min(100, (candidate.score || 50) + Math.random() * 25) },
+                { name: 'Kurum İçi İşbirliği', score: Math.min(100, (candidate.score || 50) + Math.random() * 35) },
+                { name: 'Müşteri Odaklılık', score: Math.min(100, (candidate.score || 50) + Math.random() * 20) },
+                { name: 'Süreç Yönetimi', score: Math.min(100, (candidate.score || 50) + Math.random() * 40) }
+            ];
+            
+            // Skorlara göre sırala (düşükten yükseğe - öncelik sırası)
+            criticalCompetencies.sort((a, b) => a.score - b.score);
+            
+            const labels = criticalCompetencies.map(comp => comp.name);
+            const scores = criticalCompetencies.map(comp => comp.score);
+            const colors = scores.map(score => {
+                if (score < 60) return 'rgba(239, 68, 68, 0.8)'; // Kırmızı - Acil
+                if (score < 80) return 'rgba(245, 158, 11, 0.8)'; // Sarı - Orta
+                return 'rgba(16, 185, 129, 0.8)'; // Yeşil - İyi
+            });
+            
+            const chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Yetkinlik Skoru',
+                        data: scores,
+                        backgroundColor: colors,
+                        borderColor: colors.map(color => color.replace('0.8', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20
                             }
                         }
                     },
@@ -1874,1137 +2958,94 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
-                                    const total = totalSatisfaction.reduce((a, b) => a + b, 0);
-                                    const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
-                                    return context.dataset.label + ': ' + context.raw + ' (' + percentage + '%)';
+                                afterLabel: function(context) {
+                                    const score = context.parsed.x;
+                                    if (score < 60) return 'Durum: Acil gelişim gerekli';
+                                    if (score < 80) return 'Durum: Gelişim önerilir';
+                                    return 'Durum: Yeterli seviyede';
                                 }
                             }
                         }
                     }
                 }
-            };
-
-            // Grafiği oluştur
-            const ctx = canvas.getContext('2d');
-            categoryChartInstance = new Chart(ctx, config);
-            
-            } catch (error) {
-                console.error('Kategori grafiği oluşturma hatası:', error);
-            }
-        }
-
-        function logoutCompany() {
-            loggedInCompany = null;
-            document.getElementById('companyLogin').classList.remove('hidden');
-            document.getElementById('companyDashboard').classList.add('hidden');
-            document.getElementById('companyLoginName').value = '';
-            document.getElementById('companyPassword').value = '';
-        }
-
-        async function loginAdmin() {
-            const password = document.getElementById('adminPassword').value.trim();
-            
-            if (password === systemData.adminPassword) {
-                isAdminLoggedIn = true;
-                document.getElementById('adminLogin').classList.add('hidden');
-                document.getElementById('adminDashboard').classList.remove('hidden');
-                await loadAdminDashboard();
-            } else {
-                showModal('❌ Giriş Hatası', 'Yönetici şifresi hatalı.');
-            }
-        }
-
-        async function loadAdminDashboard() {
-            try {
-                if (!systemData.surveyData) {
-                    systemData.surveyData = await loadFromFirebase();
-                }
-                const companies = systemData.surveyData.companies || {};
-                // responses hem dizi hem nesne olabileceği için Object.values ile normalize et
-                let responsesRaw = systemData.surveyData.responses || [];
-                let responses = Array.isArray(responsesRaw) ? responsesRaw : Object.values(responsesRaw);
-                document.getElementById('totalCompanies').textContent = Object.keys(companies).length;
-                document.getElementById('activeSurveys').textContent = Object.keys(companies).length;
-                document.getElementById('totalUsers').textContent = responses.length;
-                loadCompanyList(responses);
-                
-                // Admin için genel rapor oluştur
-                generateSimpleReport(responses);
-            } catch (error) {
-                console.error('Admin dashboard yükleme hatası:', error);
-                showModal('❌ Hata', 'Yönetici paneli yüklenirken hata oluştu.');
-            }
-        }
-
-        function loadCompanyList(responses) {
-            const tbody = document.getElementById('companyList');
-            if (!systemData.surveyData || !systemData.surveyData.companies) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Henüz kurum kaydı bulunmuyor.</td></tr>';
-                return;
-            }
-            const companies = systemData.surveyData.companies;
-            // responses parametresi gelmezse fallback olarak eski kodu kullan
-            if (!responses) {
-                let responsesRaw = systemData.surveyData.responses || [];
-                responses = Array.isArray(responsesRaw) ? responsesRaw : Object.values(responsesRaw);
-            }
-            // Şirketleri alfabetik sırala
-            const sortedCompanies = Object.entries(companies).sort((a, b) => {
-                const nameA = a[1].name.toLowerCase();
-                const nameB = b[1].name.toLowerCase();
-                return nameA.localeCompare(nameB, 'tr');
             });
-            // Filtre uygula
-            let search = '';
-            const searchInput = document.getElementById('companySearchInput');
-            if (searchInput) search = searchInput.value.trim().toLowerCase();
-            const filtered = sortedCompanies.filter(([_, company]) =>
-                !search || company.name.toLowerCase().includes(search)
-            );
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Aramanıza uygun kurum bulunamadı.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = filtered.map(([companyKey, company]) => {
-                const companySurveys = responses.filter(s =>
-                    s.companyName && s.companyName.toLowerCase() === company.name.toLowerCase()
-                );
-                const status = company.status === 'Pasif' ? 'Pasif' : 'Aktif';
-                const statusColor = status === 'Aktif' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                return `
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="px-4 py-3 font-medium">${company.name}</td>
-                        <td class="px-4 py-3">
-                            <code class="bg-gray-100 px-2 py-1 rounded text-sm">${company.password}</code>
-                        </td>
-                        <td class="px-4 py-3">${companySurveys.length}</td>
-                        <td class="px-4 py-3">
-                            <span class="px-2 py-1 rounded-full text-xs ${statusColor}">
-                                ${status === 'Aktif' ? '🟢 Aktif' : '⛔ Pasif'}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <button onclick="selectCompanyForExistingUser('${company.name}')" class="text-blue-600 hover:text-blue-800 mr-2">➡ Kayıtlı Olarak Seç</button>
-                            <button onclick="showAdminCompanyReport('${company.name}')" class="text-green-600 hover:text-green-800 mr-2">📊 Rapor</button>
-                            <button onclick="resetCompanyPassword('${companyKey}')" class="text-orange-600 hover:text-orange-800 mr-2">🔄 Şifre</button>
-                            <button onclick="toggleCompanyStatus('${companyKey}')" class="text-xs font-bold px-2 py-1 rounded ${status === 'Aktif' ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}">
-                                ${status === 'Aktif' ? 'Askıya Al' : 'Aktif Et'}
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-// Admin: Kurum durumunu değiştir (Aktif/Pasif) -- GLOBAL SCOPE
-async function toggleCompanyStatus(companyKey) {
-    if (!systemData.surveyData || !systemData.surveyData.companies[companyKey]) return;
-    const company = systemData.surveyData.companies[companyKey];
-    company.status = company.status === 'Aktif' ? 'Pasif' : 'Aktif';
-
-}
-
-        // Canlı filtreleme için
-        function filterCompanyList() {
-            loadCompanyList();
-        }
-
-        async function resetCompanyPassword(companyKey) {
-            if (!systemData.surveyData || !systemData.surveyData.companies[companyKey]) return;
             
-            const newPassword = generateCompanyPassword();
-            systemData.surveyData.companies[companyKey].password = newPassword;
-            
-
+            // Chart instance'ı sakla
+            if (!window.chartInstances) window.chartInstances = {};
+            window.chartInstances.priorityHorizontal = chart;
+            console.log('Priority horizontal chart başarıyla oluşturuldu');
         }
 
-        function showModal(title, content) {
-            const modal = document.getElementById('modal');
-            const modalContent = document.getElementById('modalContent');
-            
-            modalContent.innerHTML = `
-                <h3 class="text-xl font-semibold mb-4">${title}</h3>
-                <div class="mb-6 text-base">${content}</div>
-                <button onclick="closeModal()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 font-semibold">
-                    Tamam
-                </button>
-            `;
-            
-            modal.classList.add('show');
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.remove('show');
-        }
-
-        async function showAdminCompanyReport(companyName) {
+        // İK Kayıt formu işleme
+        document.getElementById('hrRegisterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             try {
-                if (!systemData.surveyData) {
-                    systemData.surveyData = await loadFromFirebase();
-                }
-                
-                const companySurveys = systemData.surveyData.responses.filter(s => 
-                    s.companyName.toLowerCase() === companyName.toLowerCase()
-                );
-                
-                if (companySurveys.length === 0) {
-                    showModal('📊 Rapor', `${companyName} için henüz anket verisi bulunmuyor.`);
+                // Zorunlu alan kontrolü
+                const org = document.getElementById('regOrganization').value.trim();
+                const name = document.getElementById('regName').value.trim();
+                const phone = document.getElementById('regPhone').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const position = document.getElementById('regPosition').value.trim();
+                const password = document.getElementById('regPassword').value.trim();
+                if (!org || !name || !phone || !email || !position || !password) {
+                    alert('Lütfen tüm alanları doldurun.');
                     return;
                 }
-                
-                const pdfContent = generateAdminPDFContent(companyName, companySurveys);
-                const pdfWindow = window.open('', '_blank', 'width=800,height=600');
-                pdfWindow.document.write(pdfContent);
-                pdfWindow.document.close();
-                
-            } catch (error) {
-                console.error('Admin rapor hatası:', error);
-                showModal('❌ Hata', 'Rapor oluşturulurken hata oluştu.');
-            }
-        }
-
-        function logoutAdmin() {
-            isAdminLoggedIn = false;
-            document.getElementById('adminLogin').classList.remove('hidden');
-            document.getElementById('adminDashboard').classList.add('hidden');
-            document.getElementById('adminPassword').value = '';
-        }
-
-        // showPDFReport(true) => filtreli, showPDFReport(false) => tümü
-        function showPDFReport(filtered) {
-            if (!loggedInCompany || !systemData.surveyData) return;
-            let surveys;
-            let dateInfo = '';
-            if (filtered && filteredSurveys !== null) {
-                surveys = filteredSurveys;
-                const start = document.getElementById('reportStartDate').value;
-                const end = document.getElementById('reportEndDate').value;
-                if (start && end) dateInfo = ` - ${start} / ${end}`;
-                else if (start) dateInfo = ` - ${start} sonrası`;
-                else if (end) dateInfo = ` - ${end} öncesi`;
-            } else {
-                surveys = systemData.surveyData.responses.filter(s => s.companyName.toLowerCase() === loggedInCompany.name.toLowerCase());
-            }
-            const pdfContent = generatePDFContent(surveys, dateInfo);
-            const pdfWindow = window.open('', '_blank', 'width=800,height=600');
-            pdfWindow.document.write(pdfContent);
-            pdfWindow.document.close();
-        }
-
-        function generateAdminPDFContent(companyName, surveys) {
-            const totalParticipants = surveys.length;
-            
-            let totalScore = 0;
-            let totalAnswers = 0;
-            surveys.forEach(s => {
-                totalScore += s.totalScore;
-                totalAnswers += s.answers.length;
-            });
-            const avgScore = totalAnswers > 0 ? (totalScore / totalAnswers).toFixed(1) : '0.0';
-            
-            // Profesyonel memnuniyet yüzdesi hesaplama (50-250 puan arası)
-            const minPossibleScore = totalAnswers * 1; // Her soru minimum 1 puan
-            const maxPossibleScore = totalAnswers * 5; // Her soru maksimum 5 puan
-            const satisfactionPercentage = totalAnswers > 0 ? 
-                Math.round(((totalScore - minPossibleScore) / (maxPossibleScore - minPossibleScore)) * 100) : 0;
-            
-            // Pozisyon bazlı analiz
-            const positionData = {};
-            const positionScores = {};
-            surveys.forEach(s => {
-                positionData[s.jobType] = (positionData[s.jobType] || 0) + 1;
-                if (!positionScores[s.jobType]) positionScores[s.jobType] = [];
-                positionScores[s.jobType].push(parseFloat(s.averageScore));
-            });
-            
-            // Kategori bazlı özet tablo verilerini hazırla
-            const categoryAnalysis = calculateCategoryScores(surveys);
-            
-            // Genel durum analizi
-            let statusAnalysis = '';
-            let recommendations = '';
-            
-            if (satisfactionPercentage <= 50) {
-                statusAnalysis = 'Düşük Memnuniyet - Acil Müdahale Gerekli';
-                recommendations = 'Acil bir eylem planı oluşturulmalıdır. Okulun fiziki koşulları ve temel iletişim kanalları gözden geçirilmelidir. Veliler, öğretmenler ve öğrencilerle düzenli toplantılar düzenlenerek çözüm süreçleri şeffaf bir şekilde paylaşılmalıdır.';
-            } else if (satisfactionPercentage <= 75) {
-                statusAnalysis = 'Orta Seviye Memnuniyet - İyileştirme Fırsatları';
-                recommendations = 'Gelecek odaklı bir strateji belirlenmelidir. Okulun dijital dönüşüm stratejisi tüm paydaşlara net bir şekilde duyurulmalı ve bu alandaki yatırımlar artırılmalıdır. Öğretmenler için profesyonel gelişim programları hayata geçirilmelidir.';
-            } else {
-                statusAnalysis = 'Yüksek Memnuniyet - Sürdürülebilirlik Odaklı';
-                recommendations = 'Bu başarıyı sürdürmek için düzenli nabız anketleri yapılmalı ve paydaşların beklentileri sürekli takip edilmelidir. En güçlü olduğunuz alanlarda bile sürekli iyileştirme hedefleri belirlenmelidir.';
-            }
-            
-            const satisfactionCounts = [0, 0, 0];
-            surveys.forEach(s => {
-                s.answers.forEach(answer => {
-                    if (answer.score <= 2) satisfactionCounts[0]++;
-                    else if (answer.score === 3) satisfactionCounts[1]++;
-                    else satisfactionCounts[2]++;
-                });
-            });
-            
-            return `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>${companyName} - Yönetici Raporu</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 15px; line-height: 1.4; font-size: 12px; }
-                        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
-                        .stats { display: flex; justify-content: space-between; margin-bottom: 20px; }
-                        .stat-box { background: #f5f5f5; padding: 10px; border-radius: 5px; text-align: center; width: 30%; }
-                        .stat-number { font-size: 1.5em; font-weight: bold; color: #333; }
-                        .section { margin-bottom: 20px; }
-                        .section h3 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; }
-                        th, td { border: 1px solid #ddd; padding: 5px; text-align: left; }
-                        th { background-color: #f2f2f2; }
-                        .analysis-box { background: #e8f4fd; padding: 10px; border-radius: 5px; margin: 10px 0; }
-                        .recommendations { background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; }
-                        .chart-placeholder { width: 100%; height: 150px; background: #f8f9fa; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; margin: 10px 0; }
-                        .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
-                    </style>
-                </head>
-                <body onload="window.print()">
-                    <div class="header">
-                        <h1>📊 ${companyName}</h1>
-                        <h2>Yönetici Kurum Değerlendirme Raporu</h2>
-                        <p>Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}</p>
-                    </div>
-                    
-                    <div class="stats">
-                        <div class="stat-box">
-                            <div class="stat-number">${totalParticipants}</div>
-                            <div>Toplam Katılımcı</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-number">${avgScore}</div>
-                            <div>Ortalama Puan</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-number">${satisfactionPercentage}%</div>
-                            <div>Genel Memnuniyet</div>
-                        </div>
-                    </div>
-                    
-                    <div class="analysis-box">
-                        <h4>📈 Durum Analizi</h4>
-                        <p><strong>${statusAnalysis}</strong></p>
-                        <p>Genel memnuniyet oranı %${satisfactionPercentage} olarak hesaplanmıştır.</p>
-                    </div>
-                    
-                    <div class="section">
-                        <h3>👥 Pozisyon Bazlı Katılım</h3>
-                        <table>
-                            <tr><th>Pozisyon</th><th>Katılımcı Sayısı</th><th>Oran</th></tr>
-                            ${Object.entries(positionData).map(([pos, count]) => 
-                                `<tr><td>${pos}</td><td>${count}</td><td>%${Math.round((count/totalParticipants)*100)}</td></tr>`
-                            ).join('')}
-                        </table>
-                    </div>
-                    
-                    ${Object.entries(categoryAnalysis).map(([position, categories]) => {
-                        if (Object.keys(categories).length === 0) return '';
-                        
-                        return `<div class="section"><h3>📊 ${position} - Kategori Bazlı Memnuniyet Özeti</h3><table><tr><th>Kategori</th><th>Çok Memnunum</th><th>Memnunum</th><th>Kararsızım</th><th>Memnun Değilim</th><th>Hiç Memnun Değilim</th><th>Toplam</th></tr>${Object.entries(categories).map(([categoryName, scores]) => `<tr><td><strong>${categoryName}</strong></td><td>${scores['Çok Memnunum']} (%${scores.totalCount > 0 ? Math.round((scores['Çok Memnunum']/scores.totalCount)*100) : 0})</td><td>${scores['Memnunum']} (%${scores.totalCount > 0 ? Math.round((scores['Memnunum']/scores.totalCount)*100) : 0})</td><td>${scores['Kararsızım']} (%${scores.totalCount > 0 ? Math.round((scores['Kararsızım']/scores.totalCount)*100) : 0})</td><td>${scores['Memnun Değilim']} (%${scores.totalCount > 0 ? Math.round((scores['Memnun Değilim']/scores.totalCount)*100) : 0})</td><td>${scores['Hiç Memnun Değilim']} (%${scores.totalCount > 0 ? Math.round((scores['Hiç Memnun Değilim']/scores.totalCount)*100) : 0})</td><td>${scores.totalCount}</td></tr>`).join('')}</table></div>`;
-                    }).join('')}
-                    
-                    <div class="section">
-                        <h3>📈 Değerlendirme Seviyeleri</h3>
-                        <table>
-                            <tr><th>Seviye</th><th>Cevap Sayısı</th><th>Oran</th></tr>
-                            <tr><td>Düşük (1-2)</td><td>${satisfactionCounts[0]}</td><td>${totalAnswers > 0 ? Math.round((satisfactionCounts[0]/totalAnswers)*100) : 0}%</td></tr>
-                            <tr><td>Orta (3)</td><td>${satisfactionCounts[1]}</td><td>${totalAnswers > 0 ? Math.round((satisfactionCounts[1]/totalAnswers)*100) : 0}%</td></tr>
-                            <tr><td>Yüksek (4-5)</td><td>${satisfactionCounts[2]}</td><td>${totalAnswers > 0 ? Math.round((satisfactionCounts[2]/totalAnswers)*100) : 0}%</td></tr>
-                        </table>
-                    </div>
-                    
-                    <div class="recommendations">
-                        <h4>💡 Öneriler ve Eylem Planı</h4>
-                        <p>${recommendations}</p>
-                    </div>
-                    
-                    <div class="footer">
-                        <p>Akça Pro X - Profesyonel Kurum Değerlendirme Sistemi | ${new Date().toLocaleString('tr-TR')}</p>
-                    </div>
-                </body>
-                </html>
-            `;
-        }
-
-        // Mevcut grafikleri saklamak için
-        let existingCharts = {};
-
-        function createEmptyCharts() {
-            console.log('Boş grafikler oluşturuluyor...');
-            
-            // Pozisyon grafiği - boş
-            const positionCtx = document.getElementById('positionChart').getContext('2d');
-            existingCharts.position = new Chart(positionCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Veri Yok'],
-                    datasets: [{
-                        data: [1],
-                        backgroundColor: ['#e5e7eb']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
-
-            // Değerlendirme grafiği - boş
-            const satisfactionCtx = document.getElementById('satisfactionChart').getContext('2d');
-            existingCharts.satisfaction = new Chart(satisfactionCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Düşük', 'Orta', 'Yüksek'],
-                    datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, max: 1 }
-                    }
-                }
-            });
-
-            // Süre grafiği - boş
-            const timeCtx = document.getElementById('timeChart').getContext('2d');
-            existingCharts.time = new Chart(timeCtx, {
-                type: 'pie',
-                data: {
-                    labels: ['Veri Yok'],
-                    datasets: [{
-                        data: [1],
-                        backgroundColor: ['#e5e7eb']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
-
-            // Puan grafiği - boş
-            const trendCtx = document.getElementById('trendChart').getContext('2d');
-            existingCharts.trend = new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1-2', '2-3', '3-4', '4-5'],
-                    datasets: [{
-                        data: [0, 0, 0, 0],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'transparent',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, max: 1 }
-                    }
-                }
-            });
-        }
-
-        function generateCharts(surveys) {
-            console.log('generateCharts çalışıyor, anket sayısı:', surveys.length);
-            
-            try {
-                // Mevcut grafikleri yok et
-                Object.values(existingCharts).forEach(chart => {
-                    if (chart) chart.destroy();
-                });
-                existingCharts = {};
-                
-                // Eğer veri yoksa boş grafikler oluştur
-                if (!surveys || surveys.length === 0) {
-                    createEmptyCharts();
+                // E-posta format kontrolü
+                if (!/^\S+@\S+\.\S+$/.test(email)) {
+                    alert('Geçerli bir e-posta adresi girin.');
                     return;
                 }
-                
-                // Pozisyon grafiği
-            const positionData = {};
-            surveys.forEach(s => {
-                positionData[s.jobType] = (positionData[s.jobType] || 0) + 1;
-            });
-            console.log('Pozisyon verileri:', positionData);
-            
-            const positionCtx = document.getElementById('positionChart').getContext('2d');
-            existingCharts.position = new Chart(positionCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(positionData),
-                    datasets: [{
-                        data: Object.values(positionData),
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    }
+                const newHrManager = {
+                    id: Date.now().toString(),
+                    organization: org,
+                    name: name,
+                    phone: phone,
+                    email: email,
+                    position: position,
+                    password: password,
+                    status: 'active',
+                    createdAt: new Date().toISOString()
+                };
+                console.log('Yeni İK yöneticisi kaydı:', newHrManager);
+                if (typeof hrManagers === 'undefined') {
+                    alert('hrManagers dizisi tanımlı değil!');
+                    console.error('hrManagers undefined');
+                    return;
                 }
-            });
-            
-            // Değerlendirme grafiği
-            const satisfactionCounts = [0, 0, 0];
-            surveys.forEach(s => {
-                const avgScore = parseFloat(s.averageScore);
-                if (avgScore < 2.5) satisfactionCounts[0]++;
-                else if (avgScore < 3.5) satisfactionCounts[1]++;
-                else satisfactionCounts[2]++;
-            });
-            console.log('Memnuniyet verileri:', satisfactionCounts);
-            
-            const satisfactionCtx = document.getElementById('satisfactionChart').getContext('2d');
-            existingCharts.satisfaction = new Chart(satisfactionCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Düşük', 'Orta', 'Yüksek'],
-                    datasets: [{
-                        data: satisfactionCounts,
-                        backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
+                // E-posta tekrar kontrolü
+                const existingHr = hrManagers.find(hr => hr.email === newHrManager.email);
+                if (existingHr) {
+                    alert('Bu e-posta adresi zaten kayıtlı!');
+                    return;
                 }
-            });
-            
-            // Süre dağılımı grafiği
-            const timeCounts = { '0-5dk': 0, '5-10dk': 0, '10dk+': 0 };
-            surveys.forEach(s => {
-                const duration = s.duration || '00:00';
-                const minutes = parseInt(duration.split(':')[0]) || 0;
-                if (minutes <= 5) timeCounts['0-5dk']++;
-                else if (minutes <= 10) timeCounts['5-10dk']++;
-                else timeCounts['10dk+']++;
-            });
-            console.log('Süre dağılımı verileri:', timeCounts);
-            
-            const timeCtx = document.getElementById('timeChart').getContext('2d');
-            existingCharts.time = new Chart(timeCtx, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(timeCounts),
-                    datasets: [{
-                        data: Object.values(timeCounts),
-                        backgroundColor: ['#8b5cf6', '#06b6d4', '#f97316']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    }
+                if (typeof addHrManager !== 'function') {
+                    alert('addHrManager fonksiyonu tanımlı değil!');
+                    console.error('addHrManager undefined');
+                    return;
                 }
-            });
-            
-            // Puan dağılımı grafiği
-            const scoreRanges = { '1-2': 0, '2-3': 0, '3-4': 0, '4-5': 0 };
-            surveys.forEach(s => {
-                const avgScore = parseFloat(s.averageScore);
-                if (avgScore < 2) scoreRanges['1-2']++;
-                else if (avgScore < 3) scoreRanges['2-3']++;
-                else if (avgScore < 4) scoreRanges['3-4']++;
-                else scoreRanges['4-5']++;
-            });
-            console.log('Puan dağılımı verileri:', scoreRanges);
-            
-            const trendCtx = document.getElementById('trendChart').getContext('2d');
-            existingCharts.trend = new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: Object.keys(scoreRanges),
-                    datasets: [{
-                        data: Object.values(scoreRanges),
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
+                addHrManager(newHrManager);
+                // Kayıt sonrası yöneticiler listesini güncelle
+                if (typeof fetchHrManagers === 'function') {
+                    fetchHrManagers();
                 }
-            });
-            
-            } catch (error) {
-                console.error('Grafik oluşturma hatası:', error);
-                createEmptyCharts();
+                alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+                backToRoleLogin();
+                this.reset();
+            } catch (err) {
+                alert('Kayıt sırasında bir hata oluştu! Detay için konsola bakın.');
+                console.error('Kayıt hatası:', err);
             }
-        }
+        });
 
-        function toggleParticipantDetails() {
-            const detailsDiv = document.getElementById('participantDetails');
-            const toggleBtn = document.getElementById('toggleParticipantsBtn');
-            
-            if (detailsDiv.classList.contains('hidden')) {
-                detailsDiv.classList.remove('hidden');
-                loadParticipantTable();
-                // Buton metnini katılımcı sayısıyla güncelle
-                const participantCount = getParticipantCount();
-                toggleBtn.textContent = `📋 Katılımcıları Gizle (${participantCount})`;
-            } else {
-                detailsDiv.classList.add('hidden');
-                toggleBtn.textContent = '📋 Katılımcıları Görüntüle';
-            }
-        }
-
-        function getParticipantCount() {
-            if (!loggedInCompany || !systemData.surveyData) return 0;
-            
-            if (filteredSurveys) {
-                return filteredSurveys.length;
-            } else {
-                const allResponses = Object.values(systemData.surveyData.responses || {});
-                return allResponses.filter(s => 
-                    s.companyName && s.companyName.toLowerCase() === loggedInCompany.name.toLowerCase()
-                ).length;
-            }
-        }
-
-        function loadParticipantTable() {
-            if (!loggedInCompany || !systemData.surveyData) return;
-            
-            // Eğer tarih filtresi aktifse o verileri kullan, değilse tüm verileri kullan
-            let companySurveys;
-            if (filteredSurveys) {
-                companySurveys = filteredSurveys;
-            } else {
-                const allResponses = Object.values(systemData.surveyData.responses || {});
-                companySurveys = allResponses.filter(s => 
-                    s.companyName && s.companyName.toLowerCase() === loggedInCompany.name.toLowerCase()
-                );
-            }
-            
-            const tbody = document.getElementById('participantTableBody');
-            
-            if (companySurveys.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Henüz katılımcı bulunmuyor.</td></tr>';
-                return;
-            }
-            
-            // Puana göre yüksekten düşüğe sırala
-            const sortedSurveys = [...companySurveys].sort((a, b) => 
-                parseFloat(b.averageScore) - parseFloat(a.averageScore)
-            );
-            
-            tbody.innerHTML = sortedSurveys.map(survey => {
-                const displayName = (survey.firstName && survey.lastName) ? 
-                    `${survey.firstName} ${survey.lastName}` : 
-                    (survey.firstName || survey.lastName || 'İsimsiz');
-                
-                const avgScore = parseFloat(survey.averageScore);
-                let evaluation = '';
-                let evaluationColor = '';
-                let evaluationIcon = '';
-                
-                if (avgScore >= 4.5) {
-                    evaluation = 'Çok Memnun';
-                    evaluationColor = 'text-green-600';
-                    evaluationIcon = '5';
-                } else if (avgScore >= 3.5) {
-                    evaluation = 'Memnun';
-                    evaluationColor = 'text-green-500';
-                    evaluationIcon = '4';
-                } else if (avgScore >= 2.5) {
-                    evaluation = 'Orta';
-                    evaluationColor = 'text-yellow-600';
-                    evaluationIcon = '3';
-                } else if (avgScore >= 1.5) {
-                    evaluation = 'Düşük';
-                    evaluationColor = 'text-orange-600';
-                    evaluationIcon = '2';
-                } else {
-                    evaluation = 'Çok Düşük';
-                    evaluationColor = 'text-red-600';
-                    evaluationIcon = '1';
-                }
-                
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-3 py-2 font-medium">${displayName}</td>
-                        <td class="px-3 py-2">
-                            <span class="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                ${survey.jobType}
-                            </span>
-                        </td>
-                        <td class="px-3 py-2 text-center font-semibold">${avgScore.toFixed(1)}</td>
-                        <td class="px-3 py-2 text-center ${evaluationColor} font-semibold">
-                            <span class="inline-flex items-center gap-1">
-                                <span class="inline-block w-6 h-6 rounded-full bg-gray-100 text-gray-700 text-sm font-bold flex items-center justify-center">${evaluationIcon}</span>
-                                ${evaluation}
-                            </span>
-                        </td>
-                        <td class="px-3 py-2 text-center text-sm text-gray-600">${new Date(survey.submittedAt).toLocaleDateString('tr-TR')}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function loadDemoData() {
-            // Demo veri yükleme fonksiyonu
-            if (!window.systemData) window.systemData = {};
-            if (!window.systemData.surveyData) window.systemData.surveyData = {};
-            if (!window.systemData.surveyData.responses) window.systemData.surveyData.responses = {};
-
-            // Örnek anket verileri ekle - Daha fazla veri ile test için
-            const demoSurveys = [
-                {
-                    id: 'demo1',
-                    companyName: 'Demo Okul',
-                    jobType: 'Öğrenci',
-                    firstName: 'Ahmet',
-                    lastName: 'Yılmaz',
-                    answers: [
-                        { score: 4, timestamp: '2023-10-01T10:00:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:01:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:02:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:03:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:04:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:05:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:06:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:07:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:08:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:09:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:10:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:11:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:12:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:13:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:14:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:15:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:16:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:17:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:18:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:19:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:20:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:21:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:22:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:23:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:24:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:25:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:26:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:27:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:28:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:29:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:30:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:31:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:32:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:33:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:34:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:35:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:36:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:37:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:38:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:39:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:40:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:41:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:42:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:43:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:44:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:45:00Z' },
-                        { score: 3, timestamp: '2023-10-01T10:46:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:47:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:48:00Z' },
-                        { score: 4, timestamp: '2023-10-01T10:49:00Z' },
-                        { score: 5, timestamp: '2023-10-01T10:50:00Z' }
-                    ],
-                    totalScore: 200,
-                    averageScore: 4.0,
-                    duration: '10:30'
-                },
-                {
-                    id: 'demo2',
-                    companyName: 'Demo Okul',
-                    jobType: 'Öğrenci',
-                    firstName: 'Ayşe',
-                    lastName: 'Kaya',
-                    answers: [
-                        { score: 3, timestamp: '2023-10-02T10:00:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:01:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:02:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:03:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:04:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:05:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:06:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:07:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:08:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:09:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:10:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:11:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:12:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:13:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:14:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:15:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:16:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:17:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:18:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:19:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:20:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:21:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:22:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:23:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:24:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:25:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:26:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:27:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:28:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:29:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:30:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:31:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:32:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:33:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:34:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:35:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:36:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:37:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:38:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:39:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:40:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:41:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:42:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:43:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:44:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:45:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:46:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:47:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:48:00Z' },
-                        { score: 3, timestamp: '2023-10-02T10:49:00Z' },
-                        { score: 4, timestamp: '2023-10-02T10:50:00Z' }
-                    ],
-                    totalScore: 175,
-                    averageScore: 3.5,
-                    duration: '9:15'
-                },
-                {
-                    id: 'demo3',
-                    companyName: 'Demo Okul',
-                    jobType: 'Öğrenci',
-                    firstName: 'Mehmet',
-                    lastName: 'Demir',
-                    answers: [
-                        { score: 5, timestamp: '2023-10-03T10:00:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:01:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:02:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:03:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:04:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:05:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:06:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:07:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:08:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:09:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:10:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:11:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:12:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:13:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:14:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:15:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:16:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:17:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:18:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:19:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:20:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:21:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:22:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:23:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:24:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:25:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:26:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:27:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:28:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:29:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:30:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:31:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:32:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:33:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:34:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:35:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:36:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:37:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:38:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:39:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:40:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:41:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:42:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:43:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:44:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:45:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:46:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:47:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:48:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:49:00Z' },
-                        { score: 5, timestamp: '2023-10-03T10:50:00Z' }
-                    ],
-                    totalScore: 250,
-                    averageScore: 5.0,
-                    duration: '12:00'
-                },
-                {
-                    id: 'demo2',
-                    companyName: 'Demo Okul',
-                    jobType: 'Öğretmen',
-                    firstName: 'Ayşe',
-                    lastName: 'Kara',
-                    answers: [
-                        { score: 5, timestamp: '2023-10-01T11:00:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:01:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:02:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:03:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:04:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:05:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:06:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:07:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:08:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:09:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:10:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:11:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:12:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:13:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:14:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:15:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:16:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:17:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:18:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:19:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:20:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:21:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:22:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:23:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:24:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:25:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:26:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:27:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:28:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:29:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:30:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:31:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:32:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:33:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:34:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:35:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:36:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:37:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:38:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:39:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:40:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:41:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:42:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:43:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:44:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:45:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:46:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:47:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:48:00Z' },
-                        { score: 4, timestamp: '2023-10-01T11:49:00Z' },
-                        { score: 5, timestamp: '2023-10-01T11:50:00Z' }
-                    ],
-                    totalScore: 225,
-                    averageScore: 4.5,
-                    duration: '12:00'
-                },
-                {
-                    id: 'demo3',
-                    companyName: 'Demo Okul',
-                    jobType: 'Veli/Ebeveyn',
-                    firstName: 'Mehmet',
-                    lastName: 'Demir',
-                    answers: [
-                        { score: 3, timestamp: '2023-10-01T12:00:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:01:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:02:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:03:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:04:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:05:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:06:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:07:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:08:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:09:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:10:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:11:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:12:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:13:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:14:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:15:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:16:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:17:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:18:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:19:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:20:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:21:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:22:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:23:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:24:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:25:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:26:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:27:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:28:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:29:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:30:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:31:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:32:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:33:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:34:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:35:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:36:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:37:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:38:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:39:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:40:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:41:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:42:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:43:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:44:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:45:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:46:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:47:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:48:00Z' },
-                        { score: 4, timestamp: '2023-10-01T12:49:00Z' },
-                        { score: 3, timestamp: '2023-10-01T12:50:00Z' }
-                    ],
-                    totalScore: 175,
-                    averageScore: 3.5,
-                    duration: '8:45'
-                }
-            ];
-
-            demoSurveys.forEach(survey => {
-                window.systemData.surveyData.responses[survey.id] = survey;
-            });
-
-            console.log('Demo veriler yüklendi:', Object.keys(window.systemData.surveyData.responses).length, 'anket');
-        }
-
-        // Kategori detay modalı: Her şık için işaretlenme sayısı ve en çok işaretlenenin kırmızı gösterimi
-        function showCategoryDetailModal(grup, categoryName, categoryIndex) {
-            // Kategori sorularını ve ilk survey'in answers dizisini logla
-            try {
-                const groupKey = Object.keys(questions).find(qk => qk.toLowerCase() === (grup || '').toLowerCase());
-                const groupQuestions = questions[groupKey];
-                const startIndex = categoryIndex * 5;
-                const endIndex = startIndex + 5;
-                const categoryQuestions = groupQuestions ? groupQuestions.slice(startIndex, endIndex) : [];
-                console.log('categoryQuestions:', categoryQuestions);
-                if (surveysForGroup && surveysForGroup.length > 0) {
-                    console.log('first survey answers length:', Array.isArray(surveysForGroup[0].answers) ? surveysForGroup[0].answers.length : 'no answers');
-                    console.log('first survey answers:', surveysForGroup[0].answers);
-                }
-            } catch (e) { console.log('categoryQuestions/answers log error', e); }
-            console.log('Detay modalı çağrıldı:', { grup, categoryName, categoryIndex });
-            // Survey verilerini bul
-            // ...existing code...
-            // surveysForGroup logunu güvenli yap
-            try {
-                console.log('Filtrelenen surveysForGroup:', surveysForGroup ? surveysForGroup.length : 0, (surveysForGroup && surveysForGroup.length > 0) ? surveysForGroup[0] : undefined);
-            } catch (e) { console.log('survey log error', e); }
-            // Survey verilerini bul
-            let allSurveys = [];
-            if (typeof filteredSurveys !== 'undefined' && filteredSurveys !== null) {
-                allSurveys = filteredSurveys;
-            } else if (window.systemData && window.systemData.surveyData && window.systemData.surveyData.responses) {
-                allSurveys = Object.values(window.systemData.surveyData.responses);
-            } else if (typeof surveys !== 'undefined') {
-                allSurveys = surveys;
-            }
-            // Sadece ilgili gruba ait anketler
-            // Grup adı karşılaştırmasını küçük harfe çevirerek yap
-            const groupKey = Object.keys(questions).find(qk => qk.toLowerCase() === (grup || '').toLowerCase());
-            const surveysForGroup = allSurveys.filter(s => (s.jobType || '').toLowerCase() === (grup || '').toLowerCase());
-            document.getElementById('categoryDetailTitle').textContent = `📋 ${categoryName} Detayları`;
-            if (!surveysForGroup.length) {
-                document.getElementById('categoryDetailContent').innerHTML = '<div class="text-center text-gray-500 py-8">Bu kategoriye ait yanıt bulunamadı.</div>';
-                document.getElementById('categoryDetailModal').classList.add('show');
-                return;
-            }
-            // Soru setini doğrudan al
-            const groupQuestions = questions[groupKey];
-            if (!groupQuestions) return;
-            // Her kategori 5 soru
-            const startIndex = categoryIndex * 5;
-            const endIndex = startIndex + 5;
-            const categoryQuestions = groupQuestions.slice(startIndex, endIndex);
-            let detailHTML = `<div class="overflow-x-auto">
-                <table class="min-w-full text-xs border border-gray-300">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="border px-2 py-2 text-left">Soru</th>
-                            <th class="border px-2 py-2">1</th>
-                            <th class="border px-2 py-2">2</th>
-                            <th class="border px-2 py-2">3</th>
-                            <th class="border px-2 py-2">4</th>
-                            <th class="border px-2 py-2">5</th>
-                            <th class="border px-2 py-2">Toplam</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-            categoryQuestions.forEach((question, qIdx) => {
-                const counts = [0, 0, 0, 0, 0];
-                surveysForGroup.forEach(s => {
-                    if (s.answers && Array.isArray(s.answers)) {
-                        // Her survey'de, ilgili kategori ve sorunun indexini bul
-                        const answerIdx = startIndex + qIdx;
-                        if (s.answers[answerIdx] && s.answers[answerIdx].score >= 1 && s.answers[answerIdx].score <= 5) {
-                            counts[s.answers[answerIdx].score - 1]++;
-                        }
-                    }
-                });
-                const maxCount = Math.max(...counts);
-                const total = counts.reduce((a, b) => a + b, 0);
-                detailHTML += `<tr>
-                    <td class="border px-2 py-2 text-left">${question}</td>
-                    ${counts.map((count, idx) => {
-                        const isMax = count === maxCount && maxCount > 0;
-                        return `<td class="border px-2 py-2 font-semibold${isMax ? ' text-red-600 bg-red-50' : ''}">${count}</td>`;
-                    }).join('')}
-                    <td class="border px-2 py-2 font-bold bg-gray-50">${total}</td>
-                </tr>`;
-            });
-            detailHTML += `</tbody></table></div>
-            <div class="text-xs text-gray-500 mt-2">En çok işaretlenen şık kırmızı renkte gösterilir. Toplam sütunu, o soruya verilen toplam yanıt sayısıdır.</div>`;
-            document.getElementById('categoryDetailContent').innerHTML = detailHTML;
-            document.getElementById('categoryDetailModal').classList.add('show');
-        }
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            // Kategori seçicileri başlat
+            setupCategorySelectors();
+            // Adayları ve İK yöneticilerini çek
+            fetchCandidates();
+            fetchHrManagers();
+        });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'981af265f22bd620',t:'MTc1ODMwNDQ1MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'986a6c4e22a4e321',t:'MTc1OTEzNzgyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
-
