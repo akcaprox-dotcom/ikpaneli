@@ -204,7 +204,7 @@
                 </button>
                 
                 <!-- İK Girişi -->
-                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     👩‍💻 İK Girişi
                 </button>
                 
@@ -340,7 +340,6 @@
                     </div>
                     <div class="flex space-x-4">
                         <button onclick="showHrSection('dashboard')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Dashboard</button>
-                        <button onclick="showHrSection('newMember')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Yeni Aday Ekle</button>
                         <button onclick="showHrSection('candidates')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Adaylar</button>
                         <button onclick="showHrSection('reports')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">Raporlar</button>
                         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
@@ -472,24 +471,25 @@
         <!-- Aday Yönetimi -->
         <div id="hrCandidates" class="hidden max-w-7xl mx-auto p-6">
             <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">Hızlı Aday Ekle</h3>
-                <p class="text-sm text-gray-600 mb-4">Detaylı test kriterleri için Dashboard'daki "Yeni Aday Ekle" bölümünü kullanın.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Yeni Aday Ekle</h3>
                 <form id="newCandidateForm" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <input type="text" id="candidateAliasInput" placeholder="Aday Rumuzu" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
                         <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        <select id="candidateTestGroup" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                            <option value="">Test Grubu Seçin</option>
-                            <option value="grup1">Beyaz Yaka Çalışanları</option>
-                            <option value="grup2">Mavi Yaka Çalışanları</option>
-                            <option value="grup3">Yönetici İmalat</option>
-                            <option value="grup4">Hizmet Personeli</option>
-                            <option value="grup5">Hizmet Yöneticileri</option>
+                        <select id="candidateMainCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                            <option value="">Ana Kategori Seç</option>
+                            <option value="manufacturing">İmalat</option>
+                            <option value="service">Hizmet</option>
                         </select>
                     </div>
-                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
-                        Hızlı Aday Ekle
-                    </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <select id="candidateSubCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required disabled>
+                            <option value="">Önce ana kategori seçin</option>
+                        </select>
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                            Aday Ekle
+                        </button>
+                    </div>
                 </form>
             </div>
             
@@ -515,7 +515,7 @@
                         <thead>
                             <tr class="bg-gray-50">
                                 <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Rumuz</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Alanı</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Kategori</th>
                                 <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Durumu</th>
                                 <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Oluşturma Tarihi</th>
                                 <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">İşlemler</th>
@@ -2428,9 +2428,11 @@ document.addEventListener('DOMContentLoaded', function() {
             newCandidateForm.addEventListener('submit', function(e) {
                 e.preventDefault();
             
-            const testGroup = document.getElementById('candidateTestGroup').value;
-            if (!testGroup) {
-                alert('Lütfen bir test grubu seçin!');
+            const mainCategory = document.getElementById('candidateMainCategory').value;
+            const subCategory = document.getElementById('candidateSubCategory').value;
+            
+            if (!mainCategory || !subCategory) {
+                alert('Lütfen ana kategori ve alt kategori seçin!');
                 return;
             }
             
@@ -2438,7 +2440,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: Date.now().toString(),
                 alias: document.getElementById('candidateAliasInput').value,
                 password: document.getElementById('candidatePasswordInput').value,
-                testGroup: testGroup,
+                mainCategory: mainCategory,
+                subCategory: subCategory,
                 createdBy: currentUser.id,
                 testCompleted: false,
                 createdAt: new Date().toISOString(),
@@ -2449,7 +2452,7 @@ document.addEventListener('DOMContentLoaded', function() {
             db.ref('candidates/' + newCandidate.alias).set(newCandidate);
 
             
-            alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
+            alert('Yeni aday başarıyla eklendi!\nKategori: ' + mainCategory + ' - ' + subCategory);
             this.reset();
             
             // Alt kategori seçimini sıfırla
@@ -2459,6 +2462,51 @@ document.addEventListener('DOMContentLoaded', function() {
             loadCandidatesList();
         });
         } // newCandidateForm if kapanışı
+
+        // Kategori seçenekleri güncelleme işlevselliği
+        const candidateMainCategorySelect = document.getElementById('candidateMainCategory');
+        const candidateSubCategorySelect = document.getElementById('candidateSubCategory');
+
+        if (candidateMainCategorySelect && candidateSubCategorySelect) {
+            candidateMainCategorySelect.addEventListener('change', function() {
+                const selectedMainCategory = this.value;
+                candidateSubCategorySelect.innerHTML = '<option value="">Alt Kategori Seçin</option>';
+                candidateSubCategorySelect.disabled = true;
+
+                if (selectedMainCategory) {
+                    candidateSubCategorySelect.disabled = false;
+                    
+                    if (selectedMainCategory === 'manufacturing') {
+                        candidateSubCategorySelect.innerHTML = `
+                            <option value="">Alt Kategori Seçin</option>
+                            <option value="production_operator">Üretim Operatörü</option>
+                            <option value="quality_control">Kalite Kontrol</option>
+                            <option value="warehouse_worker">Depo İşçisi</option>
+                            <option value="maintenance_tech">Bakım Teknisyeni</option>
+                            <option value="forklift_operator">Forklift Operatörü</option>
+                            <option value="production_planner">Üretim Planlayıcı</option>
+                            <option value="line_manager">Hat Yöneticisi</option>
+                            <option value="shift_supervisor">Vardiya Amiri</option>
+                        `;
+                    } else if (selectedMainCategory === 'service') {
+                        candidateSubCategorySelect.innerHTML = `
+                            <option value="">Alt Kategori Seçin</option>
+                            <option value="customer_service">Müşteri Hizmetleri</option>
+                            <option value="sales_rep">Satış Temsilcisi</option>
+                            <option value="cashier">Kasiyer</option>
+                            <option value="waiter">Garson</option>
+                            <option value="cleaning_staff">Temizlik Personeli</option>
+                            <option value="security_guard">Güvenlik Görevlisi</option>
+                            <option value="receptionist">Resepsiyon</option>
+                            <option value="technical_support">Teknik Destek</option>
+                            <option value="delivery_person">Kurye</option>
+                            <option value="store_manager">Mağaza Müdürü</option>
+                            <option value="team_leader">Takım Lideri</option>
+                        `;
+                    }
+                }
+            });
+        }
 
         function loadCandidatesList(filteredList) {
             const tbody = document.getElementById('candidatesList');
@@ -2470,19 +2518,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     ? filteredList
                     : Object.values(val).filter(c => c.createdBy === currentUser.id);
                 userCandidates.forEach(candidate => {
-                    const categoryNames = {
-                        manufacturing_blue: 'İmalat - Mavi Yaka',
-                        manufacturing_white: 'İmalat - Beyaz Yaka',
-                        manufacturing_manager: 'İmalat - Yönetici',
-                        service_personnel: 'Hizmet - Personel',
-                        service_admin: 'Hizmet - İdari Yönetici'
-                    };
+                    // Ana kategori ve alt kategoriyi kullan
+                    let categoryDisplay = '';
+                    if (candidate.mainCategory && candidate.subCategory) {
+                        const mainCategoryNames = {
+                            manufacturing: 'İmalat',
+                            service: 'Hizmet'
+                        };
+                        const subCategoryNames = {
+                            production_operator: 'Üretim Operatörü',
+                            quality_control: 'Kalite Kontrol',
+                            warehouse_worker: 'Depo İşçisi',
+                            maintenance_tech: 'Bakım Teknisyeni',
+                            forklift_operator: 'Forklift Operatörü',
+                            production_planner: 'Üretim Planlayıcı',
+                            line_manager: 'Hat Yöneticisi',
+                            shift_supervisor: 'Vardiya Amiri',
+                            customer_service: 'Müşteri Hizmetleri',
+                            sales_rep: 'Satış Temsilcisi',
+                            cashier: 'Kasiyer',
+                            waiter: 'Garson',
+                            cleaning_staff: 'Temizlik Personeli',
+                            security_guard: 'Güvenlik Görevlisi',
+                            receptionist: 'Resepsiyon',
+                            technical_support: 'Teknik Destek',
+                            delivery_person: 'Kurye',
+                            store_manager: 'Mağaza Müdürü',
+                            team_leader: 'Takım Lideri'
+                        };
+                        categoryDisplay = `${mainCategoryNames[candidate.mainCategory]} - ${subCategoryNames[candidate.subCategory]}`;
+                    } else {
+                        // Eski sistem uyumluluğu için
+                        const categoryNames = {
+                            manufacturing_blue: 'İmalat - Mavi Yaka',
+                            manufacturing_white: 'İmalat - Beyaz Yaka',
+                            manufacturing_manager: 'İmalat - Yönetici',
+                            service_personnel: 'Hizmet - Personel',
+                            service_admin: 'Hizmet - İdari Yönetici'
+                        };
+                        categoryDisplay = categoryNames[candidate.category] || candidate.testGroup || 'Belirtilmemiş';
+                    }
+                    
                     const row = document.createElement('tr');
                     row.className = 'border-b hover:bg-gray-50';
                     row.innerHTML = `
                         <td class="px-4 py-3">${candidate.alias}</td>
-                        <td class="px-4 py-3">${candidate.password || ''}</td>
-                        <td class="px-4 py-3">${categoryNames[candidate.category]}</td>
+                        <td class="px-4 py-3">${categoryDisplay}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-1 rounded-full text-xs ${candidate.testCompleted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
                                 ${candidate.testCompleted ? 'Tamamlandı' : 'Bekliyor'}
