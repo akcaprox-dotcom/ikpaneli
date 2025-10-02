@@ -1794,7 +1794,15 @@
             }
         }
 
+        let showHrRegisterRunning = false;
+        
         function showHrRegister() {
+            if (showHrRegisterRunning) {
+                console.log('showHrRegister zaten çalışıyor, döngü engellendi');
+                return;
+            }
+            showHrRegisterRunning = true;
+            
             console.log('showHrRegister çağrıldı - Kontroller:', {
                 disclaimerAccepted,
                 googleUser: !!googleUser
@@ -1803,12 +1811,14 @@
             // Önce sorumluluk reddi kontrolü
             if (!disclaimerAccepted) {
                 alert('Önce sorumluluk reddi beyanını okuyun ve onaylayın!');
+                showHrRegisterRunning = false;
                 return;
             }
             
             // Sonra Google giriş kontrolü  
             if (!googleUser) {
                 alert('Önce Google ile giriş yapmalısınız.');
+                showHrRegisterRunning = false;
                 return;
             }
             
@@ -1818,6 +1828,7 @@
             if (!registerScreen) {
                 console.error('hrRegisterScreen bulunamadı!');
                 alert('Kayıt ekranı yüklenemedi (hrRegisterScreen eksik).');
+                showHrRegisterRunning = false;
                 return;
             }
             
@@ -1825,9 +1836,17 @@
             if (roleLogin) {
                 roleLogin.classList.add('hidden');
                 console.log('roleLoginScreen gizlendi');
+            } else {
+                console.log('roleLoginScreen bulunamadı, ana ekranı gizlemeye çalışıyor');
+                const roleSelection = document.getElementById('roleSelection');
+                if (roleSelection) {
+                    roleSelection.style.display = 'none';
+                }
             }
             registerScreen.classList.remove('hidden');
             console.log('İK kayıt ekranı açıldı (showHrRegister)');
+            
+            showHrRegisterRunning = false;
         }
 
         // Debug amaçlı: tarayıcı konsolundan window.forceRegister() diyerek açabilirsin
