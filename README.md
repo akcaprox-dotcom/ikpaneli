@@ -248,7 +248,7 @@
             
             <div id="hrRegisterOption" class="mt-6 text-center">
                 <p class="text-gray-600 mb-4">Hesabınız yok mu?</p>
-                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 opacity-50 cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
                     Kayıt Ol
                 </button>
             </div>
@@ -819,15 +819,17 @@
         // Google Authentication Fonksiyonları
         async function signInWithGoogle() {
             try {
+                // Yeniden giriş tetiklemek için önce mevcut oturumu kapat (sessiz)
+                if (auth.currentUser) {
+                    try { await auth.signOut(); } catch(e) { console.warn('Ön signOut başarısız (önemsiz):', e); }
+                }
                 const result = await auth.signInWithPopup(googleProvider);
                 googleUser = result.user;
                 console.log('Google ile giriş başarılı:', googleUser);
                 
-                // Google kullanıcısını İK yöneticisi olarak kaydet veya güncelle
-                await registerGoogleUserAsHR(googleUser);
-                
                 // Sadece butonu değiştir - ekran aynı kalsın
                 updateGoogleButton(true);
+                updateHrRegisterButton();
                 
             } catch (error) {
                 console.error('Google giriş hatası:', error);
@@ -892,20 +894,14 @@
 
         async function registerGoogleUserAsHR(user) {
             try {
+                if (!user) return;
+                if (!user.email) return;
+                // Otomatik kayıt KALDIRILDI: Manuel işlem istenirse ayrı tetiklenecek
+                return; // Erken çık
                 // Google kullanıcısını Firebase'de İK yöneticisi olarak kaydet
-                const hrData = {
-                    id: user.uid,
-                    name: user.displayName,
-                    email: user.email,
-                    status: 'active',
-                    authMethod: 'google',
-                    photoURL: user.photoURL,
-                    createdAt: new Date().toISOString(),
-                    lastLogin: new Date().toISOString()
-                };
-                
-                await db.ref('hrManagers/' + user.uid).set(hrData);
-                console.log('Google kullanıcısı İK yöneticisi olarak kaydedildi:', hrData);
+                /* eski otomatik kayıt kodu devre dışı
+                const hrData = {...};
+                */
                 
             } catch (error) {
                 console.error('Google kullanıcısını kaydetme hatası:', error);
@@ -913,29 +909,33 @@
         }
 
         // Auth state değişikliklerini dinle
+        let userInitiatedGoogle = false; // Buton tıklaması flag
+        // Butona basınca set edilecek
+        const originalSignIn = signInWithGoogle;
+        signInWithGoogle = async function() { userInitiatedGoogle = true; return originalSignIn(); }
+
         auth.onAuthStateChanged((user) => {
-            if (user) {
+            if (user && userInitiatedGoogle) {
                 googleUser = user;
-                console.log('Kullanıcı oturum açmış:', user.email);
-                updateGoogleButton(true); // Butonu çıkış moduna geçir
-                // Otomatik İK kaydı yap
-                registerGoogleUserAsHR(user);
-                updateHrRegisterButton();
+                console.log('Kullanıcı oturum açmış (manuel):', user.email);
+                updateGoogleButton(true);
+            } else if (user && !userInitiatedGoogle) {
+                // Eski session yakalandı - yok say ve çıkış yap
+                console.log('Önceki session tespit edildi, otomatik çıkış...');
+                auth.signOut();
+                return;
             } else {
                 googleUser = null;
                 console.log('Kullanıcı oturum açmamış');
-                updateGoogleButton(false); // Butonu giriş moduna geçir
-                updateHrRegisterButton();
+                updateGoogleButton(false);
             }
+            updateHrRegisterButton();
         });
         
-        // Sayfa yüklendiğinde önceki oturumu temizle
-        window.addEventListener('load', function() {
-            if (auth.currentUser) {
-                console.log('Önceki oturum temizleniyor...');
-                auth.signOut();
-            }
-        });
+        // Oturum kalıcılığını session bazlı yap (tarayıcı kapanınca silinsin)
+        if (auth && auth.setPersistence) {
+            auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>console.warn('Persistence set edilemedi:', e));
+        }
         let timeRemaining = 1800; // 30 dakika
         let disclaimerAccepted = false;
 
