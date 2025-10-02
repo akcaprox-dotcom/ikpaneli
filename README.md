@@ -203,15 +203,21 @@
                     <span>🔐 Google ile Giriş</span>
                 </button>
                 
-                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
-                    👩‍💻 İK Yönetici
-                </button>
+                <!-- İK Kaydı ve Girişi -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="hrRegisterMainButton" onclick="showHrRegister()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
+                        👨‍💼 İK Kaydı
+                    </button>
+                    <button id="hrButton" onclick="showRoleLogin('hr')" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105">
+                        👩‍💻 İK Girişi
+                    </button>
+                </div>
                 
                 <div class="text-center">
                     <span class="text-gray-500 text-sm">veya</span>
                 </div>
                 
-                <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                     📝 Aday Portalı
                 </button>
             </div>
@@ -245,13 +251,6 @@
                     Giriş Yap
                 </button>
             </form>
-            
-            <div id="hrRegisterOption" class="mt-6 text-center">
-                <p class="text-gray-600 mb-4">Hesabınız yok mu?</p>
-                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 opacity-50 cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
-                    Kayıt Ol
-                </button>
-            </div>
         </div>
     </div>
 
@@ -1776,20 +1775,20 @@
         }
 
         function updateHrRegisterButton() {
-            const hrRegisterButton = document.getElementById('hrRegisterButton');
-            if (hrRegisterButton) {
+            const hrRegisterMainButton = document.getElementById('hrRegisterMainButton');
+            if (hrRegisterMainButton) {
                 // Sorumluluk reddi onaylanmışsa VE Google hesabı varsa aktif
                 if (disclaimerAccepted && googleUser) {
-                    hrRegisterButton.disabled = false;
-                    hrRegisterButton.classList.remove('opacity-50','cursor-not-allowed');
-                    hrRegisterButton.title = '';
+                    hrRegisterMainButton.disabled = false;
+                    hrRegisterMainButton.classList.remove('opacity-50','cursor-not-allowed');
+                    hrRegisterMainButton.title = '';
                 } else {
-                    hrRegisterButton.disabled = true;
-                    hrRegisterButton.classList.add('opacity-50','cursor-not-allowed');
+                    hrRegisterMainButton.disabled = true;
+                    hrRegisterMainButton.classList.add('opacity-50','cursor-not-allowed');
                     if (!disclaimerAccepted) {
-                        hrRegisterButton.title = 'Önce sorumluluk reddi beyanını onaylayın';
+                        hrRegisterMainButton.title = 'Önce sorumluluk reddi beyanını onaylayın';
                     } else if (!googleUser) {
-                        hrRegisterButton.title = 'Önce Google ile giriş yapın';
+                        hrRegisterMainButton.title = 'Önce Google ile giriş yapın';
                     }
                 }
             }
