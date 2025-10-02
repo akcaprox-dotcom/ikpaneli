@@ -928,6 +928,18 @@
         let disclaimerAccepted = false;
 
         // Global hata yakalama
+        // Global hata yakalayıcı ve element kontrolü
+        function safeAddEventListener(elementId, event, handler) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener(event, handler);
+                return true;
+            } else {
+                console.warn('Element bulunamadı:', elementId);
+                return false;
+            }
+        }
+        
         window.addEventListener('error', function(e) {
             console.log('Hata yakalandı ve engellendi:', e.error);
             return true; // Hatayı sessizce yakala
@@ -1579,13 +1591,6 @@
                                 <li><strong>1 - Hiç Katılmıyorum:</strong> Güçlü olumsuz duruş</li>
                             </ul>
                             
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🎯 Puanlama Algoritması</h3>
-                            <p style="margin-bottom: 10px;"><strong>Matematiksel Model:</strong></p>
-                            <ul style="margin-left: 20px; margin-bottom: 15px;">
-                                <li><strong>Doğru Yanıt (5 puan beklenen):</strong> Aday 5 verirse → %100, 4 verirse → %75, 3 verirse → %50, 2-1 verirse → %0</li>
-                                <li><strong>Ters Puanlama (1 puan beklenen):</strong> Aday 1 verirse → %100, 2 verirse → %75, 3 verirse → %50, 4-5 verirse → %0</li>
-                            </ul>
-                            
                             <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">📊 Yetkinlik Kategorileri</h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                                 <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
@@ -1788,8 +1793,10 @@
         }
 
         // Giriş formu işleme
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
             
             if (currentRole === 'candidate') {
                 const alias = document.getElementById('candidateAlias').value.trim();
@@ -1838,7 +1845,8 @@
                 }
             }
         });
-
+        } // loginForm if kapanışı
+        
         // Panel gösterme fonksiyonları
         function showAdminPanel() {
             document.getElementById('roleLoginScreen').classList.add('hidden');
@@ -2010,6 +2018,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const endInput = document.getElementById('filterEndDate');
             const filterBtn = document.getElementById('filterDateBtn');
             const clearBtn = document.getElementById('clearDateBtn');
+            
+            console.log('Dashboard elements:', {filterBtn, clearBtn, startInput, endInput});
+            
             if (filterBtn && startInput && endInput) {
                 filterBtn.addEventListener('click', function() {
                     const start = startInput.value ? new Date(startInput.value) : null;
@@ -2080,8 +2091,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Yeni üye ekleme (aday ekleme)
-        document.getElementById('newMemberForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        const newMemberForm = document.getElementById('newMemberForm');
+        if (newMemberForm) {
+            newMemberForm.addEventListener('submit', function(e) {
+                e.preventDefault();
             
             // Test grubu seçimini kontrol et
             const selectedTestGroup = document.getElementById('testGroupSelection').value;
@@ -2123,10 +2136,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadCandidatesList();
             }
         });
+        } // newMemberForm if kapanışı
 
         // Hızlı aday ekleme (varsayılan kriterlerle)
-        document.getElementById('newCandidateForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        const newCandidateForm = document.getElementById('newCandidateForm');
+        if (newCandidateForm) {
+            newCandidateForm.addEventListener('submit', function(e) {
+                e.preventDefault();
             
             const testGroup = document.getElementById('candidateTestGroup').value;
             if (!testGroup) {
@@ -2158,6 +2174,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             loadCandidatesList();
         });
+        } // newCandidateForm if kapanışı
 
         function loadCandidatesList(filteredList) {
             const tbody = document.getElementById('candidatesList');
@@ -3267,9 +3284,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // İK Kayıt formu işleme
-        document.getElementById('hrRegisterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            try {
+        const hrRegisterForm = document.getElementById('hrRegisterForm');
+        if (hrRegisterForm) {
+            hrRegisterForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                try {
                 // Zorunlu alan kontrolü
                 const org = document.getElementById('regOrganization').value.trim();
                 const name = document.getElementById('regName').value.trim();
@@ -3327,6 +3346,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Kayıt hatası:', err);
             }
         });
+        } // hrRegisterForm if kapanışı
 
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', function() {
