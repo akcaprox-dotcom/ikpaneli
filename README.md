@@ -1561,7 +1561,14 @@
 
         // Sorumluluk reddi fonksiyonları
         function showDisclaimer() {
-            document.getElementById('disclaimerModal').classList.remove('hidden');
+            console.log('showDisclaimer çağrıldı');
+            const modal = document.getElementById('disclaimerModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                console.log('Modal gösterildi');
+            } else {
+                console.error('disclaimerModal bulunamadı');
+            }
         }
         
         function closeDisclaimer() {
@@ -1569,12 +1576,22 @@
         }
         
         function acceptDisclaimer() {
+            console.log('acceptDisclaimer çağrıldı');
             disclaimerAccepted = true;
-            document.getElementById('disclaimerAccept').checked = true;
-            document.getElementById('disclaimerAccept').disabled = false;
+            
+            const disclaimerCheckbox = document.getElementById('disclaimerAccept');
+            if (disclaimerCheckbox) {
+                disclaimerCheckbox.checked = true;
+                disclaimerCheckbox.disabled = false;
+                console.log('Disclaimer checkbox güncellendi');
+            }
             
             // Sadece aday portalı butonunu aktif et (admin ve İK zaten aktif)
-            document.getElementById('candidateButton').disabled = false;
+            const candidateBtn = document.getElementById('candidateButton');
+            if (candidateBtn) {
+                candidateBtn.disabled = false;
+                console.log('Candidate button aktif edildi');
+            }
             
             // İK kayıt butonunu da güncelle
             updateHrRegisterButton();
