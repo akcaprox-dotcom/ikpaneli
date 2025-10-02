@@ -2226,14 +2226,47 @@
         // Rapor fonksiyonları
         function loadReportsData() {
             const select = document.getElementById('reportCandidateSelect');
+            if (!currentUser) return;
             select.innerHTML = '<option value="">Aday Seçin</option>';
-            
-            const userCandidates = candidates.filter(c => c.createdBy === currentUser.id && c.testCompleted);
-            userCandidates.forEach(candidate => {
-                const option = document.createElement('option');
-                option.value = candidate.id;
-                option.textContent = candidate.alias;
-                select.appendChild(option);
+
+            // Her seferinde güncel veriyi çek (önceden candidates[] doldurulmamış olabilir)
+            db.ref('candidates').once('value').then(snapshot => {
+                const all = snapshot.val() || {};
+                // Nesne -> dizi
+                let allList = Object.values(all);
+
+                // Global candidates cache'i de senkronize et (diğer yerler için)
+                candidates = allList;
+
+                // testCompleted alanı bazı kayıtlarda henüz yoksa; fallback olarak cevap veya skor/ skorlar varlığını kontrol et
+                const userCandidates = allList.filter(c => (
+                    c.createdBy === currentUser.id && (
+                        c.testCompleted === true ||
+                        (Array.isArray(c.answers) && c.answers.some(a => a !== null && a !== undefined)) ||
+                        typeof c.score === 'number' ||
+                        (c.skorlar && typeof c.skorlar === 'object')
+                    )
+                ));
+
+                if (userCandidates.length === 0) {
+                    // Kullanıcıya yardımcı bilgi için konsola detay yaz
+                    console.warn('Rapor için aday bulunamadı. Olası nedenler: 1) testCompleted=false 2) createdBy eşleşmiyor 3) henüz test bitmemiş.');
+                }
+
+                userCandidates.sort((a,b)=> (a.alias||'').localeCompare(b.alias||''));
+
+                userCandidates.forEach(cand => {
+                    const opt = document.createElement('option');
+                    opt.value = cand.id; // showReport candidate.id ile arıyor
+                    opt.textContent = cand.alias + (cand.testCompleted ? '' : ' (Devam)');
+                    select.appendChild(opt);
+                });
+            }).catch(err => {
+                console.error('Adaylar yüklenirken hata:', err);
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Adaylar yüklenemedi';
+                select.appendChild(opt);
             });
         }
 
