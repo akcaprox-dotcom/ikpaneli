@@ -3463,8 +3463,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof fetchHrManagers === 'function') {
                     fetchHrManagers();
                 }
-                alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
-                backToRoleLogin();
+                alert('Kayıt başarılı! İK Paneline yönlendiriliyorsunuz...');
+                // İK paneline direkt yönlendir
+                document.getElementById('roleSelection').style.display = 'none';
+                document.getElementById('hrSection').style.display = 'block';
+                showHrSection('dashboard');
                 this.reset();
             } catch (err) {
                 alert('Kayıt sırasında bir hata oluştu! Detay için konsola bakın.');
