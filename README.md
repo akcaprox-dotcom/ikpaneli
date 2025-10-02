@@ -205,7 +205,7 @@
                 
                 <!-- İK Kaydı ve Girişi -->
                 <div class="grid grid-cols-2 gap-3">
-                    <button id="hrRegisterMainButton" onclick="showHrRegister()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
+                    <button id="hrRegisterMainButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
                         👨‍💼 İK Kaydı
                     </button>
                     <button id="hrButton" onclick="showRoleLogin('hr')" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105">
@@ -1777,6 +1777,17 @@
         function updateHrRegisterButton() {
             const hrRegisterMainButton = document.getElementById('hrRegisterMainButton');
             if (hrRegisterMainButton) {
+                // Event listener'ı sadece bir kez ekle
+                if (!hrRegisterMainButton.hasAttribute('data-listener-added')) {
+                    hrRegisterMainButton.addEventListener('click', function() {
+                        console.log('İK Kaydı butonuna tıklandı (event listener)');
+                        if (!hrRegisterMainButton.disabled) {
+                            showHrRegister();
+                        }
+                    });
+                    hrRegisterMainButton.setAttribute('data-listener-added', 'true');
+                }
+                
                 // Sorumluluk reddi onaylanmışsa VE Google hesabı varsa aktif
                 if (disclaimerAccepted && googleUser) {
                     hrRegisterMainButton.disabled = false;
@@ -1797,6 +1808,7 @@
         let showHrRegisterRunning = false;
         
         function showHrRegister() {
+            console.log('showHrRegister çağrıldı - Flag durumu:', showHrRegisterRunning);
             if (showHrRegisterRunning) {
                 console.log('showHrRegister zaten çalışıyor, döngü engellendi');
                 return;
