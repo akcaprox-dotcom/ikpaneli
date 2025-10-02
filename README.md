@@ -657,8 +657,8 @@
     </div>
 
     <!-- Sorumluluk Reddi Modal -->
-    <div id="disclaimerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div id="disclaimerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onclick="event.target === this && closeDisclaimer()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-2xl font-bold text-gray-800">Hukuki Sorumluluk Reddi ve Veri Güvenliği Beyanı</h2>
@@ -1562,6 +1562,13 @@
         // Sorumluluk reddi fonksiyonları
         function showDisclaimer() {
             console.log('showDisclaimer çağrıldı');
+            
+            // Zaten onaylanmışsa modal açma
+            if (disclaimerAccepted) {
+                console.log('Disclaimer zaten onaylanmış, modal açılmıyor');
+                return;
+            }
+            
             const modal = document.getElementById('disclaimerModal');
             if (modal) {
                 modal.classList.remove('hidden');
@@ -1584,6 +1591,20 @@
                 disclaimerCheckbox.checked = true;
                 disclaimerCheckbox.disabled = false;
                 console.log('Disclaimer checkbox güncellendi');
+            }
+            
+            // Disclaimer butonunu güncelle
+            const disclaimerBtn = document.getElementById('disclaimerButton');
+            if (disclaimerBtn) {
+                disclaimerBtn.innerHTML = `
+                    <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>Onaylandı ✓</span>
+                `;
+                disclaimerBtn.disabled = true;
+                disclaimerBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                disclaimerBtn.classList.add('bg-green-600', 'cursor-not-allowed');
             }
             
             // Sadece aday portalı butonunu aktif et (admin ve İK zaten aktif)
@@ -1951,14 +1972,20 @@ document.addEventListener('DOMContentLoaded', function() {
         // Kategori seçim fonksiyonları
         function setupCategorySelectors() {
             // Yeni üye formu için
-            document.getElementById('newMemberMainCategory').addEventListener('change', function() {
-                updateSubCategory('newMemberSubCategory', this.value);
-            });
+            const newMemberMainCat = document.getElementById('newMemberMainCategory');
+            if (newMemberMainCat) {
+                newMemberMainCat.addEventListener('change', function() {
+                    updateSubCategory('newMemberSubCategory', this.value);
+                });
+            }
             
             // Aday ekleme formu için
-            document.getElementById('candidateMainCategory').addEventListener('change', function() {
-                updateSubCategory('candidateSubCategory', this.value);
-            });
+            const candidateMainCat = document.getElementById('candidateMainCategory');
+            if (candidateMainCat) {
+                candidateMainCat.addEventListener('change', function() {
+                    updateSubCategory('candidateSubCategory', this.value);
+                });
+            }
         }
         
         function updateSubCategory(subSelectId, mainCategory) {
