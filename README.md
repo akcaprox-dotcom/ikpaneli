@@ -531,27 +531,116 @@
 
         <!-- Raporlar -->
         <div id="hrReports" class="hidden max-w-7xl mx-auto p-6">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Aday Seç</h3>
-                    <select id="reportCandidateSelect" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="">Aday Seçin</option>
-                    </select>
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">📊 Aday Test Raporları</h3>
+                
+                <!-- Filtre Alanı -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Aday Seç</label>
+                        <select id="reportCandidateFilter" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <option value="">Tüm Adaylar</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Test Durumu</label>
+                        <select id="reportStatusFilter" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <option value="">Tümü</option>
+                            <option value="completed">Tamamlanmış</option>
+                            <option value="pending">Bekleyen</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="reportStartDate" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                        <input type="date" id="reportEndDate" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Rapor Türü</h3>
-                    <div class="space-y-2">
-                        <button onclick="showReport('answers')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Sorular ve Cevaplar</button>
-                        <button onclick="showReport('scores')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Puanlar</button>
-                        <button onclick="showReport('charts')" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">Grafikler</button>
+                
+                <div class="flex gap-3 mb-6">
+                    <button id="applyReportFilters" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition">
+                        Filtrele
+                    </button>
+                    <button id="clearReportFilters" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-semibold transition">
+                        Temizle
+                    </button>
+                    <button id="exportReportData" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold transition">
+                        📥 Excel'e Aktar
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Özet İstatistikler -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Toplam Aday</p>
+                            <p id="totalCandidatesCount" class="text-2xl font-bold">0</p>
+                        </div>
+                        <div class="text-3xl opacity-80">👥</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm">Test Tamamlanan</p>
+                            <p id="completedTestsCount" class="text-2xl font-bold">0</p>
+                        </div>
+                        <div class="text-3xl opacity-80">✅</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-orange-100 text-sm">Bekleyen Test</p>
+                            <p id="pendingTestsCount" class="text-2xl font-bold">0</p>
+                        </div>
+                        <div class="text-3xl opacity-80">⏳</div>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm">Ortalama Puan</p>
+                            <p id="averageScore" class="text-2xl font-bold">0</p>
+                        </div>
+                        <div class="text-3xl opacity-80">📊</div>
                     </div>
                 </div>
             </div>
             
-            <div id="reportContent" class="bg-white rounded-xl shadow-lg p-6">
-                <p class="text-gray-600 text-center">Rapor görüntülemek için aday seçin ve rapor türünü belirleyin.</p>
+            <!-- Detaylı Rapor Tablosu -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h4 class="text-lg font-bold text-gray-800 mb-4">Detaylı Test Sonuçları</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Aday Rumuz</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Grubu</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Test Tarihi</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Toplam Puan</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Doğru/Toplam</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Başarı Oranı</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Durum</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody">
+                            <!-- Raporlar buraya yüklenecek -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+
     </div>
 
     <!-- YENİ İK KAYIT PANELİ -->
