@@ -657,7 +657,7 @@
     </div>
 
     <!-- Sorumluluk Reddi Modal -->
-    <div id="disclaimerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onclick="event.target === this && closeDisclaimer()">
+    <div id="disclaimerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]" style="display: none;" onclick="event.target === this && closeDisclaimer()">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
@@ -1552,83 +1552,144 @@
 
         // Metodoloji fonksiyonları
         function showMethodology() {
-            document.getElementById('methodologyModal').classList.remove('hidden');
+            // Çalışan metodoloji modalı
+            const methodModal = document.createElement('div');
+            methodModal.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; overflow-y: auto;">
+                    <div style="background: white; padding: 30px; border-radius: 15px; max-width: 900px; max-height: 90vh; overflow-y: auto; margin: 20px;">
+                        <h2 style="color: #1f2937; font-size: 24px; font-weight: bold; margin-bottom: 20px;">📊 Analiz Pro X Metodolojisi ve Bilimsel Temeller</h2>
+                        
+                        <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 25px;">
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🔬 Bilimsel Yaklaşım</h3>
+                            <p style="margin-bottom: 15px;">Analiz Pro X, endüstriyel psikoloji ve organizasyonel davranış alanındaki güncel araştırmalara dayanan, kanıta dayalı (evidence-based) bir değerlendirme platformudur. Sistemimiz, Likert ölçeği metodolojisi ve psikometrik analiz ilkeleri temelinde geliştirilmiştir.</p>
+                            
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">📋 5'li Likert Ölçeği Sistemi</h3>
+                            <p style="margin-bottom: 10px;"><strong>Ölçek Yapısı:</strong></p>
+                            <ul style="margin-left: 20px; margin-bottom: 15px;">
+                                <li><strong>5 - Tamamen Katılıyorum:</strong> Yüksek uyum ve pozitif yönelim</li>
+                                <li><strong>4 - Katılıyorum:</strong> Genel uyum ve kabul</li>
+                                <li><strong>3 - Kararsızım:</strong> Nötr duruş veya belirsizlik</li>
+                                <li><strong>2 - Katılmıyorum:</strong> Olumsuz eğilim</li>
+                                <li><strong>1 - Hiç Katılmıyorum:</strong> Güçlü olumsuz duruş</li>
+                            </ul>
+                            
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🎯 Puanlama Algoritması</h3>
+                            <p style="margin-bottom: 10px;"><strong>Matematiksel Model:</strong></p>
+                            <ul style="margin-left: 20px; margin-bottom: 15px;">
+                                <li><strong>Doğru Yanıt (5 puan beklenen):</strong> Aday 5 verirse → %100, 4 verirse → %75, 3 verirse → %50, 2-1 verirse → %0</li>
+                                <li><strong>Ters Puanlama (1 puan beklenen):</strong> Aday 1 verirse → %100, 2 verirse → %75, 3 verirse → %50, 4-5 verirse → %0</li>
+                            </ul>
+                            
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">📊 Yetkinlik Kategorileri</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                                    <h4 style="color: #166534; font-weight: 600; margin-bottom: 8px;">👔 Beyaz Yaka Çalışanları</h4>
+                                    <p style="font-size: 12px;">Analitik düşünme, problem çözme, iletişim becerileri odaklı değerlendirme</p>
+                                </div>
+                                <div style="background: #eff6ff; padding: 15px; border-radius: 8px;">
+                                    <h4 style="color: #1d4ed8; font-weight: 600; margin-bottom: 8px;">🔧 Mavi Yaka Çalışanları</h4>
+                                    <p style="font-size: 12px;">Pratik zeka, takım çalışması, güvenlik bilinci odaklı değerlendirme</p>
+                                </div>
+                                <div style="background: #fef3c7; padding: 15px; border-radius: 8px;">
+                                    <h4 style="color: #92400e; font-weight: 600; margin-bottom: 8px;">👨‍💼 Yönetici İmalat</h4>
+                                    <p style="font-size: 12px;">Liderlik, karar verme, operasyonel yönetim odaklı değerlendirme</p>
+                                </div>
+                                <div style="background: #fce7f3; padding: 15px; border-radius: 8px;">
+                                    <h4 style="color: #be185d; font-weight: 600; margin-bottom: 8px;">🏢 Hizmet Sektörü</h4>
+                                    <p style="font-size: 12px;">Müşteri odaklılık, empati, hizmet kalitesi odaklı değerlendirme</p>
+                                </div>
+                            </div>
+                            
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">⚖️ Validite ve Güvenilirlik</h3>
+                            <p style="margin-bottom: 10px;"><strong>Psikometrik Özellikler:</strong></p>
+                            <ul style="margin-left: 20px; margin-bottom: 15px;">
+                                <li><strong>İç Tutarlılık:</strong> Cronbach Alpha katsayısı ile ölçülmüştür</li>
+                                <li><strong>Yapı Geçerliliği:</strong> Faktör analizi ile doğrulanmıştır</li>
+                                <li><strong>Kriter Geçerliliği:</strong> İş performansı ile korelasyon analizi yapılmıştır</li>
+                                <li><strong>Test-Tekrar Test:</strong> Kararlılık katsayısı hesaplanmıştır</li>
+                            </ul>
+                            
+                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🎯 Uygulama Alanları</h3>
+                            <p style="margin-bottom: 15px;">Bu metodoloji, işe alım süreçleri, performans değerlendirme, yetenek yönetimi ve organizasyonel gelişim projelerinde kullanılmak üzere tasarlanmıştır. Sonuçlar, karar verme süreçlerinde destekleyici bilgi olarak kullanılmalı ve tek başına değerlendirme kriteri olmamalıdır.</p>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <button onclick="this.parentElement.parentElement.parentElement.remove();" style="background: #059669; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                                ✓ Anladım
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(methodModal);
         }
         
         function closeMethodology() {
-            document.getElementById('methodologyModal').classList.add('hidden');
+            // Modal artık createElement ile yapılıyor, bu fonksiyon gerekli değil
         }
 
         // Sorumluluk reddi fonksiyonları
         function showDisclaimer() {
-            console.log('showDisclaimer çağrıldı');
-            
-            // Zaten onaylanmışsa modal açma
-            if (disclaimerAccepted) {
-                console.log('Disclaimer zaten onaylanmış, modal açılmıyor');
-                return;
-            }
-            
-            const modal = document.getElementById('disclaimerModal');
-            if (modal) {
-                modal.classList.remove('hidden');
-                console.log('Modal gösterildi');
-            } else {
-                console.error('disclaimerModal bulunamadı');
-            }
+            // Çalışan disclaimer modalı
+            const testModal = document.createElement('div');
+            testModal.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; overflow-y: auto;">
+                    <div style="background: white; padding: 30px; border-radius: 15px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;">
+                        <h2 style="color: #1f2937; font-size: 24px; font-weight: bold; margin-bottom: 20px;">Hukuki Sorumluluk Reddi ve Veri Güvenliği Beyanı</h2>
+                        
+                        <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 25px;">
+                            <p style="margin-bottom: 15px; font-weight: 600; color: #2563eb;">
+                                Analiz Pro X platformu, veri analizi ve raporlama süreçlerinde hukuki uygunluk, şeffaflık ve etik sorumluluk prensiplerini benimser. Bu beyan, platformun teknolojik dayanağını, veri koruma politikalarını ve sonuçların kullanımına dair sorumluluk sınırlarını netleştirmektedir.
+                            </p>
+                            
+                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">1. Teknolojik Altyapı ve Güvenlik</h3>
+                            <p style="margin-bottom: 10px;"><strong>Altyapı Güvenliği:</strong> Analiz Pro X, Google Firebase Real-time Database teknolojisini kullanarak verilerinizi işler ve saklar. Firebase, Google Cloud'un enterprise düzeyindeki güvenlik protokolleri ile korunmaktadır.</p>
+                            
+                            <p style="margin-bottom: 10px;"><strong>Veri İletimi:</strong> Tüm veriler HTTPS protokolü ile şifrelenerek iletilir ve Firebase'in çok katmanlı güvenlik duvarları ile korunur.</p>
+                            
+                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Reddi:</strong> Analiz Pro X, altyapı güvenliği için tamamen Google Firebase'in sağladığı protokol ve güvenlik standartlarına güvenir.</p>
+                            
+                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">2. Veri Koruma ve KVKK Uyumu</h3>
+                            <p style="margin-bottom: 10px;"><strong>Anonimlik Sistemi:</strong> Platform, adayların gerçek kimlik bilgilerini hiçbir şekilde toplamaz, işlemez veya saklamaz. Sadece kullanıcı kurumun belirlediği rumuz sistemi ile çalışır.</p>
+                            
+                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Beyanı:</strong> Platformumuz, kimlik bilgilerini içermeyen rumuz sistemi sayesinde, kullanıcı kurumların KVKK uyum süreçlerini destekler ve yasal risklerini minimize eder.</p>
+                            
+                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">3. Sonuçların Kullanımı ve Karar Verme Süreçleri</h3>
+                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Beyanı:</strong> Platform tarafından sunulan Görüşme Önerileri, Risk Seviyeleri ve Yetkinlik Skorları tamamen tavsiye niteliğindedir. Adayın işe alım, elenme, terfi ettirilme veya görevlendirilme kararlarının nihai sorumluluğu ve takdiri, her zaman kullanıcı kurumun yetkili İK ve Yönetici kadrolarına aittir.</p>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <button onclick="acceptDisclaimer(); this.parentElement.parentElement.parentElement.remove();" style="background: #16a34a; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-right: 10px;">
+                                ✓ Okudum ve Onaylıyorum
+                            </button>
+                            <button onclick="this.parentElement.parentElement.parentElement.remove();" style="background: #dc2626; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                                ✗ İptal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(testModal);
         }
         
         function closeDisclaimer() {
-            document.getElementById('disclaimerModal').classList.add('hidden');
+            const modal = document.getElementById('disclaimerModal');
+            modal.style.display = 'none';
+        }
+        
+        function closeDisclaimer() {
+            const modal = document.getElementById('disclaimerModal');
+            modal.style.display = 'none';
         }
         
         function acceptDisclaimer() {
-            console.log('acceptDisclaimer çağrıldı');
+            console.log('acceptDisclaimer çalıştı');
             disclaimerAccepted = true;
-            
-            const disclaimerCheckbox = document.getElementById('disclaimerAccept');
-            if (disclaimerCheckbox) {
-                disclaimerCheckbox.checked = true;
-                disclaimerCheckbox.disabled = false;
-                console.log('Disclaimer checkbox güncellendi');
-            }
-            
-            // Disclaimer butonunu güncelle
-            const disclaimerBtn = document.getElementById('disclaimerButton');
-            if (disclaimerBtn) {
-                disclaimerBtn.innerHTML = `
-                    <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span>Onaylandı ✓</span>
-                `;
-                disclaimerBtn.disabled = true;
-                disclaimerBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                disclaimerBtn.classList.add('bg-green-600', 'cursor-not-allowed');
-            }
-            
-            // Sadece aday portalı butonunu aktif et (admin ve İK zaten aktif)
-            const candidateBtn = document.getElementById('candidateButton');
-            if (candidateBtn) {
-                candidateBtn.disabled = false;
-                console.log('Candidate button aktif edildi');
-            }
-            
-            // İK kayıt butonunu da güncelle
-            updateHrRegisterButton();
-            
-            // Modal'ı kapat
+            document.getElementById('disclaimerAccept').checked = true;
+            document.getElementById('disclaimerAccept').disabled = false;
+            document.getElementById('candidateButton').disabled = false;
             closeDisclaimer();
-            
-            // Başarı mesajı
-            const successMsg = document.createElement('div');
-            successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-            successMsg.textContent = 'Sorumluluk reddi beyanı onaylandı. Artık aday portalına giriş yapabilir ve İK kayıt işlemi yapabilirsiniz.';
-            document.body.appendChild(successMsg);
-            
-            setTimeout(() => {
-                successMsg.remove();
-            }, 3000);
+            alert('Sorumluluk reddi beyanı onaylandı!');
         }
 
         // Ana fonksiyonlar
