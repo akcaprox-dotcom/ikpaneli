@@ -338,7 +338,7 @@
                     </div>
                     <div class="flex space-x-4">
                         <button onclick="showHrSection('dashboard')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Dashboard</button>
-
+                        <button onclick="showHrSection('newMember')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Yeni Kayıt</button>
                         <button onclick="showHrSection('candidates')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Adaylar</button>
                         <button onclick="showHrSection('reports')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">Raporlar</button>
                         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
@@ -2057,6 +2057,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (section === 'dashboard') {
                 loadHrDashboard();
+            } else if (section === 'newMember') {
+                // Yeni üye ekleme formu gösterildi, özel bir yükleme işlemi gerekmez
             } else if (section === 'candidates') {
                 loadCandidatesList();
             } else if (section === 'reports') {
