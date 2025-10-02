@@ -22,6 +22,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İK Test Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
+        <!-- Firebase Auth için ek CDN -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+        <script>
+            // Google ile giriş fonksiyonu
+            function googleSignIn() {
+                var provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider)
+                    .then(function(result) {
+                        // Kullanıcı bilgileri
+                        var user = result.user;
+                        alert('Hoşgeldin, ' + user.displayName);
+                        // Burada yönlendirme veya ek işlem yapılabilir
+                    })
+                    .catch(function(error) {
+                        alert('Giriş başarısız: ' + error.message);
+                    });
+            }
+        </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
@@ -185,6 +203,9 @@
             </div>
             
             <div class="space-y-4">
+                                <button onclick="googleSignIn()" class="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 mb-2 hover:bg-gray-100 transition">
+                                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6"> Google ile Giriş Yap
+                                </button>
                 <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     👩‍💻 İK Yönetici
                 </button>
