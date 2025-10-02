@@ -3464,8 +3464,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetchHrManagers();
                 }
                 alert('Kayıt başarılı! İK Paneline yönlendiriliyorsunuz...');
-                // İK paneline direkt yönlendir
+                // İK kayıt ekranını kapat
+                document.getElementById('hrRegisterScreen').style.display = 'none';
+                // Ana ekranı kapat
                 document.getElementById('roleSelection').style.display = 'none';
+                // İK paneline direkt yönlendir
                 document.getElementById('hrSection').style.display = 'block';
                 showHrSection('dashboard');
                 this.reset();
