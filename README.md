@@ -248,7 +248,7 @@
             
             <div id="hrRegisterOption" class="mt-6 text-center">
                 <p class="text-gray-600 mb-4">Hesabınız yok mu?</p>
-                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
                     Kayıt Ol
                 </button>
             </div>
@@ -1785,14 +1785,10 @@
         }
 
         function showHrRegister() {
-            // İK kayıt için sorumluluk reddi zorunlu
-            if (!disclaimerAccepted) {
-                alert('Lütfen önce sorumluluk reddi beyanını okuyun ve onaylayın!');
-                return;
-            }
-            
+            // İK kayıt ekranını göster
             document.getElementById('roleLoginScreen').classList.add('hidden');
             document.getElementById('hrRegisterScreen').classList.remove('hidden');
+            console.log('İK kayıt ekranı açıldı');
         }
 
         function backToRoleLogin() {
