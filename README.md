@@ -4,7 +4,6 @@
         <!-- Firebase SDK'ları -->
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
         <script>
             const firebaseConfig = {
                 apiKey: "AIzaSyC-ZvTo79-xDc9Uw2IMOZMwK9Egm9qODrU",
@@ -18,12 +17,6 @@
             };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
-            const auth = firebase.auth();
-            
-            // Google Auth Provider
-            const googleProvider = new firebase.auth.GoogleAuthProvider();
-            googleProvider.addScope('email');
-            googleProvider.addScope('profile');
         </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -192,32 +185,10 @@
             </div>
             
             <div class="space-y-4">
-                <!-- Google Authentication Butonu -->
-                <button id="googleAuthButton" onclick="signInWithGoogle()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center space-x-3">
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    <span>🔐 Google ile Giriş</span>
+                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    👩‍💻 İK Yönetici
                 </button>
-                
-                <!-- İK Kaydı ve Girişi -->
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="hrRegisterMainButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Önce Google ile giriş yapın">
-                        👨‍💼 İK Kaydı
-                    </button>
-                    <button id="hrButton" onclick="showRoleLogin('hr')" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105">
-                        👩‍💻 İK Girişi
-                    </button>
-                </div>
-                
-                <div class="text-center">
-                    <span class="text-gray-500 text-sm">veya</span>
-                </div>
-                
-                <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                     📝 Aday Portalı
                 </button>
             </div>
@@ -251,6 +222,13 @@
                     Giriş Yap
                 </button>
             </form>
+            
+            <div id="hrRegisterOption" class="mt-6 text-center">
+                <p class="text-gray-600 mb-4">Hesabınız yok mu?</p>
+                <button id="hrRegisterButton" onclick="showHrRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Kayıt Ol
+                </button>
+            </div>
         </div>
     </div>
 
@@ -325,19 +303,10 @@
         <nav class="bg-white shadow-lg">
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex justify-between items-center py-4">
-                    <div class="flex items-center space-x-4">
-                        <h1 class="text-2xl font-bold text-gray-800">İK Yönetici Paneli</h1>
-                        <div id="userInfo" class="hidden flex items-center space-x-3 bg-gray-100 rounded-lg px-3 py-2">
-                            <img id="userPhoto" src="" alt="Profile" class="w-8 h-8 rounded-full">
-                            <div>
-                                <p id="userName" class="text-sm font-semibold text-gray-800"></p>
-                                <p id="userEmail" class="text-xs text-gray-600"></p>
-                            </div>
-                        </div>
-                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">İK Yönetici Paneli</h1>
                     <div class="flex space-x-4">
                         <button onclick="showHrSection('dashboard')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Dashboard</button>
-                        <button onclick="showNewMemberPanel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Yeni Kayıt</button>
+
                         <button onclick="showHrSection('candidates')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Adaylar</button>
                         <button onclick="showHrSection('reports')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">Raporlar</button>
                         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
@@ -384,7 +353,7 @@
         </div>
 
         <!-- Yeni Üye Ekleme -->
-        <div id="hrNewMember" class="hidden max-w-6xl mx-auto p-6">
+        <div id="hrNewMember" class="max-w-6xl mx-auto p-6">
             <div class="bg-white rounded-xl shadow-lg p-8">
                 <h3 class="text-2xl font-bold text-gray-800 mb-6">Yeni Aday Ekle ve Test Kriterleri Belirle</h3>
                 <form id="newMemberForm" class="space-y-6">
@@ -410,21 +379,33 @@
 
                     <!-- Test Kriterleri Seçimi -->
                     <div class="border-t pt-6">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Test Grubu Seçimi</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <select id="testGroupSelection" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                                <option value="">Test Grubu Seçin</option>
-                                <option value="grup1">Beyaz Yaka Çalışanları (100 soru)</option>
-                                <option value="grup2">Mavi Yaka Çalışanları (100 soru)</option>
-                                <option value="grup3">Yönetici İmalat (100 soru)</option>
-                                <option value="grup4">Hizmet Personeli (100 soru)</option>
-                                <option value="grup5">Hizmet Yöneticileri (100 soru)</option>
-                            </select>
-                            <div class="px-4 py-3 border border-gray-300 rounded-xl bg-blue-50 flex items-center">
-                                <p class="text-sm text-blue-700">Seçilen gruba ait 100 soru adaya sunulacak</p>
-                            </div>
-                        </div>
-                    </div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Test Kriterleri ve Soru Alanları</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Kişilik Envanterleri -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-blue-800 mb-3">Kişilik Envanterleri</h5>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="communication" class="mr-2">
+                                        <span class="text-sm">İletişim Becerileri</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="teamwork" class="mr-2">
+                                        <span class="text-sm">Takım Çalışması</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="stress_management" class="mr-2">
+                                        <span class="text-sm">Stres Yönetimi</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="leadership" class="mr-2">
+                                        <span class="text-sm">Liderlik Potansiyeli</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="time_management" class="mr-2">
+                                        <span class="text-sm">Zaman Yönetimi</span>
+                                    </label>
+                                </div>
                             </div>
 
                             <!-- Bilişsel Kapasite -->
@@ -456,6 +437,31 @@
                                 <div class="space-y-2">
                                     <label class="flex items-center">
                                         <input type="checkbox" name="testCriteria" value="ethical_decisions" class="mr-2">
+                                        <span class="text-sm">Etik Karar Verme</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="conflict_management" class="mr-2">
+                                        <span class="text-sm">Çatışma Yönetimi</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="customer_service" class="mr-2">
+                                        <span class="text-sm">Müşteri Hizmetleri</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="testCriteria" value="crisis_management" class="mr-2">
+                                        <span class="text-sm">Kriz Yönetimi</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p class="text-sm text-yellow-800">
+                                <strong>Not:</strong> Seçtiğiniz kriterler doğrultusunda adaya özel test soruları hazırlanacaktır. 
+                                En az 3, en fazla 8 kriter seçmeniz önerilir.
+                            </p>
+                        </div>
+                    </div>
                     
                     <div class="pt-4">
                         <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
@@ -471,20 +477,18 @@
             <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Hızlı Aday Ekle</h3>
                 <p class="text-sm text-gray-600 mb-4">Detaylı test kriterleri için Dashboard'daki "Yeni Aday Ekle" bölümünü kullanın.</p>
-                <form id="newCandidateForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        <select id="candidateTestGroup" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                            <option value="">Test Grubu Seçin</option>
-                            <option value="grup1">Beyaz Yaka Çalışanları</option>
-                            <option value="grup2">Mavi Yaka Çalışanları</option>
-                            <option value="grup3">Yönetici İmalat</option>
-                            <option value="grup4">Hizmet Personeli</option>
-                            <option value="grup5">Hizmet Yöneticileri</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                <form id="newCandidateForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                    <select id="candidateMainCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <option value="">Ana Kategori Seç</option>
+                        <option value="manufacturing">İşletme</option>
+                        <option value="service">Hizmet</option>
+                    </select>
+                    <select id="candidateSubCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required disabled>
+                        <option value="">Önce ana kategori seçin</option>
+                    </select>
+                    <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
                         Hızlı Aday Ekle
                     </button>
                 </form>
@@ -656,8 +660,8 @@
     </div>
 
     <!-- Sorumluluk Reddi Modal -->
-    <div id="disclaimerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]" style="display: none;" onclick="event.target === this && closeDisclaimer()">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <div id="disclaimerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-2xl font-bold text-gray-800">Hukuki Sorumluluk Reddi ve Veri Güvenliği Beyanı</h2>
@@ -813,148 +817,8 @@
         let testQuestions = [];
         let userAnswers = [];
         let testTimer = null;
-        let googleUser = null; // Google kullanıcı bilgisi
-
-        // Google Authentication Fonksiyonları
-        async function signInWithGoogle() {
-            try {
-                // Yeniden giriş tetiklemek için önce mevcut oturumu kapat (sessiz)
-                if (auth.currentUser) {
-                    try { await auth.signOut(); } catch(e) { console.warn('Ön signOut başarısız (önemsiz):', e); }
-                }
-                const result = await auth.signInWithPopup(googleProvider);
-                googleUser = result.user;
-                console.log('Google ile giriş başarılı:', googleUser);
-                
-                // Sadece butonu değiştir - ekran aynı kalsın
-                updateGoogleButton(true);
-                updateHrRegisterButton();
-                
-            } catch (error) {
-                console.error('Google giriş hatası:', error);
-                alert('Google ile giriş yapılırken bir hata oluştu: ' + error.message);
-            }
-        }
-
-        async function signOutGoogle() {
-            try {
-                await auth.signOut();
-                googleUser = null;
-                currentUser = null;
-                console.log('Google çıkış başarılı');
-                
-                // Sadece butonu eski haline döndür - ekran aynı kalsın
-                updateGoogleButton(false);
-                
-            } catch (error) {
-                console.error('Google çıkış hatası:', error);
-                alert('Çıkış yapılırken bir hata oluştu: ' + error.message);
-            }
-        }
-
-        function updateGoogleButton(isLoggedIn) {
-            const googleButton = document.getElementById('googleAuthButton');
-            
-            if (isLoggedIn) {
-                // Giriş yapılmış - Çıkış butonu göster
-                googleButton.innerHTML = `
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M16 17v-3H9v-4h7V7l5 5-5 5zM14 2C11.24 2 9 4.24 9 7v1h5V7c0-1.1-.9-2-2-2s-2 .9-2 2v1h1V7c0-.55.45-1 1-1s1 .45 1 1v1h1V7c0-2.76-2.24-5-5-5z"/>
-                    </svg>
-                    <span>🚪 Çıkış Yap</span>
-                `;
-                googleButton.onclick = signOutGoogle;
-                googleButton.classList.remove('bg-red-600', 'hover:bg-red-700');
-                googleButton.classList.add('bg-green-600', 'hover:bg-green-700');
-            } else {
-                // Çıkış yapılmış - Giriş butonu göster
-                googleButton.innerHTML = `
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    <span>🔐 Google ile Giriş</span>
-                `;
-                googleButton.onclick = signInWithGoogle;
-                googleButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-                googleButton.classList.add('bg-red-600', 'hover:bg-red-700');
-            }
-        }
-
-        function showLoginScreen() {
-            // Tüm panelleri gizle
-            document.querySelectorAll('[id$="Panel"]').forEach(panel => panel.classList.add('hidden'));
-            document.getElementById('roleLoginScreen').classList.add('hidden');
-            // Ana giriş ekranını göster
-            document.getElementById('loginScreen').classList.remove('hidden');
-        }
-
-        async function registerGoogleUserAsHR(user) {
-            try {
-                if (!user) return;
-                if (!user.email) return;
-                // Otomatik kayıt KALDIRILDI: Manuel işlem istenirse ayrı tetiklenecek
-                return; // Erken çık
-                // Google kullanıcısını Firebase'de İK yöneticisi olarak kaydet
-                /* eski otomatik kayıt kodu devre dışı
-                const hrData = {...};
-                */
-                
-            } catch (error) {
-                console.error('Google kullanıcısını kaydetme hatası:', error);
-            }
-        }
-
-        // Auth state değişikliklerini dinle
-        let userInitiatedGoogle = false; // Buton tıklaması flag
-        // Butona basınca set edilecek
-        const originalSignIn = signInWithGoogle;
-        signInWithGoogle = async function() { userInitiatedGoogle = true; return originalSignIn(); }
-
-        auth.onAuthStateChanged((user) => {
-            if (user && userInitiatedGoogle) {
-                googleUser = user;
-                console.log('Kullanıcı oturum açmış (manuel):', user.email);
-                updateGoogleButton(true);
-            } else if (user && !userInitiatedGoogle) {
-                // Eski session yakalandı - yok say ve çıkış yap
-                console.log('Önceki session tespit edildi, otomatik çıkış...');
-                auth.signOut();
-                return;
-            } else {
-                googleUser = null;
-                console.log('Kullanıcı oturum açmamış');
-                updateGoogleButton(false);
-            }
-            updateHrRegisterButton();
-        });
-        
-        // Oturum kalıcılığını session bazlı yap (tarayıcı kapanınca silinsin)
-        if (auth && auth.setPersistence) {
-            auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>console.warn('Persistence set edilemedi:', e));
-        }
         let timeRemaining = 1800; // 30 dakika
         let disclaimerAccepted = false;
-
-        // Global hata yakalama
-        // Global hata yakalayıcı ve element kontrolü
-        function safeAddEventListener(elementId, event, handler) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.addEventListener(event, handler);
-                return true;
-            } else {
-                console.warn('Element bulunamadı:', elementId);
-                return false;
-            }
-        }
-        
-        window.addEventListener('error', function(e) {
-            console.log('Hata yakalandı ve engellendi:', e.error);
-            return true; // Hatayı sessizce yakala
-        });
 
         // Firebase bağlantısı için hazır yapı (sonradan eklenecek)
         // Örnek veri yapıları (Firebase'e geçiş için hazır)
@@ -982,22 +846,9 @@
 
         // Firebase'e yeni İK yöneticisi ekle
         function addHrManager(hrObj) {
-            try {
-                const newRef = db.ref('hrManagers').push();
-                hrObj.id = newRef.key;
-                return newRef.set(hrObj).then(() => {
-                    console.log('İK yöneticisi başarıyla kaydedildi:', hrObj);
-                    return true;
-                }).catch((error) => {
-                    console.error('Firebase kayıt hatası:', error);
-                    alert('Kayıt sırasında hata oluştu: ' + error.message);
-                    return false;
-                });
-            } catch (error) {
-                console.error('addHrManager hatası:', error);
-                alert('Kayıt yapılamadı: ' + error.message);
-                return false;
-            }
+            const newRef = db.ref('hrManagers').push();
+            hrObj.id = newRef.key;
+            newRef.set(hrObj);
         }
 
         // Firebase'den İK yöneticisi sil
@@ -1005,9 +856,11 @@
             db.ref('hrManagers/' + hrId).remove();
         }
 
-        // Soru bankası - yeni sorular yüklenecek
+        // Soru bankası (örnek format, 5 ana gruptan 100'er soru ile doldurulmalı)
         const questionBank = {
+            // 500 adet yeni soru cümlesi ve grup başlıkları txt'den alınarak aşağıya gömülmüştür
             grup1: [
+                // 1-100
                 "Yapılacak işler listesini daima önceliklendiririm",
                 "Bitmeyen işler yüzünden kişisel zamanımı sürekli feda ederim",
                 "Karmaşık projeleri küçük parçalara ayırarak planlarım",
@@ -1088,26 +941,6 @@
                 "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
                 "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
                 "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur",
-                "Mevcut süreçleri iyileştirmek için proaktif öneriler sunarım",
-                "Sadece bana söylenilen görevleri yaparım, fazlasını değil",
-                "İhtiyaç duyulan bilgi veya kaynağı kendi çabamla bulurum",
-                "Hata yapma ihtimali varsa, yeni bir şey denemekten kaçınırım",
-                "İşleri hızlandırmak ve verimliliği artırmak için yaratıcı yollar denerim",
-                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
-                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
-                "Başkalarının benim için harekete geçmesini beklerim",
-                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
-                "Yeni bir göreve başlarken detaylı bir kılavuz olmasını şart koşarım",
-                "Öğrenmeye ve yeni yetenekler kazanmaya her zaman hevesliyimdir",
-                "Kendi güçlü ve zayıf yönlerimi bilmek beni ilgilendirmez",
-                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
-                "Eğitimler ve seminerler genellikle zaman kaybıdır",
-                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
-                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
-                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
-                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
-                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
-                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
             grup2: [
                 "Çalışma alanımda her zaman güvenlik prosedürlerine uygun hareket ederim",
@@ -1211,6 +1044,7 @@
                 "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
                 "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
+            // ...grup2, grup3, grup4, grup5 aynı şekilde 100'er soru ile doldurulacak...
             grup3: [
                 "Şirketin uzun vadeli hedeflerini günlük kararlarıma dahil ederim",
                 "Sektördeki rakiplerin hareketlerini göz ardı ederim",
@@ -1516,31 +1350,43 @@
                 "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
                 "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
                 "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur"
-            ]
+            ],
         };
 
-        // 500 soruluk cevap anahtarı - yeni cevaplar yüklenecek
+        // 500 soruluk gerçek cevap anahtarı (SORU_NO, HEDEF_PUAN)
         const questionAnswerKey = [
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,5,1,5,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,1,5,1,5,1,1,
-            1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            5,1,1,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1
-        ];
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,5,1,5,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5
+    ];
 
         // Kullanıcının verdiği cevaplara göre toplam puanı hesaplayan fonksiyon
         function puanHesapla(sorular, cevaplar) {
@@ -1555,177 +1401,76 @@
                 let dogruCevap = (typeof questionAnswerKey !== 'undefined' && questionAnswerKey[i]) ? questionAnswerKey[i] : 5;
                 // Kullanıcı cevabı 0 tabanlı index, 1-5 arası puan için +1
                 let kullaniciCevap = (cevap !== null && cevap !== undefined) ? (cevap + 1) : null;
-                let puanYuzdesi = 0;
-                
+                let puan = 0;
                 if (kullaniciCevap === null) {
-                    puanYuzdesi = 0; // Cevaplanmadı = %0
+                    puan = 0;
                 } else if (dogruCevap === 5) {
-                    // Doğru cevap 5 ise
-                    if (kullaniciCevap === 5) puanYuzdesi = 100;      // Tam doğru = %100
-                    else if (kullaniciCevap === 4) puanYuzdesi = 75;  // Yakın cevap = %75
-                    else if (kullaniciCevap === 3) puanYuzdesi = 50;  // Orta cevap = %50
-                    else if (kullaniciCevap === 2) puanYuzdesi = 0;   // Ters cevap = %0
-                    else if (kullaniciCevap === 1) puanYuzdesi = 0;   // Tam ters = %0
+                    if (kullaniciCevap === 5) puan = 1;
+                    else if (kullaniciCevap === 4) puan = 0.75;
+                    else if (kullaniciCevap === 3) puan = 0.5;
+                    else if (kullaniciCevap === 2) puan = 0.25;
+                    else if (kullaniciCevap === 1) puan = 0; // tam tersi %0
+                    else puan = 0;
                 } else if (dogruCevap === 1) {
-                    // Doğru cevap 1 ise
-                    if (kullaniciCevap === 1) puanYuzdesi = 100;      // Tam doğru = %100
-                    else if (kullaniciCevap === 2) puanYuzdesi = 75;  // Yakın cevap = %75
-                    else if (kullaniciCevap === 3) puanYuzdesi = 50;  // Orta cevap = %50
-                    else if (kullaniciCevap === 4) puanYuzdesi = 0;   // Ters cevap = %0
-                    else if (kullaniciCevap === 5) puanYuzdesi = 0;   // Tam ters = %0
+                    if (kullaniciCevap === 1) puan = 1;
+                    else if (kullaniciCevap === 2) puan = 0.75;
+                    else if (kullaniciCevap === 3) puan = 0.5;
+                    else if (kullaniciCevap === 4) puan = 0.25;
+                    else if (kullaniciCevap === 5) puan = 0; // tam tersi %0
+                    else puan = 0;
                 } else {
-                    // Eğer anahtarda 2,3,4 gibi değer olursa tam eşleşme %100, diğerleri gradüel
-                    if (kullaniciCevap === dogruCevap) puanYuzdesi = 100;
-                    else {
-                        let fark = Math.abs(kullaniciCevap - dogruCevap);
-                        if (fark === 1) puanYuzdesi = 75;
-                        else if (fark === 2) puanYuzdesi = 50;
-                        else puanYuzdesi = 0;
-                    }
+                    // Eğer anahtarda 2,3,4 gibi değer olursa tam eşleşme 1, diğerleri 0
+                    puan = (kullaniciCevap === dogruCevap) ? 1 : 0;
                 }
-                
-                toplamPuan += puanYuzdesi;
-                maxPuan += 100; // Her soru maksimum %100 değerinde
+                toplamPuan += puan;
+                maxPuan += 1;
             }
-            
-            // Toplam puanı yüzde olarak hesapla
-            return maxPuan > 0 ? Math.round((toplamPuan / maxPuan) * 100) : 0;
+            // Yüzdelik başarı oranı
+            const yuzde = maxPuan > 0 ? Math.round((toplamPuan / maxPuan) * 100) : 0;
+            return yuzde;
         }
 
         // Metodoloji fonksiyonları
         function showMethodology() {
-            // Çalışan metodoloji modalı
-            const methodModal = document.createElement('div');
-            methodModal.innerHTML = `
-                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; overflow-y: auto;">
-                    <div style="background: white; padding: 30px; border-radius: 15px; max-width: 900px; max-height: 90vh; overflow-y: auto; margin: 20px;">
-                        <h2 style="color: #1f2937; font-size: 24px; font-weight: bold; margin-bottom: 20px;">📊 Analiz Pro X Metodolojisi ve Bilimsel Temeller</h2>
-                        
-                        <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 25px;">
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🔬 Bilimsel Yaklaşım</h3>
-                            <p style="margin-bottom: 15px;">Analiz Pro X, endüstriyel psikoloji ve organizasyonel davranış alanındaki güncel araştırmalara dayanan, kanıta dayalı (evidence-based) bir değerlendirme platformudur. Sistemimiz, Likert ölçeği metodolojisi ve psikometrik analiz ilkeleri temelinde geliştirilmiştir.</p>
-                            
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">📋 5'li Likert Ölçeği Sistemi</h3>
-                            <p style="margin-bottom: 10px;"><strong>Ölçek Yapısı:</strong></p>
-                            <ul style="margin-left: 20px; margin-bottom: 15px;">
-                                <li><strong>5 - Tamamen Katılıyorum:</strong> Yüksek uyum ve pozitif yönelim</li>
-                                <li><strong>4 - Katılıyorum:</strong> Genel uyum ve kabul</li>
-                                <li><strong>3 - Kararsızım:</strong> Nötr duruş veya belirsizlik</li>
-                                <li><strong>2 - Katılmıyorum:</strong> Olumsuz eğilim</li>
-                                <li><strong>1 - Hiç Katılmıyorum:</strong> Güçlü olumsuz duruş</li>
-                            </ul>
-                            
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">📊 Yetkinlik Kategorileri</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
-                                    <h4 style="color: #166534; font-weight: 600; margin-bottom: 8px;">👔 Beyaz Yaka Çalışanları</h4>
-                                    <p style="font-size: 12px;">Analitik düşünme, problem çözme, iletişim becerileri odaklı değerlendirme</p>
-                                </div>
-                                <div style="background: #eff6ff; padding: 15px; border-radius: 8px;">
-                                    <h4 style="color: #1d4ed8; font-weight: 600; margin-bottom: 8px;">🔧 Mavi Yaka Çalışanları</h4>
-                                    <p style="font-size: 12px;">Pratik zeka, takım çalışması, güvenlik bilinci odaklı değerlendirme</p>
-                                </div>
-                                <div style="background: #fef3c7; padding: 15px; border-radius: 8px;">
-                                    <h4 style="color: #92400e; font-weight: 600; margin-bottom: 8px;">👨‍💼 Yönetici İmalat</h4>
-                                    <p style="font-size: 12px;">Liderlik, karar verme, operasyonel yönetim odaklı değerlendirme</p>
-                                </div>
-                                <div style="background: #fce7f3; padding: 15px; border-radius: 8px;">
-                                    <h4 style="color: #be185d; font-weight: 600; margin-bottom: 8px;">🏢 Hizmet Sektörü</h4>
-                                    <p style="font-size: 12px;">Müşteri odaklılık, empati, hizmet kalitesi odaklı değerlendirme</p>
-                                </div>
-                            </div>
-                            
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">⚖️ Validite ve Güvenilirlik</h3>
-                            <p style="margin-bottom: 10px;"><strong>Psikometrik Özellikler:</strong></p>
-                            <ul style="margin-left: 20px; margin-bottom: 15px;">
-                                <li><strong>İç Tutarlılık:</strong> Cronbach Alpha katsayısı ile ölçülmüştür</li>
-                                <li><strong>Yapı Geçerliliği:</strong> Faktör analizi ile doğrulanmıştır</li>
-                                <li><strong>Kriter Geçerliliği:</strong> İş performansı ile korelasyon analizi yapılmıştır</li>
-                                <li><strong>Test-Tekrar Test:</strong> Kararlılık katsayısı hesaplanmıştır</li>
-                            </ul>
-                            
-                            <h3 style="font-weight: 600; color: #059669; margin: 15px 0 10px 0;">🎯 Uygulama Alanları</h3>
-                            <p style="margin-bottom: 15px;">Bu metodoloji, işe alım süreçleri, performans değerlendirme, yetenek yönetimi ve organizasyonel gelişim projelerinde kullanılmak üzere tasarlanmıştır. Sonuçlar, karar verme süreçlerinde destekleyici bilgi olarak kullanılmalı ve tek başına değerlendirme kriteri olmamalıdır.</p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button onclick="this.parentElement.parentElement.parentElement.remove();" style="background: #059669; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-                                ✓ Anladım
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(methodModal);
+            document.getElementById('methodologyModal').classList.remove('hidden');
         }
         
         function closeMethodology() {
-            // Modal artık createElement ile yapılıyor, bu fonksiyon gerekli değil
+            document.getElementById('methodologyModal').classList.add('hidden');
         }
 
         // Sorumluluk reddi fonksiyonları
         function showDisclaimer() {
-            // Çalışan disclaimer modalı
-            const testModal = document.createElement('div');
-            testModal.innerHTML = `
-                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; overflow-y: auto;">
-                    <div style="background: white; padding: 30px; border-radius: 15px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;">
-                        <h2 style="color: #1f2937; font-size: 24px; font-weight: bold; margin-bottom: 20px;">Hukuki Sorumluluk Reddi ve Veri Güvenliği Beyanı</h2>
-                        
-                        <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 25px;">
-                            <p style="margin-bottom: 15px; font-weight: 600; color: #2563eb;">
-                                Analiz Pro X platformu, veri analizi ve raporlama süreçlerinde hukuki uygunluk, şeffaflık ve etik sorumluluk prensiplerini benimser. Bu beyan, platformun teknolojik dayanağını, veri koruma politikalarını ve sonuçların kullanımına dair sorumluluk sınırlarını netleştirmektedir.
-                            </p>
-                            
-                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">1. Teknolojik Altyapı ve Güvenlik</h3>
-                            <p style="margin-bottom: 10px;"><strong>Altyapı Güvenliği:</strong> Analiz Pro X, Google Firebase Real-time Database teknolojisini kullanarak verilerinizi işler ve saklar. Firebase, Google Cloud'un enterprise düzeyindeki güvenlik protokolleri ile korunmaktadır.</p>
-                            
-                            <p style="margin-bottom: 10px;"><strong>Veri İletimi:</strong> Tüm veriler HTTPS protokolü ile şifrelenerek iletilir ve Firebase'in çok katmanlı güvenlik duvarları ile korunur.</p>
-                            
-                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Reddi:</strong> Analiz Pro X, altyapı güvenliği için tamamen Google Firebase'in sağladığı protokol ve güvenlik standartlarına güvenir.</p>
-                            
-                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">2. Veri Koruma ve KVKK Uyumu</h3>
-                            <p style="margin-bottom: 10px;"><strong>Anonimlik Sistemi:</strong> Platform, adayların gerçek kimlik bilgilerini hiçbir şekilde toplamaz, işlemez veya saklamaz. Sadece kullanıcı kurumun belirlediği rumuz sistemi ile çalışır.</p>
-                            
-                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Beyanı:</strong> Platformumuz, kimlik bilgilerini içermeyen rumuz sistemi sayesinde, kullanıcı kurumların KVKK uyum süreçlerini destekler ve yasal risklerini minimize eder.</p>
-                            
-                            <h3 style="font-weight: 600; color: #1f2937; margin: 15px 0 10px 0;">3. Sonuçların Kullanımı ve Karar Verme Süreçleri</h3>
-                            <p style="margin-bottom: 15px;"><strong>Sorumluluk Beyanı:</strong> Platform tarafından sunulan Görüşme Önerileri, Risk Seviyeleri ve Yetkinlik Skorları tamamen tavsiye niteliğindedir. Adayın işe alım, elenme, terfi ettirilme veya görevlendirilme kararlarının nihai sorumluluğu ve takdiri, her zaman kullanıcı kurumun yetkili İK ve Yönetici kadrolarına aittir.</p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button onclick="acceptDisclaimer(); this.parentElement.parentElement.parentElement.remove();" style="background: #16a34a; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-right: 10px;">
-                                ✓ Okudum ve Onaylıyorum
-                            </button>
-                            <button onclick="this.parentElement.parentElement.parentElement.remove();" style="background: #dc2626; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-                                ✗ İptal
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(testModal);
+            document.getElementById('disclaimerModal').classList.remove('hidden');
         }
         
         function closeDisclaimer() {
-            const modal = document.getElementById('disclaimerModal');
-            modal.style.display = 'none';
-        }
-        
-        function closeDisclaimer() {
-            const modal = document.getElementById('disclaimerModal');
-            modal.style.display = 'none';
+            document.getElementById('disclaimerModal').classList.add('hidden');
         }
         
         function acceptDisclaimer() {
-            console.log('acceptDisclaimer çalıştı');
             disclaimerAccepted = true;
             document.getElementById('disclaimerAccept').checked = true;
             document.getElementById('disclaimerAccept').disabled = false;
+            
+            // Sadece aday portalı butonunu aktif et (admin ve İK zaten aktif)
             document.getElementById('candidateButton').disabled = false;
-            updateHrRegisterButton(); // İK kayıt butonunu durumu güncelle
+            
+            // İK kayıt butonunu da güncelle
+            updateHrRegisterButton();
+            
+            // Modal'ı kapat
             closeDisclaimer();
-            alert('Sorumluluk reddi beyanı onaylandı!');
+            
+            // Başarı mesajı
+            const successMsg = document.createElement('div');
+            successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            successMsg.textContent = 'Sorumluluk reddi beyanı onaylandı. Artık aday portalına giriş yapabilir ve İK kayıt işlemi yapabilirsiniz.';
+            document.body.appendChild(successMsg);
+            
+            setTimeout(() => {
+                successMsg.remove();
+            }, 3000);
         }
 
         // Ana fonksiyonlar
@@ -1775,128 +1520,42 @@
         }
 
         function updateHrRegisterButton() {
-            const hrRegisterMainButton = document.getElementById('hrRegisterMainButton');
-            if (hrRegisterMainButton) {
-                // Event listener'ı sadece bir kez ekle
-                if (!hrRegisterMainButton.hasAttribute('data-listener-added')) {
-                    hrRegisterMainButton.addEventListener('click', function() {
-                        console.log('İK Kaydı butonuna tıklandı (event listener)');
-                        if (!hrRegisterMainButton.disabled) {
-                            showHrRegister();
-                        }
-                    });
-                    hrRegisterMainButton.setAttribute('data-listener-added', 'true');
-                }
-                
-                // Sorumluluk reddi onaylanmışsa VE Google hesabı varsa aktif
-                if (disclaimerAccepted && googleUser) {
-                    hrRegisterMainButton.disabled = false;
-                    hrRegisterMainButton.classList.remove('opacity-50','cursor-not-allowed');
-                    hrRegisterMainButton.title = '';
+            const hrRegisterButton = document.getElementById('hrRegisterButton');
+            if (hrRegisterButton) {
+                if (disclaimerAccepted) {
+                    hrRegisterButton.disabled = false;
                 } else {
-                    hrRegisterMainButton.disabled = true;
-                    hrRegisterMainButton.classList.add('opacity-50','cursor-not-allowed');
-                    if (!disclaimerAccepted) {
-                        hrRegisterMainButton.title = 'Önce sorumluluk reddi beyanını onaylayın';
-                    } else if (!googleUser) {
-                        hrRegisterMainButton.title = 'Önce Google ile giriş yapın';
-                    }
+                    hrRegisterButton.disabled = true;
                 }
             }
         }
 
-        let showHrRegisterRunning = false;
-        
         function showHrRegister() {
-            console.log('showHrRegister çağrıldı - Flag durumu:', showHrRegisterRunning);
-            if (showHrRegisterRunning) {
-                console.log('showHrRegister zaten çalışıyor, döngü engellendi');
-                return;
-            }
-            showHrRegisterRunning = true;
-            
-            console.log('showHrRegister çağrıldı - Kontroller:', {
-                disclaimerAccepted,
-                googleUser: !!googleUser
-            });
-            
-            // Önce sorumluluk reddi kontrolü
+            // İK kayıt için sorumluluk reddi zorunlu
             if (!disclaimerAccepted) {
-                alert('Önce sorumluluk reddi beyanını okuyun ve onaylayın!');
-                showHrRegisterRunning = false;
+                alert('Lütfen önce sorumluluk reddi beyanını okuyun ve onaylayın!');
                 return;
             }
             
-            // Sonra Google giriş kontrolü  
-            if (!googleUser) {
-                alert('Önce Google ile giriş yapmalısınız.');
-                showHrRegisterRunning = false;
-                return;
-            }
-            
-            const roleLogin = document.getElementById('roleLoginScreen');
-            const registerScreen = document.getElementById('hrRegisterScreen');
-            
-            if (!registerScreen) {
-                console.error('hrRegisterScreen bulunamadı!');
-                alert('Kayıt ekranı yüklenemedi (hrRegisterScreen eksik).');
-                showHrRegisterRunning = false;
-                return;
-            }
-            
-            // Ekranları değiştir
-            if (roleLogin) {
-                roleLogin.classList.add('hidden');
-                console.log('roleLoginScreen gizlendi');
-            } else {
-                console.log('roleLoginScreen bulunamadı, ana ekranı gizlemeye çalışıyor');
-                const roleSelection = document.getElementById('roleSelection');
-                if (roleSelection) {
-                    roleSelection.style.display = 'none';
-                }
-            }
-            registerScreen.classList.remove('hidden');
-            console.log('İK kayıt ekranı açıldı (showHrRegister)');
-            
-            showHrRegisterRunning = false;
-        }
-
-        // Debug amaçlı: tarayıcı konsolundan window.forceRegister() diyerek açabilirsin
-        window.forceRegister = function() {
-            console.log('forceRegister çağrıldı');
-            showHrRegister();
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            document.getElementById('hrRegisterScreen').classList.remove('hidden');
         }
 
         function backToRoleLogin() {
-            const registerScreen = document.getElementById('hrRegisterScreen');
-            const roleLogin = document.getElementById('roleLoginScreen');
-            if (registerScreen) registerScreen.classList.add('hidden');
-            if (roleLogin) roleLogin.classList.remove('hidden');
-            updateHrRegisterButton();
-            console.log('Role login ekranına dönüldü');
+            document.getElementById('hrRegisterScreen').classList.add('hidden');
+            document.getElementById('roleLoginScreen').classList.remove('hidden');
         }
 
         function logout() {
-            // Google oturumunu kapat
-            if (googleUser) {
-                signOutGoogle();
-            }
-            
             currentUser = null;
             currentRole = null;
-            
-            // Kullanıcı bilgilerini gizle
-            document.getElementById('userInfo').classList.add('hidden');
-            
             document.querySelectorAll('[id$="Panel"]').forEach(panel => panel.classList.add('hidden'));
             document.getElementById('loginScreen').classList.remove('hidden');
         }
 
         // Giriş formu işleme
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', function(e) {
-                e.preventDefault();
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
             if (currentRole === 'candidate') {
                 const alias = document.getElementById('candidateAlias').value.trim();
@@ -1945,8 +1604,7 @@
                 }
             }
         });
-        } // loginForm if kapanışı
-        
+
         // Panel gösterme fonksiyonları
         function showAdminPanel() {
             document.getElementById('roleLoginScreen').classList.add('hidden');
@@ -1960,19 +1618,6 @@
             
             // İK yöneticisi giriş yaptıktan sonra kayıt ol seçeneğini kilitle
             localStorage.setItem('hrRegistrationLocked', 'true');
-            
-            // Google kullanıcı bilgilerini göster
-            if (currentUser && currentUser.authMethod === 'google') {
-                const userInfo = document.getElementById('userInfo');
-                const userPhoto = document.getElementById('userPhoto');
-                const userName = document.getElementById('userName');
-                const userEmail = document.getElementById('userEmail');
-                
-                userInfo.classList.remove('hidden');
-                userPhoto.src = currentUser.photoURL || '';
-                userName.textContent = currentUser.name || '';
-                userEmail.textContent = currentUser.email || '';
-            }
             
             showHrSection('dashboard');
         }
@@ -2076,73 +1721,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // İK panel fonksiyonları
-        // Özel yeni üye paneli açma fonksiyonu
-        function showNewMemberPanel() {
-            try {
-                console.log('showNewMemberPanel çağrıldı');
-                
-                // Tüm hr panellerini gizle
-                const hrSections = ['hrDashboard', 'hrNewMember', 'hrCandidates', 'hrReports'];
-                hrSections.forEach(sectionId => {
-                    const element = document.getElementById(sectionId);
-                    if (element) {
-                        element.classList.add('hidden');
-                        console.log('Gizlendi:', sectionId);
-                    }
-                });
-                
-                // Yeni üye panelini göster
-                const newMemberPanel = document.getElementById('hrNewMember');
-                if (newMemberPanel) {
-                    newMemberPanel.classList.remove('hidden');
-                    console.log('hrNewMember paneli gösterildi');
-                    
-                    // Formu sıfırla
-                    const form = document.getElementById('newMemberForm');
-                    if (form) {
-                        form.reset();
-                        console.log('Form sıfırlandı');
-                    }
-                } else {
-                    console.error('hrNewMember paneli bulunamadı!');
-                    alert('Yeni kayıt paneli bulunamadı!');
-                }
-            } catch (error) {
-                console.error('showNewMemberPanel hatası:', error);
-                alert('Panel açılırken hata oluştu: ' + error.message);
-            }
-        }
-
         function showHrSection(section) {
-            console.log('showHrSection çağrıldı, section:', section);
-            
-            // Tüm hr panellerini gizle
             document.querySelectorAll('[id^="hr"]').forEach(el => {
                 if (el.id.startsWith('hr') && el.id !== 'hrPanel') {
                     el.classList.add('hidden');
                 }
             });
             
-            // Hedef ID'yi oluştur
-            const targetId = 'hr' + section.charAt(0).toUpperCase() + section.slice(1);
-            console.log('Aranan hedef ID:', targetId);
+            document.getElementById('hr' + section.charAt(0).toUpperCase() + section.slice(1)).classList.remove('hidden');
             
-            // Hedef elementi bul ve göster
-            const targetElement = document.getElementById(targetId);
-            if (targetElement) {
-                targetElement.classList.remove('hidden');
-                console.log('Panel gösterildi:', targetId);
-            } else {
-                console.error('Hedef panel bulunamadı:', targetId);
-                return;
-            }
-            
-            // Bölüm özel işlemleri
             if (section === 'dashboard') {
                 loadHrDashboard();
-            } else if (section === 'newMember') {
-                console.log('Yeni üye ekleme formu açıldı');
-                // Yeni üye ekleme formu gösterildi, özel bir yükleme işlemi gerekmez
             } else if (section === 'candidates') {
                 loadCandidatesList();
             } else if (section === 'reports') {
@@ -2174,9 +1763,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const endInput = document.getElementById('filterEndDate');
             const filterBtn = document.getElementById('filterDateBtn');
             const clearBtn = document.getElementById('clearDateBtn');
-            
-            console.log('Dashboard elements:', {filterBtn, clearBtn, startInput, endInput});
-            
             if (filterBtn && startInput && endInput) {
                 filterBtn.addEventListener('click', function() {
                     const start = startInput.value ? new Date(startInput.value) : null;
@@ -2206,20 +1792,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Kategori seçim fonksiyonları
         function setupCategorySelectors() {
             // Yeni üye formu için
-            const newMemberMainCat = document.getElementById('newMemberMainCategory');
-            if (newMemberMainCat) {
-                newMemberMainCat.addEventListener('change', function() {
-                    updateSubCategory('newMemberSubCategory', this.value);
-                });
-            }
+            document.getElementById('newMemberMainCategory').addEventListener('change', function() {
+                updateSubCategory('newMemberSubCategory', this.value);
+            });
             
             // Aday ekleme formu için
-            const candidateMainCat = document.getElementById('candidateMainCategory');
-            if (candidateMainCat) {
-                candidateMainCat.addEventListener('change', function() {
-                    updateSubCategory('candidateSubCategory', this.value);
-                });
-            }
+            document.getElementById('candidateMainCategory').addEventListener('change', function() {
+                updateSubCategory('candidateSubCategory', this.value);
+            });
         }
         
         function updateSubCategory(subSelectId, mainCategory) {
@@ -2247,15 +1827,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Yeni üye ekleme (aday ekleme)
-        const newMemberForm = document.getElementById('newMemberForm');
-        if (newMemberForm) {
-            newMemberForm.addEventListener('submit', function(e) {
-                e.preventDefault();
+        document.getElementById('newMemberForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            // Test grubu seçimini kontrol et
-            const selectedTestGroup = document.getElementById('testGroupSelection').value;
-            if (!selectedTestGroup) {
-                alert('Lütfen bir test grubu seçin!');
+            // Seçilen test kriterlerini al
+            const selectedCriteria = [];
+            const checkboxes = document.querySelectorAll('input[name="testCriteria"]:checked');
+            checkboxes.forEach(checkbox => {
+                selectedCriteria.push(checkbox.value);
+            });
+            
+            if (selectedCriteria.length < 3) {
+                alert('Lütfen en az 3 test kriteri seçin!');
+                return;
+            }
+            
+            if (selectedCriteria.length > 8) {
+                alert('En fazla 8 test kriteri seçebilirsiniz!');
                 return;
             }
             
@@ -2264,7 +1852,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alias: document.getElementById('newMemberAlias').value,
                 category: document.getElementById('newMemberSubCategory').value,
                 password: document.getElementById('newMemberPassword').value,
-                testGroup: selectedTestGroup, // Test grubu bilgisi
+                testCriteria: selectedCriteria,
                 createdBy: currentUser.id,
                 testCompleted: false,
                 createdAt: new Date().toISOString(),
@@ -2292,25 +1880,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadCandidatesList();
             }
         });
-        } // newMemberForm if kapanışı
 
         // Hızlı aday ekleme (varsayılan kriterlerle)
-        const newCandidateForm = document.getElementById('newCandidateForm');
-        if (newCandidateForm) {
-            newCandidateForm.addEventListener('submit', function(e) {
-                e.preventDefault();
+        document.getElementById('newCandidateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            const testGroup = document.getElementById('candidateTestGroup').value;
-            if (!testGroup) {
-                alert('Lütfen bir test grubu seçin!');
-                return;
-            }
+            // Varsayılan test kriterleri (hızlı ekleme için)
+            const defaultCriteria = ['communication', 'teamwork', 'analytical_thinking', 'problem_solving'];
             
             const newCandidate = {
                 id: Date.now().toString(),
                 alias: document.getElementById('candidateAliasInput').value,
+                category: document.getElementById('candidateSubCategory').value,
                 password: document.getElementById('candidatePasswordInput').value,
-                testGroup: testGroup,
+                testCriteria: defaultCriteria,
                 createdBy: currentUser.id,
                 testCompleted: false,
                 createdAt: new Date().toISOString(),
@@ -2330,7 +1913,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             loadCandidatesList();
         });
-        } // newCandidateForm if kapanışı
 
         function loadCandidatesList(filteredList) {
             const tbody = document.getElementById('candidatesList');
@@ -2438,11 +2020,18 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('candidateWelcome').classList.add('hidden');
             document.getElementById('candidateTest').classList.remove('hidden');
             
-            // Adayın test grubunu kontrol et (aday veritabanından)
-            const testGroup = currentUser.testGroup || 'grup1';
-            testQuestions = questionBank[testGroup] || [];
+            // Grup eşlemesi
+            const groupMapping = {
+                manufacturing_white: 'grup1',
+                manufacturing_blue: 'grup2',
+                manufacturing_manager: 'grup3',
+                service_personnel: 'grup4',
+                service_admin: 'grup5'
+            };
             
-            console.log(`Test Grubu: ${testGroup}, Soru sayısı: ${testQuestions.length}`);
+            const group = groupMapping[currentUser.category] || 'grup1';
+            testQuestions = questionBank[group] || [];
+            alert(`Kategori: ${currentUser.category}, Grup: ${group}, Soru sayısı: ${testQuestions.length}`);
             currentQuestionIndex = 0;
             userAnswers = new Array(testQuestions.length).fill(null);
             
@@ -2811,56 +2400,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             container.innerHTML = `
-                <h3 class="text-xl font-bold text-gray-800 mb-4">Detaylı Cevap Analizi - ${candidate.alias}</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Sorular ve Cevaplar - ${candidate.alias}</h3>
                 <div class="space-y-4">
                     ${questions.map((question, index) => {
                         const userAnswer = candidate.answers && candidate.answers[index] !== undefined ? candidate.answers[index] : null;
-                        const dogruCevap = questionAnswerKey[index] || 5;
-                        const kullaniciCevap = userAnswer !== null ? (userAnswer + 1) : null;
-                        
                         let userAnswerText = 'Cevaplanmadı';
-                        let puanYuzdesi = 0;
-                        let performansRenk = 'text-gray-600';
-                        let performansIcon = '❓';
-                        
-                        if (kullaniciCevap !== null) {
+                        let puanText = 'N/A';
+                        if (typeof question === 'string') {
+                            // Varsayılan 5'li Likert
                             const options = ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"];
-                            userAnswerText = options[userAnswer];
-                            
-                            // Yeni puanlama sistemine göre hesapla
-                            if (dogruCevap === 5) {
-                                if (kullaniciCevap === 5) { puanYuzdesi = 100; performansRenk = 'text-green-600'; performansIcon = '🎯'; }
-                                else if (kullaniciCevap === 4) { puanYuzdesi = 75; performansRenk = 'text-blue-600'; performansIcon = '👍'; }
-                                else if (kullaniciCevap === 3) { puanYuzdesi = 50; performansRenk = 'text-yellow-600'; performansIcon = '⚡'; }
-                                else { puanYuzdesi = 0; performansRenk = 'text-red-600'; performansIcon = '❌'; }
-                            } else if (dogruCevap === 1) {
-                                if (kullaniciCevap === 1) { puanYuzdesi = 100; performansRenk = 'text-green-600'; performansIcon = '🎯'; }
-                                else if (kullaniciCevap === 2) { puanYuzdesi = 75; performansRenk = 'text-blue-600'; performansIcon = '👍'; }
-                                else if (kullaniciCevap === 3) { puanYuzdesi = 50; performansRenk = 'text-yellow-600'; performansIcon = '⚡'; }
-                                else { puanYuzdesi = 0; performansRenk = 'text-red-600'; performansIcon = '❌'; }
+                            userAnswerText = userAnswer !== null ? options[userAnswer] : 'Cevaplanmadı';
+                            // Puanı hesapla (varsayılan: 5 doğru, 1 yanlış, 3 nötr)
+                            if (userAnswer !== null) {
+                                if (userAnswer === 4) puanText = '1';
+                                else if (userAnswer === 3) puanText = '0.75';
+                                else if (userAnswer === 2) puanText = '0.5';
+                                else if (userAnswer === 1) puanText = '0.25';
+                                else puanText = '0';
                             }
+                        } else {
+                            userAnswerText = userAnswer !== null ? (question.secenekler || question.options)[userAnswer] : 'Cevaplanmadı';
+                            puanText = userAnswer !== null && question.puanlar ? question.puanlar[userAnswer] : 'N/A';
                         }
-                        
                         return `
-                            <div class="border border-gray-200 rounded-lg p-4 ${puanYuzdesi >= 75 ? 'bg-green-50' : puanYuzdesi >= 50 ? 'bg-yellow-50' : puanYuzdesi > 0 ? 'bg-red-50' : 'bg-gray-50'}">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="font-semibold text-gray-800 flex-1">Soru ${index + 1}: ${question}</h4>
-                                    <span class="${performansRenk} text-xl ml-2">${performansIcon}</span>
-                                </div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-                                    <div>
-                                        <p class="text-sm text-gray-500">Verilen Cevap:</p>
-                                        <p class="font-semibold text-blue-600">${userAnswerText}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Hedef Cevap:</p>
-                                        <p class="font-semibold text-purple-600">${dogruCevap === 5 ? 'Kesinlikle Katılıyorum' : 'Kesinlikle Katılmıyorum'}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Performans:</p>
-                                        <p class="font-semibold ${performansRenk}">${puanYuzdesi}%</p>
-                                    </div>
-                                </div>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-800 mb-2">Soru ${index + 1}: ${question.soru || question.question || question}</h4>
+                                <p class="text-gray-600 mb-2">Verilen Cevap: <span class="font-semibold text-blue-600">${userAnswerText}</span></p>
+                                <p class="text-gray-600">Puan: <span class="font-semibold text-green-600">${puanText}</span></p>
                             </div>
                         `;
                     }).join('')}
@@ -2887,85 +2453,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Yeni puanlama sistemine göre hesaplama
-            let detayliAnaliz = '';
-            let toplamYuzde = 0;
-            let cevaplanmisSort = 0;
-            
-            if (candidate.answers && candidate.answers.length > 0) {
-                for (let i = 0; i < Math.min(questions.length, candidate.answers.length); i++) {
-                    let dogruCevap = questionAnswerKey[i] || 5;
-                    let kullaniciCevap = candidate.answers[i] !== null ? (candidate.answers[i] + 1) : null;
-                    let puanYuzdesi = 0;
-                    
-                    if (kullaniciCevap !== null) {
-                        cevaplanmisSort++;
-                        if (dogruCevap === 5) {
-                            if (kullaniciCevap === 5) puanYuzdesi = 100;
-                            else if (kullaniciCevap === 4) puanYuzdesi = 75;
-                            else if (kullaniciCevap === 3) puanYuzdesi = 50;
-                            else puanYuzdesi = 0;
-                        } else if (dogruCevap === 1) {
-                            if (kullaniciCevap === 1) puanYuzdesi = 100;
-                            else if (kullaniciCevap === 2) puanYuzdesi = 75;
-                            else if (kullaniciCevap === 3) puanYuzdesi = 50;
-                            else puanYuzdesi = 0;
-                        }
-                        toplamYuzde += puanYuzdesi;
-                    }
+            // String sorular için varsayılan puanlar
+            let totalPossible = 0;
+            questions.forEach(q => {
+                if (typeof q === 'string') {
+                    totalPossible += 1; // max puan 1
+                } else if (q.puanlar) {
+                    totalPossible += Math.max(...q.puanlar);
+                } else {
+                    totalPossible += 1;
                 }
-            }
-            
-            const genelBasari = cevaplanmisSort > 0 ? Math.round(toplamYuzde / cevaplanmisSort) : 0;
-            const tamamlanmaOrani = questions.length > 0 ? Math.round((cevaplanmisSort / questions.length) * 100) : 0;
+            });
+            const score = candidate.score || 0;
+            const percentage = totalPossible > 0 ? Math.round((score / totalPossible) * 100) : 0;
             
             container.innerHTML = `
-                <h3 class="text-xl font-bold text-gray-800 mb-4">Detaylı Puan Analizi - ${candidate.alias}</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Puan Raporu - ${candidate.alias}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-green-800 mb-2">Genel Başarı</h4>
-                        <p class="text-3xl font-bold text-green-600">${genelBasari}%</p>
-                        <p class="text-sm text-green-600 mt-1">Ortalama Performans</p>
+                        <h4 class="text-lg font-semibold text-green-800 mb-2">Toplam Puan</h4>
+                        <p class="text-3xl font-bold text-green-600">${score}</p>
+                        <p class="text-sm text-green-600 mt-1">${totalPossible} üzerinden</p>
                     </div>
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-blue-800 mb-2">Tamamlanma</h4>
-                        <p class="text-3xl font-bold text-blue-600">${tamamlanmaOrani}%</p>
-                        <p class="text-sm text-blue-600 mt-1">${cevaplanmisSort}/${questions.length} soru</p>
+                        <h4 class="text-lg font-semibold text-blue-800 mb-2">Başarı Oranı</h4>
+                        <p class="text-3xl font-bold text-blue-600">${percentage}%</p>
+                        <p class="text-sm text-blue-600 mt-1">${questions.length} soru</p>
                     </div>
                     <div class="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-purple-800 mb-2">Toplam Puan</h4>
-                        <p class="text-3xl font-bold text-purple-600">${Math.round(toplamYuzde)}</p>
-                        <p class="text-sm text-purple-600 mt-1">Toplam yüzde puanı</p>
+                        <h4 class="text-lg font-semibold text-purple-800 mb-2">Ortalama Puan</h4>
+                        <p class="text-3xl font-bold text-purple-600">${questions.length > 0 ? Math.round(score / questions.length) : 0}</p>
+                        <p class="text-sm text-purple-600 mt-1">Soru başına</p>
                     </div>
                 </div>
                 <div class="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
                     <h4 class="text-lg font-semibold text-gray-800 mb-4">Performans Değerlendirmesi</h4>
                     <div class="w-full bg-gray-200 rounded-full h-6 mb-2">
-                        <div class="bg-gradient-to-r from-green-500 to-green-600 h-6 rounded-full transition-all duration-500" style="width: ${genelBasari}%"></div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 h-6 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
                     </div>
-                    <p class="text-center text-2xl font-bold text-gray-800">${genelBasari}%</p>
-                    <div class="mt-4 text-sm text-gray-600">
-                        <p><strong>Puanlama Sistemi:</strong></p>
-                        <p>• Tam doğru cevap: %100</p>
-                        <p>• Yakın cevap: %75</p>
-                        <p>• Orta cevap: %50</p>
-                        <p>• Ters cevap: %0</p>
-                    </div>
+                    <p class="text-center text-2xl font-bold text-gray-800">${percentage}%</p>
                 </div>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
                         <h5 class="font-semibold text-gray-800 mb-2">Test Bilgileri</h5>
                         <p class="text-sm text-gray-600">Kategori: ${candidate.category}</p>
                         <p class="text-sm text-gray-600">Tamamlanma: ${candidate.completedAt ? new Date(candidate.completedAt).toLocaleString('tr-TR') : 'Bilinmiyor'}</p>
-                        <p class="text-sm text-gray-600">Cevaplanma Oranı: ${tamamlanmaOrani}%</p>
                     </div>
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
-                        <h5 class="font-semibold text-gray-800 mb-2">Performans Değerlendirmesi</h5>
-                        <p class="text-sm ${genelBasari >= 80 ? 'text-green-600' : genelBasari >= 60 ? 'text-yellow-600' : 'text-red-600'}">
-                            ${genelBasari >= 80 ? '🎉 Mükemmel Performans' : genelBasari >= 60 ? '👍 İyi Performans' : '📚 Geliştirilmesi Gereken'}
-                        </p>
-                        <p class="text-xs text-gray-500 mt-1">
-                            ${genelBasari >= 80 ? 'Beklentilerin üzerinde başarı' : genelBasari >= 60 ? 'Kabul edilebilir seviye' : 'Ek eğitim önerilir'}
+                        <h5 class="font-semibold text-gray-800 mb-2">Değerlendirme</h5>
+                        <p class="text-sm ${percentage >= 80 ? 'text-green-600' : percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                            ${percentage >= 80 ? '🎉 Mükemmel' : percentage >= 60 ? '👍 İyi' : '📚 Geliştirilmeli'}
                         </p>
                     </div>
                 </div>
@@ -3440,11 +2977,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // İK Kayıt formu işleme
-        const hrRegisterForm = document.getElementById('hrRegisterForm');
-        if (hrRegisterForm) {
-            hrRegisterForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                try {
+        document.getElementById('hrRegisterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            try {
                 // Zorunlu alan kontrolü
                 const org = document.getElementById('regOrganization').value.trim();
                 const name = document.getElementById('regName').value.trim();
@@ -3494,21 +3029,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof fetchHrManagers === 'function') {
                     fetchHrManagers();
                 }
-                alert('Kayıt başarılı! İK Paneline yönlendiriliyorsunuz...');
-                // İK kayıt ekranını kapat
-                document.getElementById('hrRegisterScreen').style.display = 'none';
-                // Ana ekranı kapat
-                document.getElementById('roleSelection').style.display = 'none';
-                // İK paneline direkt yönlendir
-                document.getElementById('hrSection').style.display = 'block';
-                showHrSection('dashboard');
+                alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+                backToRoleLogin();
                 this.reset();
             } catch (err) {
                 alert('Kayıt sırasında bir hata oluştu! Detay için konsola bakın.');
                 console.error('Kayıt hatası:', err);
             }
         });
-        } // hrRegisterForm if kapanışı
 
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', function() {
