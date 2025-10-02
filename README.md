@@ -1699,6 +1699,7 @@
             document.getElementById('disclaimerAccept').checked = true;
             document.getElementById('disclaimerAccept').disabled = false;
             document.getElementById('candidateButton').disabled = false;
+            document.getElementById('hrRegisterButton').disabled = false; // İK kayıt butonunu da aktif et
             closeDisclaimer();
             alert('Sorumluluk reddi beyanı onaylandı!');
         }
