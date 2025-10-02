@@ -411,33 +411,21 @@
 
                     <!-- Test Kriterleri Seçimi -->
                     <div class="border-t pt-6">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Test Kriterleri ve Soru Alanları</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <!-- Kişilik Envanterleri -->
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h5 class="font-semibold text-blue-800 mb-3">Kişilik Envanterleri</h5>
-                                <div class="space-y-2">
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="communication" class="mr-2">
-                                        <span class="text-sm">İletişim Becerileri</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="teamwork" class="mr-2">
-                                        <span class="text-sm">Takım Çalışması</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="stress_management" class="mr-2">
-                                        <span class="text-sm">Stres Yönetimi</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="leadership" class="mr-2">
-                                        <span class="text-sm">Liderlik Potansiyeli</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="time_management" class="mr-2">
-                                        <span class="text-sm">Zaman Yönetimi</span>
-                                    </label>
-                                </div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Test Grubu Seçimi</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <select id="testGroupSelection" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                                <option value="">Test Grubu Seçin</option>
+                                <option value="grup1">Beyaz Yaka Çalışanları (100 soru)</option>
+                                <option value="grup2">Mavi Yaka Çalışanları (100 soru)</option>
+                                <option value="grup3">Yönetici İmalat (100 soru)</option>
+                                <option value="grup4">Hizmet Personeli (100 soru)</option>
+                                <option value="grup5">Hizmet Yöneticileri (100 soru)</option>
+                            </select>
+                            <div class="px-4 py-3 border border-gray-300 rounded-xl bg-blue-50 flex items-center">
+                                <p class="text-sm text-blue-700">Seçilen gruba ait 100 soru adaya sunulacak</p>
+                            </div>
+                        </div>
+                    </div>
                             </div>
 
                             <!-- Bilişsel Kapasite -->
@@ -469,31 +457,6 @@
                                 <div class="space-y-2">
                                     <label class="flex items-center">
                                         <input type="checkbox" name="testCriteria" value="ethical_decisions" class="mr-2">
-                                        <span class="text-sm">Etik Karar Verme</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="conflict_management" class="mr-2">
-                                        <span class="text-sm">Çatışma Yönetimi</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="customer_service" class="mr-2">
-                                        <span class="text-sm">Müşteri Hizmetleri</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="testCriteria" value="crisis_management" class="mr-2">
-                                        <span class="text-sm">Kriz Yönetimi</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                            <p class="text-sm text-yellow-800">
-                                <strong>Not:</strong> Seçtiğiniz kriterler doğrultusunda adaya özel test soruları hazırlanacaktır. 
-                                En az 3, en fazla 8 kriter seçmeniz önerilir.
-                            </p>
-                        </div>
-                    </div>
                     
                     <div class="pt-4">
                         <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
@@ -509,18 +472,20 @@
             <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Hızlı Aday Ekle</h3>
                 <p class="text-sm text-gray-600 mb-4">Detaylı test kriterleri için Dashboard'daki "Yeni Aday Ekle" bölümünü kullanın.</p>
-                <form id="newCandidateForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                    <select id="candidateMainCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        <option value="">Ana Kategori Seç</option>
-                        <option value="manufacturing">İşletme</option>
-                        <option value="service">Hizmet</option>
-                    </select>
-                    <select id="candidateSubCategory" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required disabled>
-                        <option value="">Önce ana kategori seçin</option>
-                    </select>
-                    <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
+                <form id="newCandidateForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="candidateAliasInput" placeholder="Rumuz" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <input type="password" id="candidatePasswordInput" placeholder="Şifre Belirle" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        <select id="candidateTestGroup" class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                            <option value="">Test Grubu Seçin</option>
+                            <option value="grup1">Beyaz Yaka Çalışanları</option>
+                            <option value="grup2">Mavi Yaka Çalışanları</option>
+                            <option value="grup3">Yönetici İmalat</option>
+                            <option value="grup4">Hizmet Personeli</option>
+                            <option value="grup5">Hizmet Yöneticileri</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300">
                         Hızlı Aday Ekle
                     </button>
                 </form>
@@ -861,19 +826,9 @@
                 // Google kullanıcısını İK yöneticisi olarak kaydet veya güncelle
                 await registerGoogleUserAsHR(googleUser);
                 
-                // İK Yönetici paneline otomatik giriş
-                currentUser = {
-                    id: googleUser.uid,
-                    name: googleUser.displayName,
-                    email: googleUser.email,
-                    role: 'hr',
-                    authMethod: 'google'
-                };
-                
-                // Google giriş başarılı olduktan sonra direkt İK yöneticisi paneline yönlendir
+                // Google giriş başarılı olduktan sonra rol seçim ekranına yönlendir
                 document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('roleLoginScreen').classList.add('hidden');
-                document.getElementById('hrPanel').classList.remove('hidden');
+                document.getElementById('roleLoginScreen').classList.remove('hidden');
                 
             } catch (error) {
                 console.error('Google giriş hatası:', error);
@@ -1987,20 +1942,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('newMemberForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Seçilen test kriterlerini al
-            const selectedCriteria = [];
-            const checkboxes = document.querySelectorAll('input[name="testCriteria"]:checked');
-            checkboxes.forEach(checkbox => {
-                selectedCriteria.push(checkbox.value);
-            });
-            
-            if (selectedCriteria.length < 3) {
-                alert('Lütfen en az 3 test kriteri seçin!');
-                return;
-            }
-            
-            if (selectedCriteria.length > 8) {
-                alert('En fazla 8 test kriteri seçebilirsiniz!');
+            // Test grubu seçimini kontrol et
+            const selectedTestGroup = document.getElementById('testGroupSelection').value;
+            if (!selectedTestGroup) {
+                alert('Lütfen bir test grubu seçin!');
                 return;
             }
             
@@ -2009,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alias: document.getElementById('newMemberAlias').value,
                 category: document.getElementById('newMemberSubCategory').value,
                 password: document.getElementById('newMemberPassword').value,
-                testCriteria: selectedCriteria,
+                testGroup: selectedTestGroup, // Test grubu bilgisi
                 createdBy: currentUser.id,
                 testCompleted: false,
                 createdAt: new Date().toISOString(),
@@ -2042,15 +1987,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('newCandidateForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Varsayılan test kriterleri (hızlı ekleme için)
-            const defaultCriteria = ['communication', 'teamwork', 'analytical_thinking', 'problem_solving'];
+            const testGroup = document.getElementById('candidateTestGroup').value;
+            if (!testGroup) {
+                alert('Lütfen bir test grubu seçin!');
+                return;
+            }
             
             const newCandidate = {
                 id: Date.now().toString(),
                 alias: document.getElementById('candidateAliasInput').value,
-                category: document.getElementById('candidateSubCategory').value,
                 password: document.getElementById('candidatePasswordInput').value,
-                testCriteria: defaultCriteria,
+                testGroup: testGroup,
                 createdBy: currentUser.id,
                 testCompleted: false,
                 createdAt: new Date().toISOString(),
@@ -2177,18 +2124,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('candidateWelcome').classList.add('hidden');
             document.getElementById('candidateTest').classList.remove('hidden');
             
-            // Grup eşlemesi
-            const groupMapping = {
-                manufacturing_white: 'grup1',
-                manufacturing_blue: 'grup2',
-                manufacturing_manager: 'grup3',
-                service_personnel: 'grup4',
-                service_admin: 'grup5'
-            };
+            // Adayın test grubunu kontrol et (aday veritabanından)
+            const testGroup = currentUser.testGroup || 'grup1';
+            testQuestions = questionBank[testGroup] || [];
             
-            const group = groupMapping[currentUser.category] || 'grup1';
-            testQuestions = questionBank[group] || [];
-            alert(`Kategori: ${currentUser.category}, Grup: ${group}, Soru sayısı: ${testQuestions.length}`);
+            console.log(`Test Grubu: ${testGroup}, Soru sayısı: ${testQuestions.length}`);
             currentQuestionIndex = 0;
             userAnswers = new Array(testQuestions.length).fill(null);
             
