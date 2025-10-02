@@ -385,7 +385,7 @@
         </div>
 
         <!-- Yeni Üye Ekleme -->
-        <div id="hrNewMember" class="max-w-6xl mx-auto p-6">
+        <div id="hrNewMember" class="hidden max-w-6xl mx-auto p-6">
             <div class="bg-white rounded-xl shadow-lg p-8">
                 <h3 class="text-2xl font-bold text-gray-800 mb-6">Yeni Aday Ekle ve Test Kriterleri Belirle</h3>
                 <form id="newMemberForm" class="space-y-6">
@@ -2047,17 +2047,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // İK panel fonksiyonları
         function showHrSection(section) {
+            console.log('showHrSection çağrıldı, section:', section);
+            
+            // Tüm hr panellerini gizle
             document.querySelectorAll('[id^="hr"]').forEach(el => {
                 if (el.id.startsWith('hr') && el.id !== 'hrPanel') {
                     el.classList.add('hidden');
                 }
             });
             
-            document.getElementById('hr' + section.charAt(0).toUpperCase() + section.slice(1)).classList.remove('hidden');
+            // Hedef ID'yi oluştur
+            const targetId = 'hr' + section.charAt(0).toUpperCase() + section.slice(1);
+            console.log('Aranan hedef ID:', targetId);
             
+            // Hedef elementi bul ve göster
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                targetElement.classList.remove('hidden');
+                console.log('Panel gösterildi:', targetId);
+            } else {
+                console.error('Hedef panel bulunamadı:', targetId);
+                return;
+            }
+            
+            // Bölüm özel işlemleri
             if (section === 'dashboard') {
                 loadHrDashboard();
             } else if (section === 'newMember') {
+                console.log('Yeni üye ekleme formu açıldı');
                 // Yeni üye ekleme formu gösterildi, özel bir yükleme işlemi gerekmez
             } else if (section === 'candidates') {
                 loadCandidatesList();
