@@ -3,7 +3,6 @@
 <head>
         <!-- Firebase SDK'ları -->
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
         <script>
             const firebaseConfig = {
@@ -18,75 +17,6 @@
             };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
-            const auth = firebase.auth();
-            
-            // Google Authentication sistemi
-            let currentAuthUser = null;
-            
-            // Firebase Auth token alma fonksiyonu
-            async function getFirebaseAuthToken() {
-                return new Promise((resolve, reject) => {
-                    const unsubscribe = auth.onAuthStateChanged((user) => {
-                        unsubscribe();
-                        if (user) {
-                            user.getIdToken()
-                                .then(token => resolve(token))
-                                .catch(error => {
-                                    console.error('Token alma hatası:', error);
-                                    reject(new Error('Token alınamadı'));
-                                });
-                        } else {
-                            reject(new Error('Kullanıcı giriş yapmamış'));
-                        }
-                    });
-                });
-            }
-            
-            // Google ile giriş yapma
-            async function signInWithGoogle() {
-                try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    const result = await auth.signInWithPopup(provider);
-                    currentAuthUser = result.user;
-                    console.log('Google ile giriş başarılı:', currentAuthUser.displayName);
-                    updateAuthUI();
-                    return true;
-                } catch (error) {
-                    console.error('Google giriş hatası:', error);
-                    alert('Google ile giriş yapılamadı: ' + error.message);
-                    return false;
-                }
-            }
-            
-            // Çıkış yapma
-            async function signOutFromGoogle() {
-                try {
-                    await auth.signOut();
-                    currentAuthUser = null;
-                    updateAuthUI();
-                    alert('Google hesabınızdan çıkış yapıldı.');
-                } catch (error) {
-                    console.error('Çıkış hatası:', error);
-                }
-            }
-            
-            // Auth UI güncelleme
-            function updateAuthUI() {
-                const authBtn = document.getElementById('googleAuthBtn');
-                if (currentAuthUser) {
-                    if (authBtn) {
-                        authBtn.innerHTML = `🔓 <span>${currentAuthUser.displayName} - Çıkış Yap</span>`;
-                        authBtn.onclick = signOutFromGoogle;
-                        authBtn.className = 'w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3';
-                    }
-                } else {
-                    if (authBtn) {
-                        authBtn.innerHTML = '🔒 <span>Google ile Giriş Yap</span>';
-                        authBtn.onclick = signInWithGoogle;
-                        authBtn.className = 'w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3';
-                    }
-                }
-            }
         </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -255,12 +185,7 @@
             </div>
             
             <div class="space-y-4">
-                <!-- Google Authentication Butonu -->
-                <button id="googleAuthBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3">
-                    🔒 <span>Google ile Giriş Yap</span>
-                </button>
-                
-                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     👩‍💻 İK Yönetici
                 </button>
                 <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -903,80 +828,37 @@
 
         // Firebase'den adayları çek
         function fetchCandidates(callback) {
-            if (!currentAuthUser) {
-                console.warn('Giriş yapmadan aday verilerine erişilemez');
-                if (callback) callback();
-                return;
-            }
-            
             db.ref('candidates').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
                 candidates = Object.values(val);
                 if (callback) callback();
-            }).catch(error => {
-                console.error('Aday verilerini çekerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanına erişim için Google ile giriş yapmanız gerekiyor.');
-                }
             });
         }
 
         // Firebase'den İK yöneticilerini çek
         function fetchHrManagers(callback) {
-            if (!currentAuthUser) {
-                console.warn('Giriş yapmadan İK verilerine erişilemez');
-                if (callback) callback();
-                return;
-            }
-            
             db.ref('hrManagers').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
                 hrManagers = Object.values(val);
                 if (callback) callback();
-            }).catch(error => {
-                console.error('İK verilerini çekerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanına erişim için Google ile giriş yapmanız gerekiyor.');
-                }
             });
         }
 
         // Firebase'e yeni İK yöneticisi ekle
         function addHrManager(hrObj) {
-            if (!currentAuthUser) {
-                alert('İK yöneticisi eklemek için Google ile giriş yapmanız gerekiyor.');
-                return;
-            }
-            
             const newRef = db.ref('hrManagers').push();
             hrObj.id = newRef.key;
-            newRef.set(hrObj).catch(error => {
-                console.error('İK yöneticisi eklerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
-                }
-            });
+            newRef.set(hrObj);
         }
 
         // Firebase'den İK yöneticisi sil
         function deleteHrManager(hrId) {
-            if (!currentAuthUser) {
-                alert('İK yöneticisi silmek için Google ile giriş yapmanız gerekiyor.');
-                return;
-            }
-            
-            db.ref('hrManagers/' + hrId).remove().catch(error => {
-                console.error('İK yöneticisi silerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanından silme yetkisi yok. Google ile giriş yapın.');
-                }
-            });
+            db.ref('hrManagers/' + hrId).remove();
         }
 
+        // Soru bankası - yeni sorular yüklenecek
         const questionBank = {
-            // 500 adet yeni soru cümlesi ve grup başlıkları txt'den alınarak aşağıya gömülmüştür
             grup1: [
-                // 1. GRUP: BEYAZ YAKA – İMALAT (Soru 1 - 100)
                 "Yapılacak işler listesini daima önceliklendiririm",
                 "Bitmeyen işler yüzünden kişisel zamanımı sürekli feda ederim",
                 "Karmaşık projeleri küçük parçalara ayırarak planlarım",
@@ -1076,9 +958,9 @@
                 "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
                 "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
                 "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
             grup2: [
-                // 2. GRUP: MAVİ YAKA – İMALAT (Soru 101 - 200)
                 "Çalışma alanımda her zaman güvenlik prosedürlerine uygun hareket ederim",
                 "Basit görevlerde bile kişisel koruyucu ekipman (KKE) kullanmaktan kaçınırım",
                 "Tehlikeli durum veya eksik ekipman gördüğümde hemen ilgililere bildiririm",
@@ -1178,10 +1060,9 @@
                 "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
                 "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
                 "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
-            // ...grup2, grup3, grup4, grup5 aynı şekilde 100'er soru ile doldurulacak...
             grup3: [
-                // 3. GRUP: YÖNETİCİ – İMALAT (Soru 201 - 300)
                 "Şirketin uzun vadeli hedeflerini günlük kararlarıma dahil ederim",
                 "Sektördeki rakiplerin hareketlerini göz ardı ederim",
                 "Gelecekteki pazar trendlerini tahmin edebilirim",
@@ -1281,104 +1162,9 @@
                 "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
                 "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
                 "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
-                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır",
-                "Büyük resmi görmekten çok, detaylara takılı kalırım",
-                "Stratejik kararlarımı desteklemek için güvenilir verilere dayanırım",
-                "İşler yolunda giderken yeni stratejiler geliştirmeye gerek duymam",
-                "Organizasyonumun rekabet avantajını sürekli sorgularım",
-                "İş planlarını genellikle son teslim tarihine yakın hazırlarım",
-                "Zor ve önemli kararları hızlı ve emin bir şekilde alırım",
-                "Karar alma sürecinde sadece kendi deneyimlerime güvenirim",
-                "Bir kararın olası sonuçlarını önceden hesaplarım",
-                "Baskı altında karar vermek beni felç eder",
-                "Farklı görüşleri dinledikten sonra objektif bir karar veririm",
-                "Hata yapmamak için karar vermeyi sürekli ertelerim",
-                "Yeterli bilgi olmadığında bile risk alarak ilerlerim",
-                "Yanlış olduğu ortaya çıkan bir kararda sorumluluğu başkasına atarım",
-                "Başkalarına karar verme yetkisi (delege etme) vermekten çekinirim",
-                "Kararlarımı ekibime açık ve mantıklı bir şekilde açıklarım",
-                "Ekibimi şirketin vizyonu etrafında toplayabilir ve motive ederim",
-                "Ekip üyelerimin kişisel gelişim hedefleri beni ilgilendirmez",
-                "Ekip üyelerimin potansiyellerini ortaya çıkarmaları için onlara fırsat sunarım",
-                "Ekip içinde çıkan çatışmalara müdahale etmekten kaçınırım",
-                "Zorlu değişiklik süreçlerinde ekibime güven aşılarım",
-                "Yetkimi kullanarak kararlarımı sorgusuzca kabul ettiririm",
-                "Performansı düşük çalışanlara yapıcı ve dürüst geri bildirim veririm",
-                "Liderlik tarzımı farklı durum ve kişilere göre değiştiremem",
-                "Ekibimin kararlara katılımını sağlayarak sahiplenme duygusunu artırırım",
-                "Hata yapmaktan korkan bir çalışan profilini teşvik ederim",
-                "Departman hedeflerimi şirketin genel stratejisiyle uyumlu hale getiririm",
-                "Planlarımı esnek tutmak yerine katı kurallara bağlı kalırım",
-                "Kaynak (zaman, bütçe, personel) dağıtımını etkin bir şekilde yaparım",
-                "Acil durum planı yapmayı genellikle gereksiz bulurum",
-                "Planlama sürecine tüm ilgili paydaşları dahil ederim",
-                "Gelecekteki olası zorlukları planlarıma dahil etmem",
-                "İş akışlarını optimize etmek için düzenli olarak süreçleri gözden geçiririm",
-                "Planlamadan çok, anlık kararlarla ilerlemeyi tercih ederim",
-                "Planlarımı ve ilerlemeyi ekibimle düzenli olarak paylaşırım",
-                "Önceliklerim sık sık değişir ve bu durum ekibi yorar",
-                "Üst yönetimle konuşurken karmaşık bilgileri basitleştiririm",
-                "Çalışanlarımın ne düşündüğünü öğrenmek için düzenli toplantılar yapmam",
-                "Kritik bilgileri doğru zamanda, ilgili kişilere iletirim",
-                "Ekibimle iletişim kurarken genellikle resmi ve mesafeli bir dil kullanırım",
-                "Zorlu geri bildirimleri yapıcı ve empatik bir şekilde verebilirim",
-                "Çalışanların endişelerini dile getirmesi beni rahatsız eder",
-                "Bir konuşmada hem sözlü hem de sözsüz sinyallere dikkat ederim",
-                "Sık sık insanların söylediklerini yanlış anlarım",
-                "Farklı pozisyonlardaki kişilerle rahatlıkla iletişim kurabilirim",
-                "Duygusal zekam, profesyonel iletişimimi olumsuz etkiler",
-                "Karmaşık iş sorunlarında veriye dayalı çözüm yolları ararım",
-                "Bir problem çıktığında ilk tepkim sorunu görmezden gelmek olur",
-                "Sorunların kök nedenlerini tespit etmek için sistematik yöntemler kullanırım",
-                "Basit sorunların çözümü için bile çok zaman harcarım",
-                "Yenilikçi ve yaratıcı problem çözme tekniklerini teşvik ederim",
-                "Başkalarının çözüm önerilerini genellikle yetersiz bulurum",
-                "Problemleri fırsata çevirerek iş süreçlerini iyileştiririm",
-                "Çözüme ulaştıktan sonra süreç analizi yapmam",
-                "Farklı görüşlerden faydalanarak en uygun çözümü bulurum",
-                "Problem çözme yeteneğim, kriz anlarında düşer",
-                "Yüksek kalite standartlarını tüm operasyonel süreçlere entegre ederim",
-                "Kalite yönetim sistemlerinin gerekliliklerini göz ardı ederim",
-                "Kalite hatalarını azaltmak için sürekli iyileştirme projeleri başlatırım",
-                "Kaliteyi artırmak için yapılan yatırımları gereksiz bulurum",
-                "Çalışanlarımın kalite bilincini geliştirmek için eğitimler düzenlerim",
-                "Hız ve maliyet, kalite standartlarının önündedir",
-                "Müşteri şikayetlerini, kalite süreçlerini gözden geçirmek için kullanırım",
-                "Kalite hedeflerine ulaşılmadığında sorumluluğu kabul etmem",
-                "Tedarikçilerimden de aynı yüksek kalite standartlarını talep ederim",
-                "Kalite sorunları genellikle benim kontrolüm dışındaki durumlardan kaynaklanır",
-                "Müşteri ihtiyaçlarını anlamak için düzenli pazar araştırması yaparım",
-                "Müşteri beklentileri değiştiğinde hemen uyum sağlamakta zorlanırım",
-                "Müşteri şikayetlerini hızlı ve tatmin edici bir şekilde çözerim",
-                "Sadece büyük müşterilerin görüşleri benim için önemlidir",
-                "Ekibimi, her etkileşimde müşteri memnuniyetini hedeflemeye yönlendiririm",
-                "Müşteri geri bildirimlerini dinlemek zaman kaybıdır",
-                "Hem iç hem de dış müşterilerime eşit derecede önem veririm",
-                "Müşteriye hayır demekten çekinmem",
-                "Müşteri sadakatini artırmak için uzun vadeli stratejiler geliştiririm",
-                "Müşterinin tam olarak ne istediği benim için her zaman açık değildir",
-                "Sektördeki yenilikleri takip ederek yeni iş alanları yaratırım",
-                "Sürekli yeni fikirler denemektense, mevcut rutinime bağlı kalırım",
-                "Ekibimi belirlenen hedeflerin ötesine geçmeleri için teşvik ederim",
-                "Hata yapma riskini göze alamam",
-                "İşleri hızlandırmak ve verimliliği artırmak için yaratıcı yollar denerim",
-                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
-                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
-                "Başkalarının benim için harekete geçmesini beklerim",
-                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
-                "Yeni bir göreve başlarken detaylı bir kılavuz olmasını şart koşarım",
-                "Şirketimin uzun vadeli rekabet gücünü artırmak için sürekli öğrenirim",
-                "Çalışanlarımın gelişim ihtiyaçlarını göz ardı ederim",
-                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
-                "Eğitimler ve seminerler genellikle zaman kaybıdır",
-                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
-                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
-                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
-                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
-                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
             grup4: [
-                // 4. GRUP: HİZMET PERSONELİ (Soru 301 - 400)
                 "Müşteri taleplerine her zaman güler yüzle ve sabırla cevap veririm",
                 "Müşterilerin sık sık şikayet etmesi beni sinirlendirir",
                 "Müşterilerin sözünü kesmeden, söylediklerini tamamen dinlerim",
@@ -1478,96 +1264,9 @@
                 "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
                 "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
                 "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
-                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır",
-                "İş arkadaşlarımın çalışma tarzlarına ayak uydurmakta güçlük çekerim",
-                "Yüksek tempolu ve stresli çalışma ortamlarında bile sakin kalırım",
-                "Sadece bana verilen talimatlara bağlı kalırım",
-                "Müşterinin değişen taleplerine hızlıca çözüm üretirim",
-                "Rutin dışındaki durumlar beni gereğinden fazla yorar",
-                "Farklı kişilikteki iş arkadaşlarımla iyi geçinirim",
-                "Çalışma ortamında çıkan dedikodulara katılmam",
-                "Ekipteki herkesin işine eşit derecede saygı gösteririm",
-                "Ekip arkadaşlarımdan destek istemekten çekinirim",
-                "İş akışının aksamaması için kendi görevimi eksiksiz tamamlarım",
-                "Sadece benim dışımdaki ekip üyelerinin hataları üzerinde dururum",
-                "Ortak bir hedef belirlediğimizde bu hedefe tam olarak bağlı kalırım",
-                "Ekip içindeki anlaşmazlıklar beni doğrudan etkilemezse karışmam",
-                "İhtiyaç duyulduğunda başka bir birime yardım etmeye gönüllüyüm",
-                "Başkalarıyla çalışmak yerine tek başıma çalışmayı tercih ederim",
-                "İş yükü fazla olan bir arkadaşıma yardım teklif ederim",
-                "Ekip içi bilgi akışını sağlamak benim sorumluluğumda değildir",
-                "Sözlü talimatları dinlerken önemli noktaları not ederim",
-                "Yöneticimle konuşurken genellikle konuyu dağıtırım",
-                "İş arkadaşlarımla net ve saygılı bir dil kullanırım",
-                "Bir talimatı tam olarak anlamadan uygulamaya başlarım",
-                "Müşterilerle iletişim kurarken daima pozitif bir dil kullanırım",
-                "Sık sık insanların ne demek istediğini yanlış anlarım",
-                "Üretim veya hizmet alanındaki sorunları çekinmeden dile getiririm",
-                "İletişim kurarken teknik jargon kullanmaktan kaçınmam",
-                "Çalışma ortamında çıkan dedikodulara katılmam",
-                "Sorun çıktığında kişisel olarak algılar ve küserim",
-                "Vardiyam boyunca işimi verimli bir şekilde planlarım",
-                "Molalarımı genellikle uzatırım",
-                "İş akışındaki önceliklere göre kendimi hızlıca adapte ederim",
-                "Bana verilen görevi ne zaman bitireceğimi nadiren bilirim",
-                "Boş zamanlarımda bile etrafımdaki işleri düzenlerim",
-                "Görevleri yetiştiremeyeceğimi anladığımda yardım istemem",
-                "Zorlu işleri bitirmek için gerekli zamanı her zaman ayırırım",
-                "İşim bittikten sonra dinlenmektense, yeni işler aramaya koyulurum",
-                "İş yerindeki dağınıklık çalışma hızımı olumsuz etkilemez",
-                "Bir işi bitirmek için sürekli başkalarının onayını beklerim",
-                "Hizmet/ürün standartlarını titizlikle uygularım",
-                "Kalite kontrolde çıkan küçük kusurları göz ardı edebilirim",
-                "Hata payını en aza indirmek için ekstra önlemler alırım",
-                "İşim bittikten sonra kontrol etmekle vakit kaybetmem",
-                "Müşteriye sunduğum hizmetin kalitesini sürekli kontrol ederim",
-                "Kalitesiz hizmet vermektense, hizmeti yavaşlatmayı tercih ederim",
-                "Kalite benim için hızdan sonra gelir",
-                "Kullandığım malzemelerin kalitesini sürekli kontrol ederim",
-                "Kaliteyi sağlamanın tek yolu katı kurallara uymaktır",
-                "Kaliteyi artıracak önerilerimi yöneticilerime sunmaktan çekinmem",
-                "İşimin kalitesi ve zamanında teslimatından ben sorumluyum",
-                "İş yerindeki kişisel eşyalarımı dağınık bırakırım",
-                "Yapılması gereken işlerde proaktif davranırım ve beklemede kalmam",
-                "Çalışma ortamımın temiz ve düzenli olmasından ben sorumlu değilim",
-                "Verilen görevleri tamamlamadan işten ayrılmam",
-                "Benim sorumluluğumdaki bir hata çıktığında kolayca mazeret bulurum",
-                "Tüm araç ve gereçleri büyük bir dikkatle kullanırım",
-                "İş yapma biçimim sık sık başkalarını olumsuz etkiler",
-                "Görevimi yerine getirirken şirket kaynaklarını dikkatli kullanırım",
-                "İşimi yaparken sık sık kişisel işlerimle ilgilenirim",
-                "Müşterinin yaşadığı sorunlara hızlı ve etkili çözümler üretirim",
-                "Bir sorun çıktığında ilk tepkim başkasının gelip çözmesini beklemek olur",
-                "Sorunu çözmek için farklı yöntemleri denemekten çekinmem",
-                "Bir sorunun kök nedenini bulmak yerine, sadece belirtileri gidermeye odaklanırım",
-                "Problem çözümü için gerekli olan bilgileri hızla toplarım",
-                "Karmaşık sorunlar beni gergin ve çaresiz hissettirir",
-                "Çözüm süreci boyunca soğukkanlılığımı korurum",
-                "Basit sorunları bile çözmek için uzun süreye ihtiyacım olur",
-                "İş akışımı etkileyen problemleri yöneticime doğru şekilde aktarırım",
-                "Başkalarının çözüm önerilerini genellikle kabul etmem",
-                "Daha iyi bir hizmet yolu varsa, mevcut talimatlara bağlı kalmam",
-                "Yeni bir yöntemi denemek yerine bildiğim yoldan giderim",
-                "Hizmette verimliliği artıracak fikirleri hemen denerim",
-                "Bir işe başlamadan önce tüm detayların bana verilmesini beklerim",
-                "Riskleri hesaplayarak yeni bir sorumluluğu üstlenmekten çekinmem",
-                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
-                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
-                "Başkalarının benim için harekete geçmesini beklerim",
-                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
-                "Bir görevde yetkimin dışına çıkmaktan korkarım",
-                "İşimi daha iyi yapmak için sürekli yeni beceriler öğrenirim",
-                "Kendi güçlü ve zayıf yönlerimi bilmek beni ilgilendirmez",
-                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
-                "Eğitimler ve seminerler genellikle zaman kaybıdır",
-                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
-                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
-                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
-                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
-                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
+                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
             ],
             grup5: [
-                // 5. GRUP: HİZMET – YÖNETİCİ / İDARİ KADRO (Soru 401 - 500)
                 "Mevcut süreçleri iyileştirmek için proaktif öneriler sunarım",
                 "Sadece bana söylenilen görevleri yaparım, fazlasını değil",
                 "İhtiyaç duyulan bilgi veya kaynağı kendi çabamla bulurum",
@@ -1667,145 +1366,31 @@
                 "Ekip üyelerimin gelişimine katkıda bulunmak için mentorluk yaparım",
                 "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
                 "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
-                "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur",
-                "Planlarımı esnek tutmak yerine katı kurallara bağlı kalırım",
-                "Kaynak (zaman, bütçe, personel) dağıtımını etkin bir şekilde yaparım",
-                "Acil durum planı yapmayı genellikle gereksiz bulurum",
-                "Planlama sürecine tüm ilgili paydaşları dahil ederim",
-                "Gelecekteki olası zorlukları planlarıma dahil etmem",
-                "İş akışlarını optimize etmek için düzenli olarak süreçleri gözden geçiririm",
-                "Planlamadan çok, anlık kararlarla ilerlemeyi tercih ederim",
-                "Planlarımı ve ilerlemeyi ekibimle düzenli olarak paylaşırım",
-                "Önceliklerim sık sık değişir ve bu durum ekibi yorar",
-                "Şirketin uzun vadeli hedeflerini günlük kararlarıma dahil ederim",
-                "Sektördeki rakiplerin hareketlerini göz ardı ederim",
-                "Gelecekteki pazar trendlerini tahmin edebilirim",
-                "Kısa vadeli sonuçlar, stratejik planlamadan daha önemlidir",
-                "Riskleri ve fırsatları değerlendirerek alternatif planlar geliştiririm",
-                "Büyük resmi görmekten çok, detaylara takılı kalırım",
-                "Stratejik kararlarımı desteklemek için güvenilir verilere dayanırım",
-                "İşler yolunda giderken yeni stratejiler geliştirmeye gerek duymam",
-                "Organizasyonumun rekabet avantajını sürekli sorgularım",
-                "İş planlarını genellikle son teslim tarihine yakın hazırlarım",
-                "Zor ve önemli kararları hızlı ve emin bir şekilde alırım",
-                "Karar alma sürecinde sadece kendi deneyimlerime güvenirim",
-                "Bir kararın olası sonuçlarını önceden hesaplarım",
-                "Baskı altında karar vermek beni felç eder",
-                "Farklı görüşleri dinledikten sonra objektif bir karar veririm",
-                "Hata yapmamak için karar vermeyi sürekli ertelerim",
-                "Yeterli bilgi olmadığında bile risk alarak ilerlerim",
-                "Yanlış olduğu ortaya çıkan bir kararda sorumluluğu başkasına atarım",
-                "Başkalarına karar verme yetkisi (delege etme) vermekten çekinirim",
-                "Kararlarımı ekibime açık ve mantıklı bir şekilde açıklarım",
-                "Karmaşık iş sorunlarında veriye dayalı çözüm yolları ararım",
-                "Bir problem çıktığında ilk tepkim sorunu görmezden gelmek olur",
-                "Sorunların kök nedenlerini tespit etmek için sistematik yöntemler kullanırım",
-                "Basit sorunların çözümü için bile çok zaman harcarım",
-                "Yenilikçi ve yaratıcı problem çözme tekniklerini teşvik ederim",
-                "Başkalarının çözüm önerilerini genellikle yetersiz bulurum",
-                "Problemleri fırsata çevirerek iş süreçlerini iyileştiririm",
-                "Çözüme ulaştıktan sonra süreç analizi yapmam",
-                "Farklı görüşlerden faydalanarak en uygun çözümü bulurum",
-                "Problem çözme yeteneğim, kriz anlarında düşer",
-                "Yüksek kalite standartlarını tüm hizmet süreçlerine entegre ederim",
-                "Kalite yönetim sistemlerinin gerekliliklerini göz ardı ederim",
-                "Kalite hatalarını azaltmak için sürekli iyileştirme projeleri başlatırım",
-                "Kaliteyi artırmak için yapılan yatırımları gereksiz bulurum",
-                "Çalışanlarımın kalite bilincini geliştirmek için eğitimler düzenlerim",
-                "Hız ve maliyet, kalite standartlarının önündedir",
-                "Müşteri şikayetlerini, kalite süreçlerini gözden geçirmek için kullanırım",
-                "Kalite hedeflerine ulaşılmadığında sorumluluğu kabul etmem",
-                "Tedarikçilerimden de aynı yüksek kalite standartlarını talep ederim",
-                "Kalite sorunları genellikle benim kontrolüm dışındaki durumlardan kaynaklanır",
-                "Müşteri ihtiyaçlarını anlamak için düzenli pazar araştırması yaparım",
-                "Müşteri beklentileri değiştiğinde hemen uyum sağlamakta zorlanırım",
-                "Müşteri şikayetlerini hızlı ve tatmin edici bir şekilde çözerim",
-                "Sadece büyük müşterilerin görüşleri benim için önemlidir",
-                "Ekibimi, her etkileşimde müşteri memnuniyetini hedeflemeye yönlendiririm",
-                "Müşteri geri bildirimlerini dinlemek zaman kaybıdır",
-                "Hem iç hem de dış müşterilerime eşit derecede önem veririm",
-                "Müşteriye hayır demekten çekinmem",
-                "Müşteri sadakatini artırmak için uzun vadeli stratejiler geliştiririm",
-                "Müşterinin tam olarak ne istediği benim için her zaman açık değildir",
-                "Önceliklerime göre zamanımı etkin bir şekilde tahsis ederim",
-                "Çalışma saatlerimi sosyal medya veya gereksiz e-postalara harcarım",
-                "Yüksek hacimli görevleri küçük, yönetilebilir adımlara bölerim",
-                "Zaman baskısı altında işleri yetiştirmekte zorlanırım",
-                "Gecikmelere neden olan süreçleri düzenli olarak analiz edip düzeltirim",
-                "Toplantılara her zaman zamanında katılmam",
-                "En önemli görevleri (zorunlu olmasa da) günün erken saatlerinde bitiririm",
-                "Son teslim tarihlerini sık sık kaçırma eğilimim vardır",
-                "Programımı düzenli tutmak için sürekli çaba gösteririm",
-                "Bir işi bitirmek için sürekli başkalarının onayını beklerim",
-                "Bir projede doğal olarak liderlik rolünü üstlenmeye hazırım",
-                "Genellikle riskli kararlar almaktan kaçınırım",
-                "Ekip arkadaşlarıma görevleri adil bir şekilde delege edebilirim",
-                "Bir ekibi yönetmek, kişisel performansıma odaklanmaktan daha zordur",
-                "Başkalarını motive etmek ve ortak bir vizyon etrafında toplamak konusunda başarılıyımdır",
-                "Hata yapan birini eleştirmektense, konuyu geçiştirmeyi tercih ederim",
-                "Ekip üyelerimin gelişimine katkıda bulunmak için mentorluk yaparım",
-                "İnsanların bana gönüllü olarak uyması benim için önemli değildir",
-                "Zorlu durumlarda bile ekibe sakinlik ve güven aşılarım",
-                "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur",
-                "Sektördeki yenilikleri takip ederek yeni iş alanları yaratırım",
-                "Sürekli yeni fikirler denemektense, mevcut rutinime bağlı kalırım",
-                "Ekibimi belirlenen hedeflerin ötesine geçmeleri için teşvik ederim",
-                "Hata yapma riskini göze alamam",
-                "İşleri hızlandırmak ve verimliliği artırmak için yaratıcı yollar denerim",
-                "Sorunlarımı amirime danışmadan çözmeye çalışmam",
-                "Acil bir durumda dahi yetki beklemeden doğru kararı veririm",
-                "Başkalarının benim için harekete geçmesini beklerim",
-                "Yeni projeler veya bilinmeyen alanlar beni heyecanlandırır",
-                "Yeni bir göreve başlarken detaylı bir kılavuz olmasını şart koşarım",
-                "Öğrenmeye ve yeni yetenekler kazanmaya her zaman hevesliyimdir",
-                "Kendi güçlü ve zayıf yönlerimi bilmek beni ilgilendirmez",
-                "Performansımı düzenli olarak değerlendirir ve kendimi geliştiririm",
-                "Eğitimler ve seminerler genellikle zaman kaybıdır",
-                "Başarısızlıkları birer öğrenme fırsatı olarak görürüm",
-                "Değişen çalışma yöntemlerine ayak uydurmak benim için zordur",
-                "Eleştirilere açıktır ve bu geri bildirimleri gelişmek için kullanırım",
-                "İşimi en iyi şekilde yaptığımı düşündüğüm için gelişime ihtiyacım yoktur",
-                "Sektördeki son trendleri ve teknolojileri düzenli olarak takip ederim",
-                "Kariyer hedeflerime ulaşmak için net bir kişisel gelişim planım vardır"
-            ],
+                "Liderlik pozisyonu, beraberinde getirdiği sorumluluklar nedeniyle gözümü korkutur"
+            ]
         };
 
-        // 500 soruluk gerçek cevap anahtarı (SORU_NO, HEDEF_PUAN)
+        // 500 soruluk cevap anahtarı - yeni cevaplar yüklenecek
         const questionAnswerKey = [
-            // Grup 1: Beyaz Yaka İmalat (1-100)
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            // Grup 2: Mavi Yaka İmalat (101-200)
-            5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,5,1,5,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,5,1,5,1,5,5,1,5,1,5,5,1,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            // Grup 3: Yönetici İmalat (201-300)  
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            // Grup 4: Hizmet Personeli (301-400)
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,1,1,5,1,5,1,5,5,1,5,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
-            // Grup 5: Hizmet Yönetici/İdari Kadro (401-500)
-            5,1,5,1,5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,5,1,5,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,1,5,1,5,1,1,
+            1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,5,
+            5,1,1,5,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,1,5,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
+            5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1
         ];
 
         // Kullanıcının verdiği cevaplara göre toplam puanı hesaplayan fonksiyon
@@ -1821,35 +1406,41 @@
                 let dogruCevap = (typeof questionAnswerKey !== 'undefined' && questionAnswerKey[i]) ? questionAnswerKey[i] : 5;
                 // Kullanıcı cevabı 0 tabanlı index, 1-5 arası puan için +1
                 let kullaniciCevap = (cevap !== null && cevap !== undefined) ? (cevap + 1) : null;
-                let puan = 0;
+                let puanYuzdesi = 0;
+                
                 if (kullaniciCevap === null) {
-                    puan = 0;
+                    puanYuzdesi = 0; // Cevaplanmadı = %0
                 } else if (dogruCevap === 5) {
-                    // DOĞRU CEVAP 5 İSE:
-                    if (kullaniciCevap === 5) puan = 1;      // %100
-                    else if (kullaniciCevap === 4) puan = 0.75;  // %75
-                    else if (kullaniciCevap === 3) puan = 0.5;   // %50
-                    else if (kullaniciCevap === 2) puan = 0;     // %0
-                    else if (kullaniciCevap === 1) puan = 0;     // %0
-                    else puan = 0;
+                    // Doğru cevap 5 ise
+                    if (kullaniciCevap === 5) puanYuzdesi = 100;      // Tam doğru = %100
+                    else if (kullaniciCevap === 4) puanYuzdesi = 75;  // Yakın cevap = %75
+                    else if (kullaniciCevap === 3) puanYuzdesi = 50;  // Orta cevap = %50
+                    else if (kullaniciCevap === 2) puanYuzdesi = 0;   // Ters cevap = %0
+                    else if (kullaniciCevap === 1) puanYuzdesi = 0;   // Tam ters = %0
                 } else if (dogruCevap === 1) {
-                    // DOĞRU CEVAP 1 İSE:
-                    if (kullaniciCevap === 1) puan = 1;      // %100
-                    else if (kullaniciCevap === 2) puan = 0.75;  // %75
-                    else if (kullaniciCevap === 3) puan = 0.5;   // %50
-                    else if (kullaniciCevap === 4) puan = 0;     // %0
-                    else if (kullaniciCevap === 5) puan = 0;     // %0
-                    else puan = 0;
+                    // Doğru cevap 1 ise
+                    if (kullaniciCevap === 1) puanYuzdesi = 100;      // Tam doğru = %100
+                    else if (kullaniciCevap === 2) puanYuzdesi = 75;  // Yakın cevap = %75
+                    else if (kullaniciCevap === 3) puanYuzdesi = 50;  // Orta cevap = %50
+                    else if (kullaniciCevap === 4) puanYuzdesi = 0;   // Ters cevap = %0
+                    else if (kullaniciCevap === 5) puanYuzdesi = 0;   // Tam ters = %0
                 } else {
-                    // Eğer anahtarda 2,3,4 gibi değer olursa tam eşleşme 1, diğerleri 0
-                    puan = (kullaniciCevap === dogruCevap) ? 1 : 0;
+                    // Eğer anahtarda 2,3,4 gibi değer olursa tam eşleşme %100, diğerleri gradüel
+                    if (kullaniciCevap === dogruCevap) puanYuzdesi = 100;
+                    else {
+                        let fark = Math.abs(kullaniciCevap - dogruCevap);
+                        if (fark === 1) puanYuzdesi = 75;
+                        else if (fark === 2) puanYuzdesi = 50;
+                        else puanYuzdesi = 0;
+                    }
                 }
-                toplamPuan += puan;
-                maxPuan += 1;
+                
+                toplamPuan += puanYuzdesi;
+                maxPuan += 100; // Her soru maksimum %100 değerinde
             }
-            // Yüzdelik başarı oranı
-            const yuzde = maxPuan > 0 ? Math.round((toplamPuan / maxPuan) * 100) : 0;
-            return yuzde;
+            
+            // Toplam puanı yüzde olarak hesapla
+            return maxPuan > 0 ? Math.round((toplamPuan / maxPuan) * 100) : 0;
         }
 
         // Metodoloji fonksiyonları
@@ -2282,36 +1873,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 score: 0
             };
             // Firebase'e kaydet
-            if (!currentAuthUser) {
-                alert('Aday eklemek için Google ile giriş yapmanız gerekiyor.');
-                return;
-            }
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
             
-            db.ref('candidates/' + newCandidate.alias).set(newCandidate).then(() => {
-                alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
-                this.reset();
-                
-                // Tüm checkboxları temizle
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-                
-                // Alt kategori seçimini sıfırla
-                document.getElementById('newMemberSubCategory').disabled = true;
-                document.getElementById('newMemberSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
-                
-                // Eğer adaylar sekmesindeyse listeyi güncelle
-                if (!document.getElementById('hrCandidates').classList.contains('hidden')) {
-                    loadCandidatesList();
-                }
-            }).catch(error => {
-                console.error('Aday eklerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
-                } else {
-                    alert('Aday eklenirken hata oluştu: ' + error.message);
-                }
+            alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
+            this.reset();
+            
+            // Tüm checkboxları temizle
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
             });
+            
+            // Alt kategori seçimini sıfırla
+            document.getElementById('newMemberSubCategory').disabled = true;
+            document.getElementById('newMemberSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+            
+            // Eğer adaylar sekmesindeyse listeyi güncelle
+            if (!document.getElementById('hrCandidates').classList.contains('hidden')) {
+                loadCandidatesList();
+            }
         });
 
         // Hızlı aday ekleme (varsayılan kriterlerle)
@@ -2334,28 +1914,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 score: 0
             };
             // Firebase'e kaydet
-            if (!currentAuthUser) {
-                alert('Aday eklemek için Google ile giriş yapmanız gerekiyor.');
-                return;
-            }
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
+
             
-            db.ref('candidates/' + newCandidate.alias).set(newCandidate).then(() => {
-                alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
-                this.reset();
-                
-                // Alt kategori seçimini sıfırla
-                document.getElementById('candidateSubCategory').disabled = true;
-                document.getElementById('candidateSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
-                
-                loadCandidatesList();
-            }).catch(error => {
-                console.error('Aday eklerken hata:', error);
-                if (error.code === 'PERMISSION_DENIED') {
-                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
-                } else {
-                    alert('Aday eklenirken hata oluştu: ' + error.message);
-                }
-            });
+            alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
+            this.reset();
+            
+            // Alt kategori seçimini sıfırla
+            document.getElementById('candidateSubCategory').disabled = true;
+            document.getElementById('candidateSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+            
+            loadCandidatesList();
         });
 
         function loadCandidatesList(filteredList) {
@@ -2844,33 +2413,56 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             container.innerHTML = `
-                <h3 class="text-xl font-bold text-gray-800 mb-4">Sorular ve Cevaplar - ${candidate.alias}</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Detaylı Cevap Analizi - ${candidate.alias}</h3>
                 <div class="space-y-4">
                     ${questions.map((question, index) => {
                         const userAnswer = candidate.answers && candidate.answers[index] !== undefined ? candidate.answers[index] : null;
+                        const dogruCevap = questionAnswerKey[index] || 5;
+                        const kullaniciCevap = userAnswer !== null ? (userAnswer + 1) : null;
+                        
                         let userAnswerText = 'Cevaplanmadı';
-                        let puanText = 'N/A';
-                        if (typeof question === 'string') {
-                            // Varsayılan 5'li Likert
+                        let puanYuzdesi = 0;
+                        let performansRenk = 'text-gray-600';
+                        let performansIcon = '❓';
+                        
+                        if (kullaniciCevap !== null) {
                             const options = ["Kesinlikle Katılmıyorum", "Katılmıyorum", "Kararsızım", "Katılıyorum", "Kesinlikle Katılıyorum"];
-                            userAnswerText = userAnswer !== null ? options[userAnswer] : 'Cevaplanmadı';
-                            // Puanı hesapla (varsayılan: 5 doğru, 1 yanlış, 3 nötr)
-                            if (userAnswer !== null) {
-                                if (userAnswer === 4) puanText = '1';
-                                else if (userAnswer === 3) puanText = '0.75';
-                                else if (userAnswer === 2) puanText = '0.5';
-                                else if (userAnswer === 1) puanText = '0.25';
-                                else puanText = '0';
+                            userAnswerText = options[userAnswer];
+                            
+                            // Yeni puanlama sistemine göre hesapla
+                            if (dogruCevap === 5) {
+                                if (kullaniciCevap === 5) { puanYuzdesi = 100; performansRenk = 'text-green-600'; performansIcon = '🎯'; }
+                                else if (kullaniciCevap === 4) { puanYuzdesi = 75; performansRenk = 'text-blue-600'; performansIcon = '👍'; }
+                                else if (kullaniciCevap === 3) { puanYuzdesi = 50; performansRenk = 'text-yellow-600'; performansIcon = '⚡'; }
+                                else { puanYuzdesi = 0; performansRenk = 'text-red-600'; performansIcon = '❌'; }
+                            } else if (dogruCevap === 1) {
+                                if (kullaniciCevap === 1) { puanYuzdesi = 100; performansRenk = 'text-green-600'; performansIcon = '🎯'; }
+                                else if (kullaniciCevap === 2) { puanYuzdesi = 75; performansRenk = 'text-blue-600'; performansIcon = '👍'; }
+                                else if (kullaniciCevap === 3) { puanYuzdesi = 50; performansRenk = 'text-yellow-600'; performansIcon = '⚡'; }
+                                else { puanYuzdesi = 0; performansRenk = 'text-red-600'; performansIcon = '❌'; }
                             }
-                        } else {
-                            userAnswerText = userAnswer !== null ? (question.secenekler || question.options)[userAnswer] : 'Cevaplanmadı';
-                            puanText = userAnswer !== null && question.puanlar ? question.puanlar[userAnswer] : 'N/A';
                         }
+                        
                         return `
-                            <div class="border border-gray-200 rounded-lg p-4">
-                                <h4 class="font-semibold text-gray-800 mb-2">Soru ${index + 1}: ${question.soru || question.question || question}</h4>
-                                <p class="text-gray-600 mb-2">Verilen Cevap: <span class="font-semibold text-blue-600">${userAnswerText}</span></p>
-                                <p class="text-gray-600">Puan: <span class="font-semibold text-green-600">${puanText}</span></p>
+                            <div class="border border-gray-200 rounded-lg p-4 ${puanYuzdesi >= 75 ? 'bg-green-50' : puanYuzdesi >= 50 ? 'bg-yellow-50' : puanYuzdesi > 0 ? 'bg-red-50' : 'bg-gray-50'}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="font-semibold text-gray-800 flex-1">Soru ${index + 1}: ${question}</h4>
+                                    <span class="${performansRenk} text-xl ml-2">${performansIcon}</span>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                                    <div>
+                                        <p class="text-sm text-gray-500">Verilen Cevap:</p>
+                                        <p class="font-semibold text-blue-600">${userAnswerText}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500">Hedef Cevap:</p>
+                                        <p class="font-semibold text-purple-600">${dogruCevap === 5 ? 'Kesinlikle Katılıyorum' : 'Kesinlikle Katılmıyorum'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500">Performans:</p>
+                                        <p class="font-semibold ${performansRenk}">${puanYuzdesi}%</p>
+                                    </div>
+                                </div>
                             </div>
                         `;
                     }).join('')}
@@ -2897,56 +2489,85 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // String sorular için varsayılan puanlar
-            let totalPossible = 0;
-            questions.forEach(q => {
-                if (typeof q === 'string') {
-                    totalPossible += 1; // max puan 1
-                } else if (q.puanlar) {
-                    totalPossible += Math.max(...q.puanlar);
-                } else {
-                    totalPossible += 1;
+            // Yeni puanlama sistemine göre hesaplama
+            let detayliAnaliz = '';
+            let toplamYuzde = 0;
+            let cevaplanmisSort = 0;
+            
+            if (candidate.answers && candidate.answers.length > 0) {
+                for (let i = 0; i < Math.min(questions.length, candidate.answers.length); i++) {
+                    let dogruCevap = questionAnswerKey[i] || 5;
+                    let kullaniciCevap = candidate.answers[i] !== null ? (candidate.answers[i] + 1) : null;
+                    let puanYuzdesi = 0;
+                    
+                    if (kullaniciCevap !== null) {
+                        cevaplanmisSort++;
+                        if (dogruCevap === 5) {
+                            if (kullaniciCevap === 5) puanYuzdesi = 100;
+                            else if (kullaniciCevap === 4) puanYuzdesi = 75;
+                            else if (kullaniciCevap === 3) puanYuzdesi = 50;
+                            else puanYuzdesi = 0;
+                        } else if (dogruCevap === 1) {
+                            if (kullaniciCevap === 1) puanYuzdesi = 100;
+                            else if (kullaniciCevap === 2) puanYuzdesi = 75;
+                            else if (kullaniciCevap === 3) puanYuzdesi = 50;
+                            else puanYuzdesi = 0;
+                        }
+                        toplamYuzde += puanYuzdesi;
+                    }
                 }
-            });
-            const score = candidate.score || 0;
-            const percentage = totalPossible > 0 ? Math.round((score / totalPossible) * 100) : 0;
+            }
+            
+            const genelBasari = cevaplanmisSort > 0 ? Math.round(toplamYuzde / cevaplanmisSort) : 0;
+            const tamamlanmaOrani = questions.length > 0 ? Math.round((cevaplanmisSort / questions.length) * 100) : 0;
             
             container.innerHTML = `
-                <h3 class="text-xl font-bold text-gray-800 mb-4">Puan Raporu - ${candidate.alias}</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Detaylı Puan Analizi - ${candidate.alias}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-green-800 mb-2">Toplam Puan</h4>
-                        <p class="text-3xl font-bold text-green-600">${score}</p>
-                        <p class="text-sm text-green-600 mt-1">${totalPossible} üzerinden</p>
+                        <h4 class="text-lg font-semibold text-green-800 mb-2">Genel Başarı</h4>
+                        <p class="text-3xl font-bold text-green-600">${genelBasari}%</p>
+                        <p class="text-sm text-green-600 mt-1">Ortalama Performans</p>
                     </div>
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-blue-800 mb-2">Başarı Oranı</h4>
-                        <p class="text-3xl font-bold text-blue-600">${percentage}%</p>
-                        <p class="text-sm text-blue-600 mt-1">${questions.length} soru</p>
+                        <h4 class="text-lg font-semibold text-blue-800 mb-2">Tamamlanma</h4>
+                        <p class="text-3xl font-bold text-blue-600">${tamamlanmaOrani}%</p>
+                        <p class="text-sm text-blue-600 mt-1">${cevaplanmisSort}/${questions.length} soru</p>
                     </div>
                     <div class="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
-                        <h4 class="text-lg font-semibold text-purple-800 mb-2">Ortalama Puan</h4>
-                        <p class="text-3xl font-bold text-purple-600">${questions.length > 0 ? Math.round(score / questions.length) : 0}</p>
-                        <p class="text-sm text-purple-600 mt-1">Soru başına</p>
+                        <h4 class="text-lg font-semibold text-purple-800 mb-2">Toplam Puan</h4>
+                        <p class="text-3xl font-bold text-purple-600">${Math.round(toplamYuzde)}</p>
+                        <p class="text-sm text-purple-600 mt-1">Toplam yüzde puanı</p>
                     </div>
                 </div>
                 <div class="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
                     <h4 class="text-lg font-semibold text-gray-800 mb-4">Performans Değerlendirmesi</h4>
                     <div class="w-full bg-gray-200 rounded-full h-6 mb-2">
-                        <div class="bg-gradient-to-r from-green-500 to-green-600 h-6 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 h-6 rounded-full transition-all duration-500" style="width: ${genelBasari}%"></div>
                     </div>
-                    <p class="text-center text-2xl font-bold text-gray-800">${percentage}%</p>
+                    <p class="text-center text-2xl font-bold text-gray-800">${genelBasari}%</p>
+                    <div class="mt-4 text-sm text-gray-600">
+                        <p><strong>Puanlama Sistemi:</strong></p>
+                        <p>• Tam doğru cevap: %100</p>
+                        <p>• Yakın cevap: %75</p>
+                        <p>• Orta cevap: %50</p>
+                        <p>• Ters cevap: %0</p>
+                    </div>
                 </div>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
                         <h5 class="font-semibold text-gray-800 mb-2">Test Bilgileri</h5>
                         <p class="text-sm text-gray-600">Kategori: ${candidate.category}</p>
                         <p class="text-sm text-gray-600">Tamamlanma: ${candidate.completedAt ? new Date(candidate.completedAt).toLocaleString('tr-TR') : 'Bilinmiyor'}</p>
+                        <p class="text-sm text-gray-600">Cevaplanma Oranı: ${tamamlanmaOrani}%</p>
                     </div>
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
-                        <h5 class="font-semibold text-gray-800 mb-2">Değerlendirme</h5>
-                        <p class="text-sm ${percentage >= 80 ? 'text-green-600' : percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
-                            ${percentage >= 80 ? '🎉 Mükemmel' : percentage >= 60 ? '👍 İyi' : '📚 Geliştirilmeli'}
+                        <h5 class="font-semibold text-gray-800 mb-2">Performans Değerlendirmesi</h5>
+                        <p class="text-sm ${genelBasari >= 80 ? 'text-green-600' : genelBasari >= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                            ${genelBasari >= 80 ? '🎉 Mükemmel Performans' : genelBasari >= 60 ? '👍 İyi Performans' : '📚 Geliştirilmesi Gereken'}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            ${genelBasari >= 80 ? 'Beklentilerin üzerinde başarı' : genelBasari >= 60 ? 'Kabul edilebilir seviye' : 'Ek eğitim önerilir'}
                         </p>
                     </div>
                 </div>
@@ -3486,21 +3107,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('DOMContentLoaded', function() {
             // Kategori seçicileri başlat
             setupCategorySelectors();
-            
-            // Auth durumu kontrol et
-            auth.onAuthStateChanged((user) => {
-                currentAuthUser = user;
-                updateAuthUI();
-                
-                if (user) {
-                    // Kullanıcı giriş yaptıysa verileri yükle
-                    fetchCandidates();
-                    fetchHrManagers();
-                } else {
-                    // Giriş yapmamışsa uyarı göster
-                    console.log('Kullanıcı giriş yapmamış, veri yükleme atlandı');
-                }
-            });
+            // Adayları ve İK yöneticilerini çek
+            fetchCandidates();
+            fetchHrManagers();
         });
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'986a6c4e22a4e321',t:'MTc1OTEzNzgyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
