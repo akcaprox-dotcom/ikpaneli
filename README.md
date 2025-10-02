@@ -1724,7 +1724,7 @@
             document.getElementById('disclaimerAccept').checked = true;
             document.getElementById('disclaimerAccept').disabled = false;
             document.getElementById('candidateButton').disabled = false;
-            document.getElementById('hrRegisterButton').disabled = false; // İK kayıt butonunu da aktif et
+            updateHrRegisterButton(); // İK kayıt butonunu durumu güncelle
             closeDisclaimer();
             alert('Sorumluluk reddi beyanı onaylandı!');
         }
@@ -1778,34 +1778,54 @@
         function updateHrRegisterButton() {
             const hrRegisterButton = document.getElementById('hrRegisterButton');
             if (hrRegisterButton) {
-                // Sadece Google hesabı ile giriş yapılmışsa aktif
-                if (googleUser) {
+                // Sorumluluk reddi onaylanmışsa VE Google hesabı varsa aktif
+                if (disclaimerAccepted && googleUser) {
                     hrRegisterButton.disabled = false;
                     hrRegisterButton.classList.remove('opacity-50','cursor-not-allowed');
                     hrRegisterButton.title = '';
                 } else {
                     hrRegisterButton.disabled = true;
                     hrRegisterButton.classList.add('opacity-50','cursor-not-allowed');
-                    hrRegisterButton.title = 'Önce Google ile giriş yapın';
+                    if (!disclaimerAccepted) {
+                        hrRegisterButton.title = 'Önce sorumluluk reddi beyanını onaylayın';
+                    } else if (!googleUser) {
+                        hrRegisterButton.title = 'Önce Google ile giriş yapın';
+                    }
                 }
             }
         }
 
         function showHrRegister() {
-            const roleLogin = document.getElementById('roleLoginScreen');
-            const registerScreen = document.getElementById('hrRegisterScreen');
-            if (!googleUser) {
-                alert('Önce Google ile giriş yapmalısınız.');
-                updateHrRegisterButton();
+            console.log('showHrRegister çağrıldı - Kontroller:', {
+                disclaimerAccepted,
+                googleUser: !!googleUser
+            });
+            
+            // Önce sorumluluk reddi kontrolü
+            if (!disclaimerAccepted) {
+                alert('Önce sorumluluk reddi beyanını okuyun ve onaylayın!');
                 return;
             }
+            
+            // Sonra Google giriş kontrolü  
+            if (!googleUser) {
+                alert('Önce Google ile giriş yapmalısınız.');
+                return;
+            }
+            
+            const roleLogin = document.getElementById('roleLoginScreen');
+            const registerScreen = document.getElementById('hrRegisterScreen');
+            
             if (!registerScreen) {
                 console.error('hrRegisterScreen bulunamadı!');
                 alert('Kayıt ekranı yüklenemedi (hrRegisterScreen eksik).');
                 return;
             }
+            
+            // Ekranları değiştir
             if (roleLogin) {
                 roleLogin.classList.add('hidden');
+                console.log('roleLoginScreen gizlendi');
             }
             registerScreen.classList.remove('hidden');
             console.log('İK kayıt ekranı açıldı (showHrRegister)');
