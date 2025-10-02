@@ -3,6 +3,7 @@
 <head>
         <!-- Firebase SDK'ları -->
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
         <script>
             const firebaseConfig = {
@@ -17,6 +18,75 @@
             };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
+            const auth = firebase.auth();
+            
+            // Google Authentication sistemi
+            let currentAuthUser = null;
+            
+            // Firebase Auth token alma fonksiyonu
+            async function getFirebaseAuthToken() {
+                return new Promise((resolve, reject) => {
+                    const unsubscribe = auth.onAuthStateChanged((user) => {
+                        unsubscribe();
+                        if (user) {
+                            user.getIdToken()
+                                .then(token => resolve(token))
+                                .catch(error => {
+                                    console.error('Token alma hatası:', error);
+                                    reject(new Error('Token alınamadı'));
+                                });
+                        } else {
+                            reject(new Error('Kullanıcı giriş yapmamış'));
+                        }
+                    });
+                });
+            }
+            
+            // Google ile giriş yapma
+            async function signInWithGoogle() {
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    const result = await auth.signInWithPopup(provider);
+                    currentAuthUser = result.user;
+                    console.log('Google ile giriş başarılı:', currentAuthUser.displayName);
+                    updateAuthUI();
+                    return true;
+                } catch (error) {
+                    console.error('Google giriş hatası:', error);
+                    alert('Google ile giriş yapılamadı: ' + error.message);
+                    return false;
+                }
+            }
+            
+            // Çıkış yapma
+            async function signOutFromGoogle() {
+                try {
+                    await auth.signOut();
+                    currentAuthUser = null;
+                    updateAuthUI();
+                    alert('Google hesabınızdan çıkış yapıldı.');
+                } catch (error) {
+                    console.error('Çıkış hatası:', error);
+                }
+            }
+            
+            // Auth UI güncelleme
+            function updateAuthUI() {
+                const authBtn = document.getElementById('googleAuthBtn');
+                if (currentAuthUser) {
+                    if (authBtn) {
+                        authBtn.innerHTML = `🔓 <span>${currentAuthUser.displayName} - Çıkış Yap</span>`;
+                        authBtn.onclick = signOutFromGoogle;
+                        authBtn.className = 'w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3';
+                    }
+                } else {
+                    if (authBtn) {
+                        authBtn.innerHTML = '🔒 <span>Google ile Giriş Yap</span>';
+                        authBtn.onclick = signInWithGoogle;
+                        authBtn.className = 'w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3';
+                    }
+                }
+            }
         </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -185,7 +255,12 @@
             </div>
             
             <div class="space-y-4">
-                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <!-- Google Authentication Butonu -->
+                <button id="googleAuthBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 flex items-center justify-center gap-3">
+                    🔒 <span>Google ile Giriş Yap</span>
+                </button>
+                
+                <button id="hrButton" onclick="showRoleLogin('hr')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     👩‍💻 İK Yönetici
                 </button>
                 <button id="candidateButton" onclick="showRoleLogin('candidate')" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -828,32 +903,74 @@
 
         // Firebase'den adayları çek
         function fetchCandidates(callback) {
+            if (!currentAuthUser) {
+                console.warn('Giriş yapmadan aday verilerine erişilemez');
+                if (callback) callback();
+                return;
+            }
+            
             db.ref('candidates').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
                 candidates = Object.values(val);
                 if (callback) callback();
+            }).catch(error => {
+                console.error('Aday verilerini çekerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanına erişim için Google ile giriş yapmanız gerekiyor.');
+                }
             });
         }
 
         // Firebase'den İK yöneticilerini çek
         function fetchHrManagers(callback) {
+            if (!currentAuthUser) {
+                console.warn('Giriş yapmadan İK verilerine erişilemez');
+                if (callback) callback();
+                return;
+            }
+            
             db.ref('hrManagers').once('value').then(snapshot => {
                 const val = snapshot.val() || {};
                 hrManagers = Object.values(val);
                 if (callback) callback();
+            }).catch(error => {
+                console.error('İK verilerini çekerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanına erişim için Google ile giriş yapmanız gerekiyor.');
+                }
             });
         }
 
         // Firebase'e yeni İK yöneticisi ekle
         function addHrManager(hrObj) {
+            if (!currentAuthUser) {
+                alert('İK yöneticisi eklemek için Google ile giriş yapmanız gerekiyor.');
+                return;
+            }
+            
             const newRef = db.ref('hrManagers').push();
             hrObj.id = newRef.key;
-            newRef.set(hrObj);
+            newRef.set(hrObj).catch(error => {
+                console.error('İK yöneticisi eklerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
+                }
+            });
         }
 
         // Firebase'den İK yöneticisi sil
         function deleteHrManager(hrId) {
-            db.ref('hrManagers/' + hrId).remove();
+            if (!currentAuthUser) {
+                alert('İK yöneticisi silmek için Google ile giriş yapmanız gerekiyor.');
+                return;
+            }
+            
+            db.ref('hrManagers/' + hrId).remove().catch(error => {
+                console.error('İK yöneticisi silerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanından silme yetkisi yok. Google ile giriş yapın.');
+                }
+            });
         }
 
         // Soru bankası (örnek format, 5 ana gruptan 100'er soru ile doldurulmalı)
@@ -1860,25 +1977,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 score: 0
             };
             // Firebase'e kaydet
-            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
-
-            
-            alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
-            this.reset();
-            
-            // Tüm checkboxları temizle
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = false;
-            });
-            
-            // Alt kategori seçimini sıfırla
-            document.getElementById('newMemberSubCategory').disabled = true;
-            document.getElementById('newMemberSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
-            
-            // Eğer adaylar sekmesindeyse listeyi güncelle
-            if (!document.getElementById('hrCandidates').classList.contains('hidden')) {
-                loadCandidatesList();
+            if (!currentAuthUser) {
+                alert('Aday eklemek için Google ile giriş yapmanız gerekiyor.');
+                return;
             }
+            
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate).then(() => {
+                alert(`Yeni aday başarıyla eklendi!\nSeçilen kriterler: ${selectedCriteria.length} adet\nTest soruları hazırlandı.`);
+                this.reset();
+                
+                // Tüm checkboxları temizle
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                // Alt kategori seçimini sıfırla
+                document.getElementById('newMemberSubCategory').disabled = true;
+                document.getElementById('newMemberSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+                
+                // Eğer adaylar sekmesindeyse listeyi güncelle
+                if (!document.getElementById('hrCandidates').classList.contains('hidden')) {
+                    loadCandidatesList();
+                }
+            }).catch(error => {
+                console.error('Aday eklerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
+                } else {
+                    alert('Aday eklenirken hata oluştu: ' + error.message);
+                }
+            });
         });
 
         // Hızlı aday ekleme (varsayılan kriterlerle)
@@ -1901,17 +2029,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 score: 0
             };
             // Firebase'e kaydet
-            db.ref('candidates/' + newCandidate.alias).set(newCandidate);
-
+            if (!currentAuthUser) {
+                alert('Aday eklemek için Google ile giriş yapmanız gerekiyor.');
+                return;
+            }
             
-            alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
-            this.reset();
-            
-            // Alt kategori seçimini sıfırla
-            document.getElementById('candidateSubCategory').disabled = true;
-            document.getElementById('candidateSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
-            
-            loadCandidatesList();
+            db.ref('candidates/' + newCandidate.alias).set(newCandidate).then(() => {
+                alert('Yeni aday başarıyla eklendi!\nVarsayılan test kriterleri uygulandı.');
+                this.reset();
+                
+                // Alt kategori seçimini sıfırla
+                document.getElementById('candidateSubCategory').disabled = true;
+                document.getElementById('candidateSubCategory').innerHTML = '<option value="">Önce ana kategori seçin</option>';
+                
+                loadCandidatesList();
+            }).catch(error => {
+                console.error('Aday eklerken hata:', error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('Veritabanına yazma yetkisi yok. Google ile giriş yapın.');
+                } else {
+                    alert('Aday eklenirken hata oluştu: ' + error.message);
+                }
+            });
         });
 
         function loadCandidatesList(filteredList) {
@@ -3042,9 +3181,21 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('DOMContentLoaded', function() {
             // Kategori seçicileri başlat
             setupCategorySelectors();
-            // Adayları ve İK yöneticilerini çek
-            fetchCandidates();
-            fetchHrManagers();
+            
+            // Auth durumu kontrol et
+            auth.onAuthStateChanged((user) => {
+                currentAuthUser = user;
+                updateAuthUI();
+                
+                if (user) {
+                    // Kullanıcı giriş yaptıysa verileri yükle
+                    fetchCandidates();
+                    fetchHrManagers();
+                } else {
+                    // Giriş yapmamışsa uyarı göster
+                    console.log('Kullanıcı giriş yapmamış, veri yükleme atlandı');
+                }
+            });
         });
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'986a6c4e22a4e321',t:'MTc1OTEzNzgyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
