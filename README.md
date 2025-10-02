@@ -338,7 +338,7 @@
                     </div>
                     <div class="flex space-x-4">
                         <button onclick="showHrSection('dashboard')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Dashboard</button>
-                        <button onclick="showHrSection('newMember')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Yeni Kayıt</button>
+                        <button onclick="showNewMemberPanel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Yeni Kayıt</button>
                         <button onclick="showHrSection('candidates')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Adaylar</button>
                         <button onclick="showHrSection('reports')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">Raporlar</button>
                         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Çıkış</button>
@@ -2046,6 +2046,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // İK panel fonksiyonları
+        // Özel yeni üye paneli açma fonksiyonu
+        function showNewMemberPanel() {
+            try {
+                console.log('showNewMemberPanel çağrıldı');
+                
+                // Tüm hr panellerini gizle
+                const hrSections = ['hrDashboard', 'hrNewMember', 'hrCandidates', 'hrReports'];
+                hrSections.forEach(sectionId => {
+                    const element = document.getElementById(sectionId);
+                    if (element) {
+                        element.classList.add('hidden');
+                        console.log('Gizlendi:', sectionId);
+                    }
+                });
+                
+                // Yeni üye panelini göster
+                const newMemberPanel = document.getElementById('hrNewMember');
+                if (newMemberPanel) {
+                    newMemberPanel.classList.remove('hidden');
+                    console.log('hrNewMember paneli gösterildi');
+                    
+                    // Formu sıfırla
+                    const form = document.getElementById('newMemberForm');
+                    if (form) {
+                        form.reset();
+                        console.log('Form sıfırlandı');
+                    }
+                } else {
+                    console.error('hrNewMember paneli bulunamadı!');
+                    alert('Yeni kayıt paneli bulunamadı!');
+                }
+            } catch (error) {
+                console.error('showNewMemberPanel hatası:', error);
+                alert('Panel açılırken hata oluştu: ' + error.message);
+            }
+        }
+
         function showHrSection(section) {
             console.log('showHrSection çağrıldı, section:', section);
             
