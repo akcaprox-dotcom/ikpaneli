@@ -916,12 +916,22 @@
         auth.onAuthStateChanged((user) => {
             if (user) {
                 googleUser = user;
-                console.log('Kullanıcı oturum açmış:', user);
+                console.log('Kullanıcı oturum açmış:', user.email);
                 updateGoogleButton(true); // Butonu çıkış moduna geçir
+                // Otomatik İK kaydı yap
+                registerGoogleUserAsHR(user);
             } else {
                 googleUser = null;
                 console.log('Kullanıcı oturum açmamış');
                 updateGoogleButton(false); // Butonu giriş moduna geçir
+            }
+        });
+        
+        // Sayfa yüklendiğinde önceki oturumu temizle
+        window.addEventListener('load', function() {
+            if (auth.currentUser) {
+                console.log('Önceki oturum temizleniyor...');
+                auth.signOut();
             }
         });
         let timeRemaining = 1800; // 30 dakika
@@ -971,9 +981,22 @@
 
         // Firebase'e yeni İK yöneticisi ekle
         function addHrManager(hrObj) {
-            const newRef = db.ref('hrManagers').push();
-            hrObj.id = newRef.key;
-            newRef.set(hrObj);
+            try {
+                const newRef = db.ref('hrManagers').push();
+                hrObj.id = newRef.key;
+                return newRef.set(hrObj).then(() => {
+                    console.log('İK yöneticisi başarıyla kaydedildi:', hrObj);
+                    return true;
+                }).catch((error) => {
+                    console.error('Firebase kayıt hatası:', error);
+                    alert('Kayıt sırasında hata oluştu: ' + error.message);
+                    return false;
+                });
+            } catch (error) {
+                console.error('addHrManager hatası:', error);
+                alert('Kayıt yapılamadı: ' + error.message);
+                return false;
+            }
         }
 
         // Firebase'den İK yöneticisi sil
