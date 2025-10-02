@@ -926,7 +926,15 @@
             googleButton.classList.add('bg-red-600', 'hover:bg-red-700');
             
             // Ana sayfaya dön
-            showWelcomeScreen();
+            showLoginScreen();
+        }
+
+        function showLoginScreen() {
+            // Tüm panelleri gizle
+            document.querySelectorAll('[id$="Panel"]').forEach(panel => panel.classList.add('hidden'));
+            document.getElementById('roleLoginScreen').classList.add('hidden');
+            // Ana giriş ekranını göster
+            document.getElementById('loginScreen').classList.remove('hidden');
         }
 
         async function registerGoogleUserAsHR(user) {
