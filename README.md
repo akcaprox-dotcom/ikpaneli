@@ -927,6 +927,12 @@
         let timeRemaining = 1800; // 30 dakika
         let disclaimerAccepted = false;
 
+        // Global hata yakalama
+        window.addEventListener('error', function(e) {
+            console.log('Hata yakalandı ve engellendi:', e.error);
+            return true; // Hatayı sessizce yakala
+        });
+
         // Firebase bağlantısı için hazır yapı (sonradan eklenecek)
         // Örnek veri yapıları (Firebase'e geçiş için hazır)
         let hrManagers = [];
