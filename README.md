@@ -920,10 +920,12 @@
                 updateGoogleButton(true); // Butonu çıkış moduna geçir
                 // Otomatik İK kaydı yap
                 registerGoogleUserAsHR(user);
+                updateHrRegisterButton();
             } else {
                 googleUser = null;
                 console.log('Kullanıcı oturum açmamış');
                 updateGoogleButton(false); // Butonu giriş moduna geçir
+                updateHrRegisterButton();
             }
         });
         
@@ -1776,24 +1778,52 @@
         function updateHrRegisterButton() {
             const hrRegisterButton = document.getElementById('hrRegisterButton');
             if (hrRegisterButton) {
-                if (disclaimerAccepted) {
+                // Sadece Google hesabı ile giriş yapılmışsa aktif
+                if (googleUser) {
                     hrRegisterButton.disabled = false;
+                    hrRegisterButton.classList.remove('opacity-50','cursor-not-allowed');
+                    hrRegisterButton.title = '';
                 } else {
                     hrRegisterButton.disabled = true;
+                    hrRegisterButton.classList.add('opacity-50','cursor-not-allowed');
+                    hrRegisterButton.title = 'Önce Google ile giriş yapın';
                 }
             }
         }
 
         function showHrRegister() {
-            // İK kayıt ekranını göster
-            document.getElementById('roleLoginScreen').classList.add('hidden');
-            document.getElementById('hrRegisterScreen').classList.remove('hidden');
-            console.log('İK kayıt ekranı açıldı');
+            const roleLogin = document.getElementById('roleLoginScreen');
+            const registerScreen = document.getElementById('hrRegisterScreen');
+            if (!googleUser) {
+                alert('Önce Google ile giriş yapmalısınız.');
+                updateHrRegisterButton();
+                return;
+            }
+            if (!registerScreen) {
+                console.error('hrRegisterScreen bulunamadı!');
+                alert('Kayıt ekranı yüklenemedi (hrRegisterScreen eksik).');
+                return;
+            }
+            if (roleLogin) {
+                roleLogin.classList.add('hidden');
+            }
+            registerScreen.classList.remove('hidden');
+            console.log('İK kayıt ekranı açıldı (showHrRegister)');
+        }
+
+        // Debug amaçlı: tarayıcı konsolundan window.forceRegister() diyerek açabilirsin
+        window.forceRegister = function() {
+            console.log('forceRegister çağrıldı');
+            showHrRegister();
         }
 
         function backToRoleLogin() {
-            document.getElementById('hrRegisterScreen').classList.add('hidden');
-            document.getElementById('roleLoginScreen').classList.remove('hidden');
+            const registerScreen = document.getElementById('hrRegisterScreen');
+            const roleLogin = document.getElementById('roleLoginScreen');
+            if (registerScreen) registerScreen.classList.add('hidden');
+            if (roleLogin) roleLogin.classList.remove('hidden');
+            updateHrRegisterButton();
+            console.log('Role login ekranına dönüldü');
         }
 
         function logout() {
